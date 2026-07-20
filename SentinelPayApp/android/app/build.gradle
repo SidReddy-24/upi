@@ -17,6 +17,10 @@ android {
     buildFeatures {
         buildConfig true
     }
+    
+    aaptOptions {
+        noCompress "tflite"
+    }
 
     namespace "com.sentinelpay"
     defaultConfig {
@@ -36,6 +40,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file('sentinelpay-release.keystore')
+            storePassword 'sentinelpay123'
+            keyAlias 'sentinelpay'
+            keyPassword 'sentinelpay123'
+        }
     }
 
     buildTypes {
@@ -43,7 +53,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
@@ -52,6 +62,9 @@ android {
 
 dependencies {
     implementation("com.facebook.react:react-android")
+    
+    // TFLite Text Classification
+    implementation 'org.tensorflow:tensorflow-lite-task-text:0.4.4'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

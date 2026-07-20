@@ -37,11 +37,13 @@ public class SmsReceiverModule extends ReactContextBaseJavaModule {
 
     private final ReactApplicationContext reactContext;
     private BroadcastReceiver smsReceiver;
+    private SmsClassifier smsClassifier;
     private boolean isListening = false;
 
     public SmsReceiverModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
+        this.smsClassifier = new SmsClassifier(reactContext);
     }
 
     @Override
@@ -81,10 +83,17 @@ public class SmsReceiverModule extends ReactContextBaseJavaModule {
                         String body   = smsMessage.getMessageBody();
                         long   timestamp = smsMessage.getTimestampMillis();
 
+                        float fraudScore = 0.0f;
+                        if (smsClassifier != null && body != null) {
+                            fraudScore = smsClassifier.classify(body);
+                            Log.d(TAG, "TFLite Fraud Score for SMS: " + fraudScore);
+                        }
+
                         WritableMap params = Arguments.createMap();
                         params.putString("sender", sender != null ? sender : "");
                         params.putString("body", body != null ? body : "");
                         params.putDouble("timestamp", timestamp);
+                        params.putDouble("fraudScore", fraudScore);
 
                         Log.d(TAG, "SMS received from: " + sender);
                         emitEvent(EVENT_SMS_RECEIVED, params);

@@ -28,11 +28,13 @@ const OTP_REGEX        = /\b\d{4,8}\b/;
 export interface UseSmsOtpResult {
   otpInLast60s: boolean;
   permissionGranted: boolean;
+  latestSmsFraudScore: number | null;
 }
 
 export function useSmsOtp(): UseSmsOtpResult {
   const [otpInLast60s, setOtpInLast60s]         = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [latestSmsFraudScore, setLatestSmsFraudScore] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Restore state on mount (e.g. screen re-mount) ──────────────────────────
@@ -108,8 +110,13 @@ export function useSmsOtp(): UseSmsOtpResult {
         emitter = new NativeEventEmitter(SmsModule);
         subscription = emitter.addListener(
           'onSmsReceived',
-          (data: { sender: string; body: string; timestamp: number }) => {
+          (data: { sender: string; body: string; timestamp: number; fraudScore?: number }) => {
             console.log('[useSmsOtp] SMS from:', data.sender);
+            
+            if (data.fraudScore !== undefined) {
+              setLatestSmsFraudScore(data.fraudScore);
+            }
+
             if (OTP_REGEX.test(data.body)) {
               console.log('[useSmsOtp] OTP detected in SMS!');
               markOtpReceived();
@@ -130,5 +137,5 @@ export function useSmsOtp(): UseSmsOtpResult {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { otpInLast60s, permissionGranted };
+  return { otpInLast60s, permissionGranted, latestSmsFraudScore };
 }

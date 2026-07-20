@@ -76,6 +76,7 @@ export async function executePayment(
   riskScore: number | null,
   decision: string,
   fraudReason: string | null,
+  callDuringPayment?: boolean, // Phase 5.2.4
 ): Promise<PaymentResult> {
   const user = await getUser();
 
@@ -96,6 +97,7 @@ export async function executePayment(
     risk_score: riskScore,
     decision,
     fraud_reason: fraudReason,
+    ...(callDuringPayment ? { call_during_payment: true } : {}),
     created_at: new Date().toISOString(),
   };
 

@@ -28,6 +28,7 @@ export interface WalletTransaction {
   risk_score: number | null;
   decision: string | null;
   fraud_reason: string | null;
+  call_during_payment?: boolean; // Phase 5.2.4
   created_at: string;
 }
 
@@ -35,6 +36,7 @@ export interface WalletTransaction {
 export interface DeviceInfo {
   device_id: string;
   os_type: 'ANDROID' | 'IOS';
+  os_version?: string; // Phase 7.2
   is_rooted: boolean;
   is_emulator: boolean;
   app_version?: string;

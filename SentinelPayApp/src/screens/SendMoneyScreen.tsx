@@ -14,7 +14,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Alert, Keyboard, Platform,
+  StyleSheet, ActivityIndicator, Alert, Keyboard, Platform, Animated,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -26,6 +26,7 @@ import RiskBadge from '../components/RiskBadge';
 import FraudExplanationCard from '../components/FraudExplanationCard';
 import { useSmsOtp } from '../hooks/useSmsOtp';
 import { useCallState } from '../hooks/useCallState';
+import { useDeviceFingerprint } from '../hooks/useDeviceFingerprint';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SendMoney'>;
@@ -55,10 +56,27 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Phase 4: SMS OTP detection ─────────────────────────────────────────────
-  const { otpInLast60s } = useSmsOtp();
+  const { otpInLast60s, latestSmsFraudScore } = useSmsOtp();
 
   // ── Phase 5: Call detection ────────────────────────────────────────────────
   const { isCallActive } = useCallState();
+
+  // ── Phase 7.2: Device fingerprinting ──────────────────────────────────────
+  const { deviceInfo } = useDeviceFingerprint();
+
+  // ── Phase 8.1.3: Skeleton pulse animation ─────────────────────────────────
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    if (step === 'SCORING') loop.start();
+    else loop.stop();
+    return () => loop.stop();
+  }, [step, pulseAnim]);
 
   const amount = parseFloat(amountStr) || 0;
   const vpaValid = /^[a-zA-Z0-9.\-_]+@[a-zA-Z0-9]+$/.test(receiverVpa.trim());
@@ -141,12 +159,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         amount,
         currency: 'INR',
         transaction_type: 'P2P',
-        device: {
-          device_id: `DEV_SP_${Platform.OS.toUpperCase()}`,
-          os_type: 'ANDROID',
-          is_rooted: false,
-          is_emulator: true, // demo — flag honestly
-        },
+        device: deviceInfo, // Phase 7.2 — real fingerprint
         location: { latitude: 19.076, longitude: 72.877 }, // Mumbai
         network: { ip_address: '10.0.2.2', connection_type: 'Wifi' },
         metadata: {
@@ -154,6 +167,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
           channel: 'mobile_app',
           // Phase 4 — OTP intelligence signal
           ...(otpInLast60s ? { otp_in_last_60s: true } : {}),
+          ...(latestSmsFraudScore !== null ? { sms_fraud_score: latestSmsFraudScore } : {}),
           // Phase 5 — Call context signal
           ...(isCallActive ? { is_call_active: true } : {}),
         },
@@ -202,6 +216,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       score.risk_score,
       score.decision,
       fraudReason,
+      isCallActive, // Phase 5.2.4 — log call context
     );
 
     if (result.success) {
@@ -216,12 +231,24 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const goHome = () => navigation.navigate('Home');
 
   // ─── Render ────────────────────────────────────────────────────────────────
+  // ── Phase 8.1.3: Skeleton loading state ───────────────────────────────────
   if (step === 'SCORING') {
     return (
       <View style={styles.centeredState}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <Animated.View style={[styles.skeletonIcon, { opacity: pulseAnim }]}>
+          <Text style={{ fontSize: 40 }}>🛡️</Text>
+        </Animated.View>
         <Text style={styles.scoringTitle}>Analysing transaction…</Text>
         <Text style={styles.scoringSubtitle}>Running ML + rule engine checks</Text>
+        {/* Skeleton bars */}
+        <View style={styles.skeletonBars}>
+          {['ML Model', 'Rule Engine', 'Behaviour', 'Graph'].map(label => (
+            <Animated.View key={label} style={[styles.skeletonRow, { opacity: pulseAnim }]}>
+              <Text style={styles.skeletonLabel}>{label}</Text>
+              <View style={styles.skeletonBar} />
+            </Animated.View>
+          ))}
+        </View>
         {otpInLast60s && (
           <View style={styles.otpBadge}>
             <Text style={styles.otpBadgeText}>🔑 OTP detected — flagging signal</Text>
@@ -501,6 +528,19 @@ const styles = StyleSheet.create({
   bigEmoji: { fontSize: 64, marginBottom: 16 },
   scoringTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginTop: 16 },
   scoringSubtitle: { fontSize: 14, color: '#6b7280', marginTop: 6 },
+
+  // Phase 8.1.3 — Skeleton loading
+  skeletonIcon: { marginBottom: 8 },
+  skeletonBars: { width: '100%', marginTop: 20, gap: 10 },
+  skeletonRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#f3f4f6', borderRadius: 8, padding: 10,
+  },
+  skeletonLabel: { fontSize: 12, fontWeight: '600', color: '#9ca3af', width: 80 },
+  skeletonBar: {
+    flex: 1, height: 10, borderRadius: 5,
+    backgroundColor: '#d1d5db', marginLeft: 12,
+  },
   successTitle: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 4 },
   successAmount: { fontSize: 32, fontWeight: '800', color: '#16a34a' },
   successTo: { fontSize: 15, color: '#6b7280', marginBottom: 16 },
