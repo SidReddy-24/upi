@@ -1,100 +1,57 @@
+/**
+ * FraudShield AI — API Service
+ *
+ * Base URL notes:
+ *  - Android emulator → 10.0.2.2 maps to your laptop's localhost
+ *  - Real device on same WiFi → use laptop's LAN IP (e.g. 192.168.1.x)
+ *  - VPS → full public URL
+ */
 import axios from 'axios';
+import { TransactionRequest, FraudScore } from '../types';
 
-// Change this to your laptop's IP when testing on real device
-// Or deploy to a VPS and use that URL
-const API_BASE_URL = 'http://192.168.1.100:8000/api/v1'; // UPDATE THIS
+// 10.0.2.2 = localhost from Android emulator
+export const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 const API_KEY = 'fs_demo_key_001';
 
-const fraudShieldClient = axios.create({
+const client = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 5000,
+  timeout: 8000,
   headers: {
     'Content-Type': 'application/json',
     'X-API-Key': API_KEY,
   },
 });
 
-export interface TransactionRequest {
-  transaction_id: string;
-  sender_vpa: string;
-  receiver_vpa: string;
-  amount: number;
-  currency: string;
-  transaction_type: string;
-  device: {
-    device_id: string;
-    os_type: string;
-    is_rooted: boolean;
-    is_emulator: boolean;
-    is_call_active?: boolean;
-  };
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
-  network?: {
-    ip_address?: string;
-  };
-  metadata: {
-    org_id: string;
-    otp_in_last_60s?: boolean;
-  };
-}
+// Interceptor: log every request in dev
+client.interceptors.request.use(req => {
+  console.log(`[FraudShield] ${req.method?.toUpperCase()} ${req.url}`);
+  return req;
+});
 
-export interface FraudScore {
-  request_id: string;
-  transaction_id: string;
-  risk_score: number;
-  confidence: number;
-  decision: 'APPROVE' | 'REVIEW' | 'REJECT';
-  explanation: {
-    nl_summary: string;
-    reasons: Array<{
-      code: string;
-      description: string;
-      severity: string;
-      contribution?: number;
-    }>;
-    top_features: Array<{
-      feature: string;
-      value: number;
-      contribution: number;
-      direction: string;
-    }>;
-  };
-  signals: {
-    rule_flags: string[];
-    behavioral_deviation: number;
-    graph_risk: number;
-    device_risk: number;
-  };
-  latency_ms: number;
-  scored_at: string;
-}
-
-export const fraudShieldApi = {
+const fraudShieldApi = {
   /**
-   * Score a transaction for fraud risk
+   * Submit a transaction for real-time fraud scoring.
+   * Returns risk_score (0-1), decision (APPROVE/REVIEW/REJECT), signals, explanation.
    */
-  async scoreTransaction(transaction: TransactionRequest): Promise<FraudScore> {
-    const response = await fraudShieldClient.post<FraudScore>('/score', transaction);
-    return response.data;
+  async scoreTransaction(txn: TransactionRequest): Promise<FraudScore> {
+    const resp = await client.post<FraudScore>('/score', txn);
+    return resp.data;
   },
 
   /**
-   * Check system health
+   * Check backend health — used on Home screen status indicator.
    */
-  async checkHealth(): Promise<{status: string; components: Record<string, any>}> {
-    const response = await fraudShieldClient.get('/health');
-    return response.data;
+  async checkHealth(): Promise<{ status: string; components: Record<string, unknown> }> {
+    const resp = await client.get('/health');
+    return resp.data;
   },
 
   /**
-   * Get analytics
+   * Fetch analytics summary (period: 24h | 7d | 30d).
    */
-  async getAnalytics(): Promise<any> {
-    const response = await fraudShieldClient.get('/analytics');
-    return response.data;
+  async getAnalytics(period: '24h' | '7d' | '30d' = '24h'): Promise<unknown> {
+    const resp = await client.get(`/analytics?period=${period}`);
+    return resp.data;
   },
 };
 
