@@ -41,7 +41,18 @@ export default function ProfileScreen() {
           <Text style={styles.avatarText}>👤</Text>
         </View>
         <Text style={styles.userName}>{user.name}</Text>
-        <Text style={styles.userVpa}>{user.vpa}</Text>
+
+        <View style={styles.idPillContainer}>
+          <View style={styles.idPill}>
+            <Text style={styles.idPillTag}>🆔 UNIQUE USER ID</Text>
+            <Text style={styles.idPillValue}>USR_{user.vpa.split('@')[0].toUpperCase()}</Text>
+          </View>
+          <View style={styles.idPill}>
+            <Text style={styles.idPillTag}>💳 UNIQUE UPI ID</Text>
+            <Text style={styles.idPillValue}>{user.vpa}</Text>
+          </View>
+        </View>
+
         <View style={styles.simulatedPill}>
           <Text style={styles.simulatedText}>🧪 SIMULATED SPC ACCOUNT</Text>
         </View>
@@ -92,9 +103,13 @@ const styles = StyleSheet.create({
   profileHeader: { alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 24, marginBottom: 16, elevation: 2 },
   avatarBox: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e0e7ff', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   avatarText: { fontSize: 32 },
-  userName: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  userName: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 },
   userVpa: { fontSize: 14, color: '#6b7280', marginTop: 2 },
-  simulatedPill: { marginTop: 10, backgroundColor: '#fef3c7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  idPillContainer: { width: '100%', marginTop: 10, gap: 8 },
+  idPill: { backgroundColor: '#f1f5f9', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  idPillTag: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 0.5, marginBottom: 2 },
+  idPillValue: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  simulatedPill: { marginTop: 12, backgroundColor: '#fef3c7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
   simulatedText: { fontSize: 11, fontWeight: '800', color: '#92400e' },
   section: { backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 14 },

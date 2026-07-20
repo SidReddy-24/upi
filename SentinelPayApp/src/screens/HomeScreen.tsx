@@ -22,7 +22,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, WalletUser, WalletTransaction } from '../types';
-import { getUser, getTransactions } from '../utils/walletDb';
+import { getUser, getTransactions, updateBalance } from '../utils/walletDb';
 import fraudShieldApi from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
 
@@ -49,7 +49,17 @@ export default function HomeScreen({ navigation }: Props) {
 
   const loadData = useCallback(async () => {
     try {
-      const [u, t] = await Promise.all([getUser(), getTransactions()]);
+      let u = await getUser();
+      try {
+        const liveProfile = await fraudShieldApi.getUserProfile(u.vpa);
+        if (liveProfile && liveProfile.balance !== undefined) {
+          u.balance = liveProfile.balance;
+          await updateBalance(liveProfile.balance);
+        }
+      } catch {
+        // Fallback to local storage if offline
+      }
+      const t = await getTransactions();
       setUser(u);
       setTxns(t.slice(0, 5)); // show last 5
     } catch (e) {
@@ -96,9 +106,19 @@ export default function HomeScreen({ navigation }: Props) {
 
       {/* ── BALANCE CARD ── */}
       <View style={styles.balanceCard}>
+        {user && (
+          <View style={{ marginBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.15)', paddingBottom: 10 }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#c7d2fe', letterSpacing: 0.5 }}>
+              🆔 USER ID: USR_{user.vpa.split('@')[0].toUpperCase()}
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginTop: 2 }}>
+              💳 UPI ID: {user.vpa}
+            </Text>
+          </View>
+        )}
         <Text style={styles.balanceLabel}>SPC Balance</Text>
         <Text style={styles.balanceAmount}>{formatAmount(balance)}</Text>
-        <Text style={styles.balanceSub}>SentinelPay Credits · Demo Account</Text>
+        <Text style={styles.balanceSub}>SentinelPay Credits · Cloud Account</Text>
 
         {/* balance bar */}
         <View style={styles.balanceBarBg}>
