@@ -149,7 +149,7 @@ results["GET /model"] = print_result("GET /api/v1/model  (Model Registry)", sc, 
 # ── 10. Feedback — Legitimate ─────────────────────────────────
 feedback_payload = {
     "transaction_id": scored_txn_id,
-    "feedback_type": "FALSE_POSITIVE",
+    "feedback_type": "CLEAR_FRAUD",
     "analyst_decision": "LEGITIMATE",
     "fraud_type": None,
     "notes": "Customer confirmed — legitimate purchase",
@@ -161,7 +161,7 @@ results["POST /feedback (legit)"] = print_result("POST /api/v1/feedback  (Mark L
 # ── 11. Feedback — Fraud with case escalation ─────────────────
 fraud_feedback_payload = {
     "transaction_id": "TXN_TEST_FRAUD_002",
-    "feedback_type": "TRUE_POSITIVE",
+    "feedback_type": "CONFIRM_FRAUD",
     "analyst_decision": "FRAUD",
     "fraud_type": "ACCOUNT_TAKEOVER",
     "notes": "Confirmed fraud via device + IP cross-check",

@@ -141,6 +141,8 @@ async def get_risk_details(
             "case_id": case_id,
             "audit_trail": audit_trail
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error querying risk details: {str(e)}")
         raise HTTPException(

@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS feedback (
     analyst_id          VARCHAR(64) NOT NULL,
     feedback_type       VARCHAR(16) NOT NULL,
     original_decision   VARCHAR(8) NOT NULL,
-    analyst_decision    VARCHAR(8) NOT NULL,
+    analyst_decision    VARCHAR(16) NOT NULL,
     fraud_type          VARCHAR(32),
     notes               TEXT,
     submitted_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

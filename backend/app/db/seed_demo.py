@@ -163,8 +163,10 @@ async def seed_demo():
         await redis.set("graph:user:rahul.sharma@upi:risk", "0.02")
         await redis.set("graph:user:mule_account@upi:risk", "0.85")
         
-        # Blacklist receiver VPA
+        # Blacklist receiver VPA (known fraud mule)
         await redis.set("vpa:mule_account@upi:blacklisted", "1")
+        # Also blacklist the test fixture from API test suite
+        await redis.set("vpa:mule@okhdfc:blacklisted", "1")
         
         logger.info("Redis seeding completed.")
     except Exception as e:

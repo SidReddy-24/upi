@@ -3,23 +3,29 @@
  *
  * Flow:
  *  1. User enters receiver VPA + amount
- *  2. Tap "Check & Pay" → calls FraudShield /score endpoint
- *  3. Decision = APPROVE → execute payment immediately
- *  4. Decision = REVIEW  → show warning, user must confirm after 5s cooldown
- *  5. Decision = REJECT  → block, show reason, no payment
+ *  2. VPA loses focus → calls /qr/trust/{vpa} (Phase 6.3) → shows trust badge
+ *  3. Tap "Check & Pay" → calls FraudShield /score endpoint
+ *     – Passes `otp_in_last_60s` flag (from SMS hook, Phase 4)
+ *     – Passes `is_call_active` flag (from call hook, Phase 5)
+ *  4. Decision = APPROVE → biometric prompt (Phase 7) → execute payment
+ *  5. Decision = REVIEW  → call-active warning + biometric prompt → execute
+ *  6. Decision = REJECT  → block, show reason, no payment
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert, Keyboard, Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import { RootStackParamList, FraudScore } from '../types';
 import { getUser, executePayment } from '../utils/walletDb';
-import fraudShieldApi from '../services/fraudShieldApi';
+import fraudShieldApi, { QRTrustResult } from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
 import FraudExplanationCard from '../components/FraudExplanationCard';
+import { useSmsOtp } from '../hooks/useSmsOtp';
+import { useCallState } from '../hooks/useCallState';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SendMoney'>;
@@ -32,6 +38,8 @@ function genTxnId() {
   return `TXN_SP_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 }
 
+const rnBiometrics = new ReactNativeBiometrics();
+
 export default function SendMoneyScreen({ navigation, route }: Props) {
   const [receiverVpa, setReceiverVpa] = useState(route.params?.prefillVpa ?? '');
   const [amountStr, setAmountStr] = useState(
@@ -41,17 +49,78 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const [score, setScore] = useState<FraudScore | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  // Phase 6.3 — QR trust check
+  const [qrTrust, setQrTrust] = useState<QRTrustResult | null>(null);
+  const [qrTrustLoading, setQrTrustLoading] = useState(false);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Phase 4: SMS OTP detection ─────────────────────────────────────────────
+  const { otpInLast60s } = useSmsOtp();
+
+  // ── Phase 5: Call detection ────────────────────────────────────────────────
+  const { isCallActive } = useCallState();
 
   const amount = parseFloat(amountStr) || 0;
   const vpaValid = /^[a-zA-Z0-9.\-_]+@[a-zA-Z0-9]+$/.test(receiverVpa.trim());
   const amountValid = amount > 0 && amount <= 200000;
 
+  // ── Phase 6.3: QR trust check on VPA change ────────────────────────────────
+  useEffect(() => {
+    if (!vpaValid) {
+      setQrTrust(null);
+      return;
+    }
+    let cancelled = false;
+    setQrTrustLoading(true);
+    fraudShieldApi.getQrTrust(receiverVpa.trim())
+      .then(result => { if (!cancelled) { setQrTrust(result); setQrTrustLoading(false); } })
+      .catch(() => { if (!cancelled) { setQrTrust(null); setQrTrustLoading(false); } });
+    return () => { cancelled = true; };
+  }, [receiverVpa, vpaValid]);
+
+  // ── Phase 7: Biometric prompt ──────────────────────────────────────────────
+  const requestBiometric = async (): Promise<boolean> => {
+    try {
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+      if (!available) {
+        // No biometrics — fall through to payment
+        return true;
+      }
+      const promptMessage =
+        biometryType === 'FaceID'
+          ? 'Look at your phone to confirm payment'
+          : 'Confirm payment with fingerprint';
+      const { success } = await rnBiometrics.simplePrompt({ promptMessage });
+      return success;
+    } catch (e) {
+      console.warn('[Biometrics] Error:', e);
+      // Biometric unavailable / cancelled → allow through for UX
+      return true;
+    }
+  };
+
   // ── Step 1: Score the transaction ──────────────────────────────────────────
   const handleScore = async () => {
-    if (!vpaValid)  return Alert.alert('Invalid VPA', 'Enter a valid VPA like name@bankname');
+    if (!vpaValid)    return Alert.alert('Invalid VPA', 'Enter a valid VPA like name@bankname');
     if (!amountValid) return Alert.alert('Invalid Amount', 'Amount must be between ₹1 and ₹2,00,000');
 
+    // Phase 5: Warn if on a call before even scoring
+    if (isCallActive) {
+      Alert.alert(
+        '📞 You Are On A Call',
+        'You appear to be on a phone call right now. Fraudsters often call victims while conducting transactions. Are you sure you want to continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Proceed Anyway', style: 'destructive', onPress: () => doScore() },
+        ],
+      );
+      return;
+    }
+
+    doScore();
+  };
+
+  const doScore = async () => {
     Keyboard.dismiss();
     setStep('SCORING');
     setError(null);
@@ -76,11 +145,18 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
           device_id: `DEV_SP_${Platform.OS.toUpperCase()}`,
           os_type: 'ANDROID',
           is_rooted: false,
-          is_emulator: true, // demo: flag as emulator honestly
+          is_emulator: true, // demo — flag honestly
         },
         location: { latitude: 19.076, longitude: 72.877 }, // Mumbai
         network: { ip_address: '10.0.2.2', connection_type: 'Wifi' },
-        metadata: { org_id: 'ORG_DEMO_001', channel: 'mobile_app' },
+        metadata: {
+          org_id: 'ORG_DEMO_001',
+          channel: 'mobile_app',
+          // Phase 4 — OTP intelligence signal
+          ...(otpInLast60s ? { otp_in_last_60s: true } : {}),
+          // Phase 5 — Call context signal
+          ...(isCallActive ? { is_call_active: true } : {}),
+        },
       });
 
       setScore(result);
@@ -109,6 +185,13 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   // ── Step 2: Execute payment after decision ─────────────────────────────────
   const handleExecute = async () => {
     if (!score) return;
+
+    // Phase 7 — Biometric gate for ALL payments
+    const bioPassed = await requestBiometric();
+    if (!bioPassed) {
+      Alert.alert('Authentication Failed', 'Biometric authentication was not confirmed. Payment cancelled.');
+      return;
+    }
 
     const fraudReason =
       score.explanation?.summary ?? score.signals?.rule_flags?.join(', ') ?? null;
@@ -139,6 +222,16 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         <ActivityIndicator size="large" color="#6366f1" />
         <Text style={styles.scoringTitle}>Analysing transaction…</Text>
         <Text style={styles.scoringSubtitle}>Running ML + rule engine checks</Text>
+        {otpInLast60s && (
+          <View style={styles.otpBadge}>
+            <Text style={styles.otpBadgeText}>🔑 OTP detected — flagging signal</Text>
+          </View>
+        )}
+        {isCallActive && (
+          <View style={styles.callBadge}>
+            <Text style={styles.callBadgeText}>📞 Call active — flagging signal</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -190,6 +283,24 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         <Text style={styles.simulatedText}>🧪 SIMULATED — Not real money</Text>
       </View>
 
+      {/* ── ACTIVE CALL WARNING (Phase 5) ── */}
+      {isCallActive && (
+        <View style={styles.callWarningBanner}>
+          <Text style={styles.callWarningText}>
+            📞 You are currently on a phone call. Scammers often impersonate bank officials during transactions. Stay alert!
+          </Text>
+        </View>
+      )}
+
+      {/* ── OTP RECENTLY RECEIVED WARNING (Phase 4) ── */}
+      {otpInLast60s && (
+        <View style={styles.otpWarningBanner}>
+          <Text style={styles.otpWarningText}>
+            🔑 OTP received recently. Never share OTPs with anyone. This signal is being passed to FraudShield AI.
+          </Text>
+        </View>
+      )}
+
       {/* ── FORM ── */}
       {step === 'FORM' && (
         <View style={styles.formCard}>
@@ -207,6 +318,26 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
           />
           {receiverVpa.length > 3 && !vpaValid && (
             <Text style={styles.fieldError}>VPA format: name@bank</Text>
+          )}
+
+          {/* Phase 6.3 — VPA Trust Badge */}
+          {qrTrustLoading && vpaValid && (
+            <View style={styles.trustBadgeLoading}>
+              <Text style={styles.trustBadgeLoadingText}>Checking VPA trust…</Text>
+            </View>
+          )}
+          {!qrTrustLoading && qrTrust && (
+            <View style={[
+              styles.trustBadge,
+              qrTrust.trust_level === 'VERIFIED'  && styles.trustVerified,
+              qrTrust.trust_level === 'CAUTION'   && styles.trustCaution,
+              qrTrust.trust_level === 'FLAGGED'   && styles.trustFlagged,
+            ]}>
+              <Text style={styles.trustBadgeText}>{qrTrust.message}</Text>
+              {qrTrust.flags.length > 0 && (
+                <Text style={styles.trustBadgeFlags}>Flags: {qrTrust.flags.join(', ')}</Text>
+              )}
+            </View>
           )}
 
           <Text style={styles.label}>Amount (₹)</Text>
@@ -250,6 +381,22 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
             <Text style={styles.txnSummaryTo}>→ {receiverVpa.trim()}</Text>
           </View>
 
+          {/* Phase 4/5: Context signals display */}
+          {(otpInLast60s || isCallActive) && (
+            <View style={styles.signalBanners}>
+              {otpInLast60s && (
+                <View style={styles.signalChipAlert}>
+                  <Text style={styles.signalChipAlertText}>🔑 OTP received in last 60s</Text>
+                </View>
+              )}
+              {isCallActive && (
+                <View style={styles.signalChipAlert}>
+                  <Text style={styles.signalChipAlertText}>📞 Call active during payment</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           <FraudExplanationCard
             decision={score.decision}
             explanation={score.explanation}
@@ -274,7 +421,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
           {/* Action buttons based on decision */}
           {score.decision === 'APPROVE' && (
             <TouchableOpacity style={styles.approveBtn} onPress={handleExecute}>
-              <Text style={styles.approveBtnText}>✓ Confirm Payment</Text>
+              <Text style={styles.approveBtnText}>🔒 Confirm Payment</Text>
             </TouchableOpacity>
           )}
 
@@ -290,7 +437,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
                 onPress={handleExecute}
                 disabled={cooldown > 0}>
                 <Text style={styles.approveBtnText}>
-                  {cooldown > 0 ? `Wait ${cooldown}s to confirm…` : '⚠️ Proceed Anyway'}
+                  {cooldown > 0 ? `Wait ${cooldown}s to confirm…` : '🔒 Proceed Anyway'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={handleReject}>
@@ -333,6 +480,20 @@ const styles = StyleSheet.create({
   },
   simulatedText: { fontSize: 12, fontWeight: '700', color: '#92400e' },
 
+  // Phase 5 call warning
+  callWarningBanner: {
+    backgroundColor: '#fef2f2', borderLeftWidth: 4, borderLeftColor: '#ef4444',
+    marginHorizontal: 16, marginTop: 12, borderRadius: 8, padding: 12,
+  },
+  callWarningText: { fontSize: 13, color: '#991b1b', lineHeight: 19 },
+
+  // Phase 4 OTP warning
+  otpWarningBanner: {
+    backgroundColor: '#fffbeb', borderLeftWidth: 4, borderLeftColor: '#f59e0b',
+    marginHorizontal: 16, marginTop: 8, borderRadius: 8, padding: 12,
+  },
+  otpWarningText: { fontSize: 13, color: '#92400e', lineHeight: 19 },
+
   centeredState: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32, paddingTop: 80,
@@ -345,6 +506,18 @@ const styles = StyleSheet.create({
   successTo: { fontSize: 15, color: '#6b7280', marginBottom: 16 },
   blockedTitle: { fontSize: 24, fontWeight: '800', color: '#dc2626', marginBottom: 8 },
   blockedReason: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 16 },
+
+  // Scoring state pills
+  otpBadge: {
+    marginTop: 12, backgroundColor: '#fffbeb', borderRadius: 8,
+    paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#fde68a',
+  },
+  otpBadgeText: { fontSize: 12, color: '#92400e', fontWeight: '600' },
+  callBadge: {
+    marginTop: 8, backgroundColor: '#fef2f2', borderRadius: 8,
+    paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#fecaca',
+  },
+  callBadgeText: { fontSize: 12, color: '#991b1b', fontWeight: '600' },
 
   formCard: {
     backgroundColor: '#fff', margin: 16, borderRadius: 16,
@@ -402,6 +575,14 @@ const styles = StyleSheet.create({
   txnSummaryAmount: { fontSize: 28, fontWeight: '800', color: '#111827' },
   txnSummaryTo: { fontSize: 14, color: '#6b7280', marginTop: 2 },
 
+  // Phase 4/5 signal banner in result card
+  signalBanners: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  signalChipAlert: {
+    backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a',
+    borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8,
+  },
+  signalChipAlertText: { fontSize: 11, color: '#92400e', fontWeight: '600' },
+
   signalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 8 },
   signalChip: {
     backgroundColor: '#f3f4f6', borderRadius: 8, padding: 10,
@@ -421,4 +602,20 @@ const styles = StyleSheet.create({
   },
   rejectBannerText: { fontSize: 13, color: '#991b1b', lineHeight: 18 },
   latencyNote: { fontSize: 11, color: '#d1d5db', textAlign: 'center', marginTop: 16 },
+
+  // Phase 6.3 — QR trust badge styles
+  trustBadgeLoading: {
+    marginTop: 8, padding: 8, borderRadius: 8,
+    backgroundColor: '#f3f4f6', alignItems: 'center',
+  },
+  trustBadgeLoadingText: { fontSize: 12, color: '#6b7280' },
+  trustBadge: {
+    marginTop: 8, padding: 10, borderRadius: 8,
+    borderWidth: 1,
+  },
+  trustVerified: { backgroundColor: '#f0fdf4', borderColor: '#86efac' },
+  trustCaution:  { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
+  trustFlagged:  { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  trustBadgeText: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  trustBadgeFlags: { fontSize: 11, color: '#6b7280', marginTop: 2 },
 });

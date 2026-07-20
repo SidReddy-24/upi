@@ -28,6 +28,16 @@ client.interceptors.request.use(req => {
   return req;
 });
 
+export interface QRTrustResult {
+  vpa: string;
+  trust_level: 'VERIFIED' | 'CAUTION' | 'FLAGGED';
+  trust_score: number;
+  is_blacklisted: boolean;
+  flags: string[];
+  message: string;
+  checked_sources: string[];
+}
+
 const fraudShieldApi = {
   /**
    * Submit a transaction for real-time fraud scoring.
@@ -53,6 +63,16 @@ const fraudShieldApi = {
     const resp = await client.get(`/analytics?period=${period}`);
     return resp.data;
   },
+
+  /**
+   * Phase 6.3 — QR Trust Check.
+   * Checks Redis blacklist + graph engine risk for a given VPA before payment.
+   */
+  async getQrTrust(vpa: string): Promise<QRTrustResult> {
+    const resp = await client.get<QRTrustResult>(`/qr/trust/${encodeURIComponent(vpa)}`);
+    return resp.data;
+  },
 };
 
 export default fraudShieldApi;
+
