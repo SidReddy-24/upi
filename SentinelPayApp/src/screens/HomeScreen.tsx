@@ -148,6 +148,37 @@ export default function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* ── SECURITY INTELLIGENCE TOOLS ── */}
+      <View style={[styles.actionsRow, { marginTop: 10 }]}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('ScamAssistant')}>
+          <Text style={styles.actionIcon}>🤖</Text>
+          <Text style={styles.actionLabel}>AI Assistant</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('ReportScam')}>
+          <Text style={styles.actionIcon}>🚨</Text>
+          <Text style={styles.actionLabel}>Report Scam</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('ScamHeatMap')}>
+          <Text style={styles.actionIcon}>🗺️</Text>
+          <Text style={styles.actionLabel}>Heat Map</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('Profile')}>
+          <Text style={styles.actionIcon}>👤</Text>
+          <Text style={styles.actionLabel}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* ── RECENT TRANSACTIONS ── */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>

@@ -72,6 +72,35 @@ const fraudShieldApi = {
     const resp = await client.get<QRTrustResult>(`/qr/trust/${encodeURIComponent(vpa)}`);
     return resp.data;
   },
+
+  /**
+   * Community Report & Scam Passport APIs.
+   */
+  async submitCommunityReport(data: { entity_id: string; entity_type: string; category: string; description: string }): Promise<any> {
+    const resp = await client.post('/community/report', data);
+    return resp.data;
+  },
+
+  async getScamPassport(entityId: string): Promise<any> {
+    const resp = await client.get(`/passport/${encodeURIComponent(entityId)}`);
+    return resp.data;
+  },
+
+  /**
+   * AI Scam Assistant API.
+   */
+  async queryScamAssistant(query_text: string): Promise<any> {
+    const resp = await client.post('/assistant/analyze', { query_text });
+    return resp.data;
+  },
+
+  /**
+   * Scam Heatmap API.
+   */
+  async getScamHeatmap(): Promise<any> {
+    const resp = await client.get('/heatmap');
+    return resp.data;
+  },
 };
 
 export default fraudShieldApi;

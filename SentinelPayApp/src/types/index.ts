@@ -7,6 +7,11 @@ export type RootStackParamList = {
   TransactionDetail: { txnId: string };
   ReceiveMoney: undefined;
   ScanQR: undefined;
+  ReportScam: undefined;
+  ScamPassport: { entityId?: string };
+  ScamAssistant: undefined;
+  ScamHeatMap: undefined;
+  Profile: undefined;
 };
 
 // ─── Wallet / DB ──────────────────────────────────────────────────────────────
