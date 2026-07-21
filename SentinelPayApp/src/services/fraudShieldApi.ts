@@ -101,6 +101,22 @@ const fraudShieldApi = {
     const resp = await client.get('/heatmap');
     return resp.data;
   },
+
+  /**
+   * Phase 9: Send transaction SMS notifications.
+   */
+  async sendTransactionNotification(data: {
+    transaction_id: string;
+    sender_vpa: string;
+    receiver_vpa: string;
+    amount: number;
+    status: string;
+    risk_score: number;
+    timestamp: string;
+  }): Promise<any> {
+    const resp = await client.post('/notifications/transaction', data);
+    return resp.data;
+  },
 };
 
 export default fraudShieldApi;

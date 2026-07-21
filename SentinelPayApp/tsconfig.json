@@ -4,8 +4,9 @@
     "rootDir": ".",
     "outDir": "dist",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node", "jest"]
   },
-  "include": ["src/**/*", "index.js", "App.tsx"],
+  "include": ["src/**/*", "__tests__/**/*", "index.js", "App.tsx"],
   "exclude": ["node_modules", "dist", "android", "ios"]
 }

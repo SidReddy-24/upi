@@ -49,16 +49,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const loadData = useCallback(async () => {
     try {
-      let u = await getUser();
-      try {
-        const liveProfile = await fraudShieldApi.getUserProfile(u.vpa);
-        if (liveProfile && liveProfile.balance !== undefined) {
-          u.balance = liveProfile.balance;
-          await updateBalance(liveProfile.balance);
-        }
-      } catch {
-        // Fallback to local storage if offline
-      }
+      const u = await getUser();
       const t = await getTransactions();
       setUser(u);
       setTxns(t.slice(0, 5)); // show last 5
@@ -196,6 +187,13 @@ export default function HomeScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('Profile')}>
           <Text style={styles.actionIcon}>👤</Text>
           <Text style={styles.actionLabel}>Profile</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('Settings')}>
+          <Text style={styles.actionIcon}>⚙️</Text>
+          <Text style={styles.actionLabel}>Settings</Text>
         </TouchableOpacity>
       </View>
 
