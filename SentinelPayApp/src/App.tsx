@@ -26,6 +26,7 @@ import ScamPassportScreen from './screens/ScamPassportScreen';
 import ScamAssistantScreen from './screens/ScamAssistantScreen';
 import ScamHeatMapScreen from './screens/ScamHeatMapScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -118,6 +119,11 @@ export default function App(): React.JSX.Element {
                 name="Profile"
                 component={ProfileScreen}
                 options={{ title: 'User Profile & Security' }}
+              />
+              <Stack.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{ title: 'Settings & Preferences' }}
               />
 
             </Stack.Navigator>

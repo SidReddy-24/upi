@@ -27,13 +27,14 @@ import FraudExplanationCard from '../components/FraudExplanationCard';
 import { useSmsOtp } from '../hooks/useSmsOtp';
 import { useCallState } from '../hooks/useCallState';
 import { useDeviceFingerprint } from '../hooks/useDeviceFingerprint';
+import { getSettings } from '../utils/settingsDb';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SendMoney'>;
   route: RouteProp<RootStackParamList, 'SendMoney'>;
 };
 
-type Step = 'FORM' | 'SCORING' | 'RESULT' | 'SUCCESS' | 'BLOCKED';
+type Step = 'FORM' | 'SCORING' | 'RESULT' | 'HOLD' | 'SUCCESS' | 'BLOCKED';
 
 function genTxnId() {
   return `TXN_SP_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
@@ -50,10 +51,12 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const [score, setScore] = useState<FraudScore | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [holdCountdown, setHoldCountdown] = useState(0);
   // Phase 6.3 — QR trust check
   const [qrTrust, setQrTrust] = useState<QRTrustResult | null>(null);
   const [qrTrustLoading, setQrTrustLoading] = useState(false);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Phase 4: SMS OTP detection ─────────────────────────────────────────────
   const { otpInLast60s, latestSmsFraudScore } = useSmsOtp();
@@ -200,32 +203,97 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const handleExecute = async () => {
     if (!score) return;
 
-    // Phase 7 — Biometric gate for ALL payments
-    const bioPassed = await requestBiometric();
-    if (!bioPassed) {
-      Alert.alert('Authentication Failed', 'Biometric authentication was not confirmed. Payment cancelled.');
+    // Phase 9 — Check Transaction Hold settings
+    const settings = await getSettings();
+    if (settings.holdEnabled && amount >= settings.holdThresholdAmount) {
+      // Enter HOLD state
+      setStep('HOLD');
+      setHoldCountdown(settings.holdDuration);
+      
+      // Start hold countdown timer
+      holdTimerRef.current = setInterval(() => {
+        setHoldCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(holdTimerRef.current!);
+            // Auto-cancel when timer reaches 0
+            handleCancelHold();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
       return;
     }
 
-    try {
-      const currentUser = await getUser();
-      const transferRes = await fraudShieldApi.executeP2PTransfer({
-        sender_vpa: currentUser.vpa,
-        receiver_vpa: receiverVpa.trim(),
-        amount,
-        device_id: deviceInfo.device_id,
-        is_call_active: isCallActive,
-        otp_in_last_60s: otpInLast60s,
-        sms_fraud_score: latestSmsFraudScore ?? undefined,
-      });
+    // Continue with biometric and payment
+    await proceedWithPayment();
+  };
 
-      await updateBalance(transferRes.updated_sender_balance);
+  // ── Phase 9: Proceed with payment (called after hold or directly) ──────�      await updateBalance(transferRes.updated_sender_balance);
+
+      // Phase 9: Send SMS notifications
+      const settings = await getSettings();
+      if (settings.smsNotificationsEnabled) {
+        try {
+          await fraudShieldApi.sendTransactionNotification({
+            transaction_id: transferRes.transaction_id || score.transaction_id,
+            sender_vpa: currentUser.vpa,
+            receiver_vpa: receiverVpa.trim(),
+            amount,
+            status: score.decision,
+            risk_score: score.risk_score,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.warn('[SMS] Failed to send notification:', e);
+          // Don't block on SMS failure
+        }
+      }
+
+      setStep('SUCCESS'); notifications
+      const settings = await getSettings();
+      if (settings.smsNotificationsEnabled) {
+        try {
+          const user = await getUser();
+          await fraudShieldApi.sendTransactionNotification({
+            transaction_id: score.transaction_id,
+            sender_vpa: user.vpa,
+            receiver_vpa: receiverVpa.trim(),
+            amount,
+            status: score.decision,
+            risk_score: score.risk_score,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.warn('[SMS] Failed to send notification:', e);
+          // Don't block on SMS failure
+        }
+      }
+      
+>>>>>>> 70e26be8f3f718e8a5a71da8def8f3f96deb7f2b
       setStep('SUCCESS');
     } catch (e: any) {
       const msg = e?.response?.data?.detail ?? e?.message ?? 'Payment failed';
       setError(msg);
       setStep('BLOCKED');
     }
+  };
+
+  // ── Phase 9: Confirm during hold period ────────────────────────────────────
+  const handleConfirmHold = () => {
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+    }
+    proceedWithPayment();
+  };
+
+  // ── Phase 9: Cancel during hold period ─────────────────────────────────────
+  const handleCancelHold = () => {
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+    }
+    Alert.alert('Payment Cancelled', 'Transaction was cancelled during review period.');
+    setStep('BLOCKED');
   };
 
   const handleReject = () => setStep('BLOCKED');
@@ -260,6 +328,65 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
             <Text style={styles.callBadgeText}>📞 Call active — flagging signal</Text>
           </View>
         )}
+      </View>
+    );
+  }
+
+  // ── Phase 9: HOLD state (transaction review period) ───────────────────────
+  if (step === 'HOLD') {
+    return (
+      <View style={styles.centeredState}>
+        <Text style={styles.bigEmoji}>⏱️</Text>
+        <Text style={styles.holdTitle}>Transaction on Hold</Text>
+        <Text style={styles.holdSubtitle}>Review your payment carefully</Text>
+
+        <View style={styles.holdCountdownBox}>
+          <Text style={styles.holdCountdownLabel}>Time Remaining</Text>
+          <Text style={styles.holdCountdown}>{holdCountdown}s</Text>
+          <Text style={styles.holdCountdownHint}>Auto-cancel in {holdCountdown} seconds</Text>
+        </View>
+
+        <View style={styles.holdDetailsCard}>
+          <Text style={styles.holdDetailsTitle}>Transaction Details</Text>
+          
+          <View style={styles.holdDetailRow}>
+            <Text style={styles.holdDetailLabel}>Amount</Text>
+            <Text style={styles.holdDetailValue}>₹{amount.toLocaleString('en-IN')}</Text>
+          </View>
+
+          <View style={styles.holdDetailRow}>
+            <Text style={styles.holdDetailLabel}>To</Text>
+            <Text style={styles.holdDetailValue}>{receiverVpa.trim()}</Text>
+          </View>
+
+          {score && (
+            <>
+              <View style={styles.holdDetailRow}>
+                <Text style={styles.holdDetailLabel}>Fraud Score</Text>
+                <Text style={styles.holdDetailValue}>{Math.round(score.risk_score * 100)}%</Text>
+              </View>
+
+              <View style={styles.holdDetailRow}>
+                <Text style={styles.holdDetailLabel}>Decision</Text>
+                <View>
+                  <RiskBadge decision={score.decision} riskScore={score.risk_score} />
+                </View>
+              </View>
+            </>
+          )}
+        </View>
+
+        <TouchableOpacity style={styles.holdConfirmBtn} onPress={handleConfirmHold}>
+          <Text style={styles.holdConfirmBtnText}>✓ Confirm Payment</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.holdCancelBtn} onPress={handleCancelHold}>
+          <Text style={styles.holdCancelBtnText}>✗ Cancel Payment</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.holdWarning}>
+          ⚠️ If you don't take action, this payment will be automatically cancelled.
+        </Text>
       </View>
     );
   }
@@ -659,4 +786,40 @@ const styles = StyleSheet.create({
   trustFlagged:  { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
   trustBadgeText: { fontSize: 13, fontWeight: '600', color: '#111827' },
   trustBadgeFlags: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+
+  // Phase 9 — Transaction Hold styles
+  holdTitle: { fontSize: 24, fontWeight: '800', color: '#111827', marginTop: 12 },
+  holdSubtitle: { fontSize: 14, color: '#6b7280', marginTop: 4, marginBottom: 20 },
+  holdCountdownBox: {
+    backgroundColor: '#eef2ff', borderRadius: 16, padding: 20,
+    alignItems: 'center', marginBottom: 20, borderWidth: 2, borderColor: '#c7d2fe', width: '100%',
+  },
+  holdCountdownLabel: { fontSize: 12, fontWeight: '600', color: '#6366f1', textTransform: 'uppercase', letterSpacing: 1 },
+  holdCountdown: { fontSize: 48, fontWeight: '800', color: '#4338ca', marginVertical: 8 },
+  holdCountdownHint: { fontSize: 11, color: '#818cf8' },
+  holdDetailsCard: {
+    backgroundColor: '#fff', borderRadius: 12, padding: 16, width: '100%',
+    marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb',
+  },
+  holdDetailsTitle: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 12, textAlign: 'center' },
+  holdDetailRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+  },
+  holdDetailLabel: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  holdDetailValue: { fontSize: 13, color: '#111827', fontWeight: '700', textAlign: 'right', flex: 1, marginLeft: 12 },
+  holdConfirmBtn: {
+    backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 15,
+    alignItems: 'center', width: '100%', marginBottom: 10,
+  },
+  holdConfirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  holdCancelBtn: {
+    backgroundColor: '#f3f4f6', borderRadius: 12, paddingVertical: 15,
+    alignItems: 'center', width: '100%', borderWidth: 1, borderColor: '#e5e7eb',
+  },
+  holdCancelBtnText: { color: '#374151', fontSize: 16, fontWeight: '600' },
+  holdWarning: {
+    fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: 16,
+    paddingHorizontal: 20, lineHeight: 16,
+  },
 });

@@ -12,6 +12,10 @@ export type RootStackParamList = {
   ScamAssistant: undefined;
   ScamHeatMap: undefined;
   Profile: undefined;
+  Settings: undefined;
+  GuardianManagement: undefined;
+  Login: undefined;
+  Register: undefined;
 };
 
 // ─── Wallet / DB ──────────────────────────────────────────────────────────────
@@ -93,4 +97,146 @@ export interface FraudScore {
   signals: FraudSignals;
   explanation: FraudExplanation;
   latency_ms: number;
+}
+
+// ─── Notifications (Phase 9) ──────────────────────────────────────────────────
+export interface TransactionNotificationPayload {
+  amount: number;
+  counterpartyVpa: string;
+  status: 'APPROVE' | 'REVIEW' | 'REJECT';
+  fraudScore?: number;
+  timestamp: Date;
+  txnId: string;
+}
+
+export interface NotificationEvent {
+  id: string;
+  type: 'TRANSACTION' | 'SMS_WARNING' | 'GUARDIAN_REQUEST';
+  payload: TransactionNotificationPayload | SmsWarningPayload | GuardianApprovalRequest;
+  timestamp: Date;
+  delivered: boolean;
+  read: boolean;
+}
+
+// ─── SMS Reader (Phase 9) ─────────────────────────────────────────────────────
+export interface SmsMessage {
+  sender: string;
+  body: string;
+  timestamp: Date;
+}
+
+export interface SmsClassificationResult {
+  riskLevel: 'SAFE' | 'SUSPICIOUS' | 'DANGEROUS';
+  confidence: number;
+  containsOtp: boolean;
+  isTrustedSender: boolean;
+}
+
+export interface SmsWarningPayload {
+  sender: string;
+  riskLevel: 'SUSPICIOUS' | 'DANGEROUS';
+  advice: string;
+  timestamp: Date;
+}
+
+export interface SmsAuditLog {
+  id: string;
+  sender: string;
+  bodyHash: string; // SHA-256 hash for privacy
+  riskLevel: 'SAFE' | 'SUSPICIOUS' | 'DANGEROUS';
+  confidence: number;
+  containsOtp: boolean;
+  isTrustedSender: boolean;
+  actionTaken: 'NONE' | 'WARNING_SHOWN';
+  timestamp: Date;
+}
+
+// ─── Guardian System (Phase 9) ────────────────────────────────────────────────
+export interface Guardian {
+  id: string;
+  phone?: string;
+  vpa?: string;
+  status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'REMOVED';
+}
+
+export interface GuardianApprovalRequest {
+  id: string;
+  transactionId: string;
+  amount: number;
+  recipientVpa: string;
+  fraudScore: number;
+  riskSignals: string[];
+  expiresAt: Date;
+  requesterName?: string;
+}
+
+// ─── Authentication (Phase 9) ─────────────────────────────────────────────────
+export interface User {
+  id: string;
+  phone: string;
+  email?: string;
+  vpa: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number; // seconds
+}
+
+export interface UserSession {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: Date;
+  biometricEnabled: boolean;
+}
+
+export interface JwtPayload {
+  user_id: string;
+  phone: string;
+  email?: string;
+  exp: number; // Unix timestamp
+}
+
+// ─── Transaction Hold (Phase 9) ───────────────────────────────────────────────
+export interface HoldConfiguration {
+  enabled: boolean;
+  durationSeconds: number; // 10-30
+  thresholdAmount: number; // e.g., 5000
+}
+
+export interface TransactionHoldState {
+  sessionId: string;
+  transactionData: WalletTransaction;
+  holdDuration: number;
+  startTime: Date;
+  expiresAt: Date;
+  status: 'HOLDING' | 'CONFIRMED' | 'CANCELLED' | 'EXPIRED';
+}
+
+export interface HoldSession {
+  id: string;
+  transaction: WalletTransaction;
+  expiresAt: Date;
+  onExpire: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+// ─── Formatters/Parsers (Phase 9) ─────────────────────────────────────────────
+export interface TransactionNotification {
+  amount: number;
+  counterpartyVpa: string;
+  status: 'APPROVED' | 'FLAGGED' | 'BLOCKED';
+  fraudScore?: number;
+  timestamp: Date;
+}
+
+export interface GuardianApprovalMessage {
+  amount: number;
+  recipientVpa: string;
+  fraudScore: number;
+  riskSignals: string[];
+  requesterName: string;
 }
