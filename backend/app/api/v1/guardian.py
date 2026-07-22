@@ -15,7 +15,7 @@ Endpoints:
 Requirements: 2.1 - 2.15
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 import json
 import logging
@@ -407,7 +407,7 @@ async def request_approval(req: CreateApprovalRequest, current_user: dict = Depe
                 raise HTTPException(status_code=400, detail="You have no active guardians configured.")
 
             # Create approval requests with 5-minute timeout
-            expires_at = datetime.utcnow() + timedelta(minutes=5)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
             created_requests = []
 
             for g in guardians:
@@ -492,7 +492,7 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
             # Check expiration
             expires_at = approval_req['expires_at']
             # Make sure comparing both naive or both aware
-            now_time = datetime.utcnow().replace(tzinfo=expires_at.tzinfo)
+            now_time = datetime.now(timezone.utc)
             if expires_at < now_time:
                 cursor.execute("""
                     UPDATE guardian_approval_requests

@@ -15,7 +15,7 @@ Endpoints:
 Requirements: 5.1-5.21
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import secrets
 import bcrypt
@@ -140,8 +140,8 @@ def generate_access_token(user_id: str, phone: str, email: Optional[str]) -> str
         'user_id': user_id,
         'phone': phone,
         'email': email,
-        'exp': datetime.utcnow() + ACCESS_TOKEN_EXPIRY,
-        'iat': datetime.utcnow(),
+        'exp': datetime.now(timezone.utc) + ACCESS_TOKEN_EXPIRY,
+        'iat': datetime.now(timezone.utc),
         'type': 'access'
     }
     return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -200,7 +200,7 @@ async def send_otp(request: SendOTPRequest):
         with conn.cursor() as cursor:
             # Generate OTP
             otp_code = generate_otp()
-            expires_at = datetime.utcnow() + timedelta(minutes=5)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
             
             # Store OTP in database
             cursor.execute("""
@@ -379,7 +379,7 @@ async def register(request: RegisterRequest):
             cursor.execute("""
                 INSERT INTO refresh_tokens (user_id, token, expires_at)
                 VALUES (%s, %s, %s)
-            """, (user['id'], refresh_token, datetime.utcnow() + REFRESH_TOKEN_EXPIRY))
+            """, (user['id'], refresh_token, datetime.now(timezone.utc) + REFRESH_TOKEN_EXPIRY))
             conn.commit()
             
             return AuthResponse(
@@ -448,7 +448,7 @@ async def login(request: LoginRequest):
             cursor.execute("""
                 INSERT INTO refresh_tokens (user_id, token, expires_at)
                 VALUES (%s, %s, %s)
-            """, (user['id'], refresh_token, datetime.utcnow() + REFRESH_TOKEN_EXPIRY))
+            """, (user['id'], refresh_token, datetime.now(timezone.utc) + REFRESH_TOKEN_EXPIRY))
             conn.commit()
             
             return AuthResponse(
@@ -502,7 +502,7 @@ async def refresh_token(request: RefreshTokenRequest):
             if token_record['revoked']:
                 raise HTTPException(status_code=401, detail='Refresh token revoked')
             
-            if token_record['expires_at'] < datetime.utcnow():
+            if token_record['expires_at'] < datetime.now(timezone.utc):
                 raise HTTPException(status_code=401, detail='Refresh token expired')
             
             # Update last used
