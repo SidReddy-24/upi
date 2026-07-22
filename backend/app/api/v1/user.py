@@ -8,7 +8,6 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.db.database import get_db
 from app.services.auth_service import verify_api_key
 
 logger = logging.getLogger("fraudshield.user")

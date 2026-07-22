@@ -28,13 +28,14 @@ import { useSmsOtp } from '../hooks/useSmsOtp';
 import { useCallState } from '../hooks/useCallState';
 import { useDeviceFingerprint } from '../hooks/useDeviceFingerprint';
 import { getSettings } from '../utils/settingsDb';
+import guardianService from '../services/guardianService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SendMoney'>;
   route: RouteProp<RootStackParamList, 'SendMoney'>;
 };
 
-type Step = 'FORM' | 'SCORING' | 'RESULT' | 'HOLD' | 'SUCCESS' | 'BLOCKED';
+type Step = 'FORM' | 'SCORING' | 'RESULT' | 'HOLD' | 'SUCCESS' | 'BLOCKED' | 'AWAITING_GUARDIAN_APPROVAL';
 
 function genTxnId() {
   return `TXN_SP_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
@@ -55,8 +56,10 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   // Phase 6.3 — QR trust check
   const [qrTrust, setQrTrust] = useState<QRTrustResult | null>(null);
   const [qrTrustLoading, setQrTrustLoading] = useState(false);
+  const [guardianTimer, setGuardianTimer] = useState(300);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const guardianTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Phase 4: SMS OTP detection ─────────────────────────────────────────────
   const { otpInLast60s, latestSmsFraudScore } = useSmsOtp();
@@ -78,7 +81,13 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
     );
     if (step === 'SCORING') loop.start();
     else loop.stop();
-    return () => loop.stop();
+    return () => {
+      loop.stop();
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+      if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+      if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+      guardianService.cleanup();
+    };
   }, [step, pulseAnim]);
 
   const amount = parseFloat(amountStr) || 0;
@@ -98,6 +107,69 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       .catch(() => { if (!cancelled) { setQrTrust(null); setQrTrustLoading(false); } });
     return () => { cancelled = true; };
   }, [receiverVpa, vpaValid]);
+
+  // ── Phase 9: Real-time Guardian approval response listener ───────────────
+  useEffect(() => {
+    if (step !== 'AWAITING_GUARDIAN_APPROVAL' || !score) return;
+
+    guardianService.initialize();
+
+    const unsubscribe = guardianService.subscribe((event) => {
+      if (event.type === 'APPROVAL_RESPONSE' && event.data.transaction_id === score.transaction_id) {
+        if (event.data.status === 'APPROVED') {
+          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+          Alert.alert(
+            '✅ Guardian Approved',
+            `Your payment was approved by ${event.data.guardian_name}. Note: ${event.data.note || 'None'}`,
+            [{ text: 'Proceed', onPress: () => proceedWithPayment() }]
+          );
+        } else if (event.data.status === 'REJECTED') {
+          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+          Alert.alert(
+            '❌ Guardian Rejected',
+            `Your payment was rejected by ${event.data.guardian_name}. Note: ${event.data.note || 'None'}`
+          );
+          setStep('BLOCKED');
+        }
+      }
+    });
+
+    const statusPoll = setInterval(async () => {
+      try {
+        const statusRes = await guardianService.getRequestStatus(score.transaction_id);
+        if (statusRes.status === 'APPROVED') {
+          clearInterval(statusPoll);
+          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+          Alert.alert(
+            '✅ Guardian Approved',
+            `Your payment was approved by ${statusRes.guardian_name}. Note: ${statusRes.note || 'None'}`,
+            [{ text: 'Proceed', onPress: () => proceedWithPayment() }]
+          );
+        } else if (statusRes.status === 'REJECTED') {
+          clearInterval(statusPoll);
+          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+          Alert.alert(
+            '❌ Guardian Rejected',
+            `Your payment was rejected by ${statusRes.guardian_name}. Note: ${statusRes.note || 'None'}`
+          );
+          setStep('BLOCKED');
+        } else if (statusRes.status === 'EXPIRED') {
+          clearInterval(statusPoll);
+          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+          Alert.alert('⏳ Guardian Request Expired', 'The guardian approval request timed out (5 minutes). Payment cancelled.');
+          setStep('BLOCKED');
+        }
+      } catch (e) {
+        console.debug('Failed to poll status:', e);
+      }
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(statusPoll);
+      guardianService.cleanup();
+    };
+  }, [step, score]);
 
   // ── Phase 7: Biometric prompt ──────────────────────────────────────────────
   const requestBiometric = async (): Promise<boolean> => {
@@ -177,6 +249,52 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       });
 
       setScore(result);
+
+      if (result.decision !== 'REJECT' && result.risk_score > 0.7) {
+        // Check active guardians count
+        let activeGuardiansCount = 0;
+        try {
+          const listRes = await guardianService.listGuardians();
+          activeGuardiansCount = listRes.guardians.filter(g => g.status === 'ACTIVE').length;
+        } catch (e) {
+          console.warn('Failed to fetch guardians list:', e);
+        }
+
+        if (activeGuardiansCount > 0) {
+          try {
+            const reqRes = await guardianService.requestApproval({
+              transaction_id: txnId,
+              amount,
+              recipient_vpa: receiverVpa.trim(),
+              fraud_score: result.risk_score,
+              risk_signals: result.signals.rule_flags,
+            });
+
+            if (reqRes && reqRes.success) {
+              setStep('AWAITING_GUARDIAN_APPROVAL');
+              setGuardianTimer(300);
+              if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+              guardianTimerRef.current = setInterval(() => {
+                setGuardianTimer(prev => {
+                  if (prev <= 1) {
+                    clearInterval(guardianTimerRef.current!);
+                    Alert.alert('⏳ Guardian Request Expired', 'The guardian approval request timed out (5 minutes). Payment cancelled.');
+                    setStep('BLOCKED');
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
+              return;
+            }
+          } catch (reqErr: any) {
+            Alert.alert('Guardian Error', reqErr.response?.data?.detail || 'Failed to request guardian approval.');
+            setStep('FORM');
+            return;
+          }
+        }
+      }
+
       setStep('RESULT');
 
       // For REVIEW, start 5-second cooldown before confirm button enables
@@ -407,6 +525,42 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         )}
         <TouchableOpacity style={styles.primaryBtn} onPress={goHome}>
           <Text style={styles.primaryBtnText}>Back to Wallet</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (step === 'AWAITING_GUARDIAN_APPROVAL') {
+    const mins = Math.floor(guardianTimer / 60);
+    const secs = guardianTimer % 60;
+    const formattedTime = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+    return (
+      <View style={styles.centeredState}>
+        <View style={styles.guardianIconContainer}>
+          <Text style={{ fontSize: 44 }}>🛡️</Text>
+        </View>
+        <Text style={styles.holdTitle}>Guardian Review Required</Text>
+        <Text style={styles.holdSubtitle}>
+          This transaction has a high risk score of {score ? (score.risk_score * 100).toFixed(0) : 0}%. We have notified your active guardians to verify and approve this payment.
+        </Text>
+
+        <View style={styles.guardianCountdownCard}>
+          <Text style={styles.countdownLabel}>REMAINING TIME TO APPROVE</Text>
+          <Text style={styles.countdownTime}>{formattedTime}</Text>
+        </View>
+
+        <Text style={styles.pollingStatusText}>🔍 Listening for guardian response in real-time...</Text>
+
+        <TouchableOpacity
+          style={styles.holdCancelBtn}
+          onPress={() => {
+            if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+            Alert.alert('Payment Cancelled', 'You cancelled the transaction.');
+            setStep('FORM');
+          }}
+        >
+          <Text style={styles.holdCancelBtnText}>Cancel Payment</Text>
         </TouchableOpacity>
       </View>
     );
@@ -824,4 +978,18 @@ const styles = StyleSheet.create({
     fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: 16,
     paddingHorizontal: 20, lineHeight: 16,
   },
+  // Guardian approval styles
+  guardianIconContainer: {
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: '#312e81', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 20, borderWidth: 2, borderColor: '#6366f1',
+  },
+  guardianCountdownCard: {
+    backgroundColor: '#1e1b4b', borderRadius: 16, padding: 20,
+    alignItems: 'center', marginVertical: 24, borderWidth: 1, borderColor: '#4338ca',
+    width: '100%',
+  },
+  countdownLabel: { fontSize: 11, fontWeight: '700', color: '#818cf8', textTransform: 'uppercase', letterSpacing: 1 },
+  countdownTime: { fontSize: 44, fontWeight: '800', color: '#fb7185', marginVertical: 6 },
+  pollingStatusText: { fontSize: 13, color: '#94a3b8', fontStyle: 'italic', marginBottom: 30 },
 });

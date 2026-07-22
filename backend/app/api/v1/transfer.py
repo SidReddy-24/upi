@@ -9,7 +9,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from app.services.auth_service import verify_api_key
-from app.engines.scoring_engine import scoring_engine
+from app.models.transaction import TransactionRequest, DeviceInfo, LocationInfo, NetworkInfo, TransactionMetadata
+from app.core.scoring_engine import score_transaction
+from datetime import datetime
 from app.api.v1.user import USERS_STORE, USER_TRANSACTIONS, UserProfileResponse
 
 logger = logging.getLogger("fraudshield.transfer")
@@ -79,26 +81,35 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
         )
 
     # 3. Score transaction with FraudShield AI Engine
-    score_payload = {
-        "transaction_id": f"TXN_{uuid.uuid4().hex[:8].upper()}",
-        "sender_vpa": sender,
-        "receiver_vpa": receiver,
-        "amount": amount,
-        "currency": "INR",
-        "txn_type": "P2P",
-        "device_id": payload.device_id,
-        "ip_address": payload.ip_address,
-        "geo_lat": payload.geo_lat,
-        "geo_lon": payload.geo_lon,
-        "is_call_active": payload.is_call_active,
-        "otp_in_last_60s": payload.otp_in_last_60s,
-        "sms_fraud_score": payload.sms_fraud_score,
-    }
+    score_payload = TransactionRequest(
+        transaction_id=f"TXN_{uuid.uuid4().hex[:8].upper()}",
+        sender_vpa=sender,
+        receiver_vpa=receiver,
+        amount=amount,
+        currency="INR",
+        transaction_type="P2P",
+        timestamp=datetime.utcnow(),
+        device=DeviceInfo(
+            device_id=payload.device_id or "DEV_DEFAULT",
+            os_type="ANDROID",
+            is_emulator=False
+        ),
+        location=LocationInfo(
+            latitude=payload.geo_lat or 12.9716,
+            longitude=payload.geo_lon or 77.5946
+        ),
+        network=NetworkInfo(
+            ip_address=payload.ip_address or "127.0.0.1"
+        ),
+        metadata=TransactionMetadata(
+            org_id="SentinelPayApp"
+        )
+    )
 
-    score_result = await scoring_engine.score_transaction(score_payload)
-    decision = score_result.get("decision", "APPROVE")
-    risk_score = score_result.get("risk_score", 0.1)
-    explanation = score_result.get("explanation", {}).get("nl_summary", "Legitimate transaction")
+    score_result = await score_transaction(score_payload)
+    decision = score_result.decision
+    risk_score = score_result.risk_score
+    explanation = score_result.explanation.nl_summary if score_result.explanation else "Legitimate transaction"
 
     if decision == "REJECT":
         raise HTTPException(

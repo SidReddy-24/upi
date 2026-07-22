@@ -6,27 +6,8 @@
  *  - Real device on same WiFi → use laptop's LAN IP (e.g. 192.168.1.x)
  *  - VPS → full public URL
  */
-import axios from 'axios';
+import { authClient as client, API_BASE_URL } from './authService';
 import { TransactionRequest, FraudScore } from '../types';
-
-// 10.0.2.2 = localhost from Android emulator
-export const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
-const API_KEY = 'fs_demo_key_001';
-
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 8000,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': API_KEY,
-  },
-});
-
-// Interceptor: log every request in dev
-client.interceptors.request.use(req => {
-  console.log(`[FraudShield] ${req.method?.toUpperCase()} ${req.url}`);
-  return req;
-});
 
 export interface QRTrustResult {
   vpa: string;

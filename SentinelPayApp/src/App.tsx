@@ -27,16 +27,26 @@ import ScamAssistantScreen from './screens/ScamAssistantScreen';
 import ScamHeatMapScreen from './screens/ScamHeatMapScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
+import { authService } from './services/authService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App(): React.JSX.Element {
-  const [initialRoute, setInitialRoute] = useState<'Onboarding' | 'Home' | null>(null);
+  const [initialRoute, setInitialRoute] = useState<'Onboarding' | 'Login' | 'Home' | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
-      setInitialRoute(val === 'true' ? 'Home' : 'Onboarding');
-    });
+    const checkState = async () => {
+      const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);
+      if (onboarded !== 'true') {
+        setInitialRoute('Onboarding');
+        return;
+      }
+      const loggedIn = await authService.isLoggedIn();
+      setInitialRoute(loggedIn ? 'Home' : 'Login');
+    };
+    checkState();
   }, []);
 
   if (!initialRoute) {
@@ -63,6 +73,16 @@ export default function App(): React.JSX.Element {
               <Stack.Screen
                 name="Onboarding"
                 component={OnboardingScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Register"
+                component={RegisterScreen}
                 options={{ headerShown: false }}
               />
               <Stack.Screen
