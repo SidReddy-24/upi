@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authClient, API_BASE_URL } from './authService';
 
-// Map 10.0.2.2 for emulator WebSocket connection
-const WS_BASE_URL = API_BASE_URL.replace('http://', 'ws://');
+// Use secure WSS for the cloud production endpoint
+const WS_BASE_URL = API_BASE_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+
 
 export interface GuardianRelationship {
   id: string;
