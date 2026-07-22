@@ -83,7 +83,7 @@ export const authService = {
   /**
    * Send OTP for registration/reset.
    */
-  async sendOtp(phone: string, purpose: 'REGISTRATION' | 'PASSWORD_RESET'): Promise<{ message: string }> {
+  async sendOtp(phone: string, purpose: 'REGISTRATION' | 'PASSWORD_RESET'): Promise<any> {
     const resp = await authClient.post('/auth/send-otp', { phone, purpose });
     return resp.data;
   },

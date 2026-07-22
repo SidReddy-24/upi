@@ -34,6 +34,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   
   const [timer, setTimer] = useState(300); // 5 minutes in seconds
+  const [demoOtp, setDemoOtp] = useState('');
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -85,12 +86,15 @@ export default function RegisterScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      await authService.sendOtp(cleanPhone, 'REGISTRATION');
+      const res = await authService.sendOtp(cleanPhone, 'REGISTRATION');
       setStage(2);
       setTimer(300);
+      if (res && res.data && res.data.otp_code) {
+        setDemoOtp(res.data.otp_code);
+      }
       Alert.alert(
         'OTP Sent Successfully',
-        'A mock OTP has been generated. For testing, please check the FastAPI backend terminal console logs.'
+        'We have sent a 6-digit verification code to your device.'
       );
     } catch (error: any) {
       const msg = error.response?.data?.detail || 'Failed to send OTP. Phone number may already be registered.';
@@ -248,6 +252,13 @@ export default function RegisterScreen({ navigation }: Props) {
               <Text style={styles.instructions}>
                 We sent a 6-digit OTP code to <Text style={styles.bold}>{phone}</Text>. Enter the code below to verify your device identity.
               </Text>
+
+              {demoOtp ? (
+                <View style={styles.demoOtpBox}>
+                  <Text style={styles.demoOtpLabel}>🧪 SANDBOX OTP (DEMO KEY):</Text>
+                  <Text style={styles.demoOtpValue}>{demoOtp}</Text>
+                </View>
+              ) : null}
 
               <Text style={styles.label}>OTP Verification Code</Text>
               <TextInput
@@ -463,5 +474,27 @@ const styles = StyleSheet.create({
   footerLink: {
     color: '#6366f1',
     fontWeight: '700',
+  },
+  demoOtpBox: {
+    backgroundColor: '#1e1b4b',
+    borderWidth: 1,
+    borderColor: '#4338ca',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    marginVertical: 14,
+  },
+  demoOtpLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#818cf8',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  demoOtpValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#f43f5e',
+    letterSpacing: 4,
   },
 });

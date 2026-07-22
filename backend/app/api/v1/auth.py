@@ -227,7 +227,8 @@ async def send_otp(request: SendOTPRequest):
                 data={
                     'otp_id': str(otp_id),
                     'expires_in': 300,  # 5 minutes in seconds
-                    'phone': request.phone
+                    'phone': request.phone,
+                    'otp_code': otp_code
                 }
             )
     

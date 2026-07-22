@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getUser, resetWallet } from '../utils/walletDb';
-import { WalletUser } from '../types';
+import { WalletUser, RootStackParamList } from '../types';
+import { authService } from '../services/authService';
 
-export default function ProfileScreen() {
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Profile'>;
+};
+
+export default function ProfileScreen({ navigation }: Props) {
   const [user, setUser] = useState<WalletUser | null>(null);
   const [secureMode, setSecureMode] = useState(false);
   const [familyGuard, setFamilyGuard] = useState(true);
@@ -11,6 +17,27 @@ export default function ProfileScreen() {
   useEffect(() => {
     getUser().then(setUser);
   }, []);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of your SentinelPay account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await authService.logout();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
+          },
+        },
+      ]
+    );
+  };
 
   const handleReset = async () => {
     Alert.alert(
@@ -89,9 +116,13 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚙️ Wallet Tools & Reset</Text>
+        <Text style={styles.sectionTitle}>⚙️ Wallet Tools & Session</Text>
         <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
           <Text style={styles.resetBtnText}>🔄 Reset Demo Wallet to ₹1,00,000 SPC</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.resetBtn, styles.logoutBtn]} onPress={handleLogout}>
+          <Text style={styles.logoutBtnText}>🚪 Sign Out / Logout</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -121,4 +152,6 @@ const styles = StyleSheet.create({
   toggleDesc: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   resetBtn: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   resetBtnText: { color: '#dc2626', fontSize: 14, fontWeight: '700' },
+  logoutBtn: { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1', marginTop: 12 },
+  logoutBtnText: { color: '#475569', fontSize: 14, fontWeight: '700' },
 });
