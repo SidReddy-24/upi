@@ -88,6 +88,8 @@ Once executed, all tables and indexes will be successfully created in your datab
    - **Start Command**: `PYTHONPATH=backend gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT`
    - **Environment Variables**:
      - `DATABASE_URL`: Set to your **Supabase Connection URI**.
+       > [!IMPORTANT]
+       > You **MUST** change the prefix of the URL from `postgresql://` to `postgresql+psycopg://` (e.g., `postgresql+psycopg://postgres:YOUR_PASSWORD@db.vquyspdvswszdwgqomxv.supabase.co:5432/postgres`) so SQLAlchemy can use the correct async driver.
      - `JWT_SECRET`: Any secure random alphanumeric string.
 4. Click **Deploy**. Render will host your server at a public HTTPS URL (e.g. `https://sentinelpay-backend.onrender.com`).
 5. Update `API_BASE_URL` in `authService.ts` to this URL and build your final release APK!
