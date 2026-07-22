@@ -101,6 +101,40 @@ const fraudShieldApi = {
     const resp = await client.get('/heatmap');
     return resp.data;
   },
+
+  /**
+   * Multi-User Identity & Cloud Account APIs.
+   */
+  async registerUser(deviceId: string, name?: string, customVpa?: string): Promise<any> {
+    const resp = await client.post('/user/register', { device_id: deviceId, name, custom_vpa: customVpa });
+    return resp.data;
+  },
+
+  async getUserProfile(identifier: string): Promise<any> {
+    const resp = await client.get(`/user/profile/${encodeURIComponent(identifier)}`);
+    return resp.data;
+  },
+
+  async getUserTransactions(vpa: string): Promise<any[]> {
+    const resp = await client.get(`/user/transactions/${encodeURIComponent(vpa)}`);
+    return resp.data;
+  },
+
+  /**
+   * Atomic Multi-User P2P Transfer API.
+   */
+  async executeP2PTransfer(data: {
+    sender_vpa: string;
+    receiver_vpa: string;
+    amount: number;
+    device_id?: string;
+    is_call_active?: boolean;
+    otp_in_last_60s?: boolean;
+    sms_fraud_score?: number;
+  }): Promise<any> {
+    const resp = await client.post('/transfer', data);
+    return resp.data;
+  },
 };
 
 export default fraudShieldApi;

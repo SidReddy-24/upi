@@ -20,7 +20,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { RootStackParamList, FraudScore } from '../types';
-import { getUser, executePayment } from '../utils/walletDb';
+import { getUser, executePayment, updateBalance } from '../utils/walletDb';
 import fraudShieldApi, { QRTrustResult } from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
 import FraudExplanationCard from '../components/FraudExplanationCard';
@@ -207,22 +207,23 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       return;
     }
 
-    const fraudReason =
-      score.explanation?.summary ?? score.signals?.rule_flags?.join(', ') ?? null;
+    try {
+      const currentUser = await getUser();
+      const transferRes = await fraudShieldApi.executeP2PTransfer({
+        sender_vpa: currentUser.vpa,
+        receiver_vpa: receiverVpa.trim(),
+        amount,
+        device_id: deviceInfo.device_id,
+        is_call_active: isCallActive,
+        otp_in_last_60s: otpInLast60s,
+        sms_fraud_score: latestSmsFraudScore ?? undefined,
+      });
 
-    const result = await executePayment(
-      receiverVpa.trim(),
-      amount,
-      score.risk_score,
-      score.decision,
-      fraudReason,
-      isCallActive, // Phase 5.2.4 — log call context
-    );
-
-    if (result.success) {
+      await updateBalance(transferRes.updated_sender_balance);
       setStep('SUCCESS');
-    } else {
-      setError(result.error ?? 'Payment failed');
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail ?? e?.message ?? 'Payment failed';
+      setError(msg);
       setStep('BLOCKED');
     }
   };

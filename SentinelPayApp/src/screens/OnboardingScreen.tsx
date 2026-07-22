@@ -17,6 +17,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
+import fraudShieldApi from '../services/fraudShieldApi';
 
 export const ONBOARDING_KEY = 'sentinelpay_onboarded';
 
@@ -74,6 +75,26 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   const handleComplete = async () => {
+    try {
+      const deviceIdKey = 'sentinelpay_device_id';
+      let deviceId = await AsyncStorage.getItem(deviceIdKey);
+      if (!deviceId) {
+        deviceId = `SP_DEV_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        await AsyncStorage.setItem(deviceIdKey, deviceId);
+      }
+
+      // Register unique user profile in central database
+      const profile = await fraudShieldApi.registerUser(deviceId, 'Sentinel User');
+      await AsyncStorage.setItem('sentinelpay_user', JSON.stringify({
+        id: 1,
+        name: profile.name,
+        vpa: profile.vpa,
+        balance: profile.balance,
+        created_at: new Date().toISOString(),
+      }));
+    } catch (e) {
+      console.warn('Backend user registration fallback to local:', e);
+    }
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     navigation.replace('Home');
   };
