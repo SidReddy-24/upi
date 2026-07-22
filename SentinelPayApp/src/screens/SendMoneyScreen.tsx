@@ -229,7 +229,30 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
     await proceedWithPayment();
   };
 
-  // ── Phase 9: Proceed with payment (called after hold or directly) ──────�      await updateBalance(transferRes.updated_sender_balance);
+  // ── Phase 9: Proceed with payment (called after hold or directly) ──────────
+  const proceedWithPayment = async () => {
+    if (!score) return;
+
+    // Phase 7 — Biometric gate for ALL payments
+    const bioPassed = await requestBiometric();
+    if (!bioPassed) {
+      Alert.alert('Authentication Failed', 'Biometric authentication was not confirmed. Payment cancelled.');
+      return;
+    }
+
+    try {
+      const currentUser = await getUser();
+      const transferRes = await fraudShieldApi.executeP2PTransfer({
+        sender_vpa: currentUser.vpa,
+        receiver_vpa: receiverVpa.trim(),
+        amount,
+        device_id: deviceInfo.device_id,
+        is_call_active: isCallActive,
+        otp_in_last_60s: otpInLast60s,
+        sms_fraud_score: latestSmsFraudScore ?? undefined,
+      });
+
+      await updateBalance(transferRes.updated_sender_balance);
 
       // Phase 9: Send SMS notifications
       const settings = await getSettings();
@@ -250,27 +273,6 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         }
       }
 
-      setStep('SUCCESS'); notifications
-      const settings = await getSettings();
-      if (settings.smsNotificationsEnabled) {
-        try {
-          const user = await getUser();
-          await fraudShieldApi.sendTransactionNotification({
-            transaction_id: score.transaction_id,
-            sender_vpa: user.vpa,
-            receiver_vpa: receiverVpa.trim(),
-            amount,
-            status: score.decision,
-            risk_score: score.risk_score,
-            timestamp: new Date().toISOString(),
-          });
-        } catch (e) {
-          console.warn('[SMS] Failed to send notification:', e);
-          // Don't block on SMS failure
-        }
-      }
-      
->>>>>>> 70e26be8f3f718e8a5a71da8def8f3f96deb7f2b
       setStep('SUCCESS');
     } catch (e: any) {
       const msg = e?.response?.data?.detail ?? e?.message ?? 'Payment failed';
