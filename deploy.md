@@ -60,11 +60,25 @@ Exposing your local laptop is great for demos, but for persistent 24/7 service, 
 3. Replace the port parameter with `5432` if needed, and make sure it starts with `postgresql://`.
 
 ### Step 2: Push Schemas to Supabase
-Run the schema files directly on your Supabase instance to configure database tables:
-```bash
-psql "YOUR_SUPABASE_CONNECTION_URI" -f backend/app/db/schema.sql
-psql "YOUR_SUPABASE_CONNECTION_URI" -f backend/app/db/schema_auth.sql
-```
+
+> [!NOTE]
+> Supabase direct database connection domains (`db.xxxx.supabase.co`) are **IPv6-only** by default. If your local network or ISP does not support IPv6 routing, you will get a `No route to host` or `nodename nor servname provided` error when running `psql` locally.
+
+To bypass this network limitation, the most reliable and recommended way to initialize your tables is directly from the **Supabase Dashboard**:
+
+1. **Open the SQL Editor**:
+   - Go to your [Supabase Dashboard](https://supabase.com/dashboard) and select your project.
+   - Click on the **SQL Editor** tab (the `SQL` icon on the left sidebar navigation menu).
+2. **Execute Schema SQL**:
+   - Click **New Query**.
+   - Copy all the contents of [schema.sql](file:///Users/pranaykadam/Desktop/upi/backend/app/db/schema.sql) and paste them into the editor.
+   - Click **Run** (or press `Cmd + Enter`).
+3. **Execute Auth Schema SQL**:
+   - Click **New Query** again.
+   - Copy all the contents of [schema_auth.sql](file:///Users/pranaykadam/Desktop/upi/backend/app/db/schema_auth.sql) and paste them into the editor.
+   - Click **Run**.
+
+Once executed, all tables and indexes will be successfully created in your database instance without needing local tool setups or network tunneling.
 
 ### Step 3: Deploy the FastAPI Backend to Render
 1. Register a free account on [Render](https://render.com).
