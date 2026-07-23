@@ -24,7 +24,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneAuth'>;
 export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX.Element {
   const useMock = route.params?.useMock ?? true;
   
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('9876543210');
+
   const [otp, setOtp] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
