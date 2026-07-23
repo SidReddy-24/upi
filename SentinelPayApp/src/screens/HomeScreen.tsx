@@ -52,11 +52,56 @@ export default function HomeScreen({ navigation }: Props) {
       const u = await getUser();
       const t = await getTransactions();
       setUser(u);
-      setTxns(t.slice(0, 5)); // show last 5
+      setTxns(t.slice(0, 5));
+
+      // Sync user profile & live balance from cloud backend
+      if (u && u.vpa) {
+        try {
+          const profile = await fraudShieldApi.getUserProfile(u.vpa);
+          if (profile && typeof profile.balance === 'number') {
+            if (profile.balance !== u.balance) {
+              await updateBalance(profile.balance);
+              setUser(prev => prev ? { ...prev, balance: profile.balance } : null);
+            }
+          }
+        } catch (cloudProfileErr) {
+          console.debug('[HomeScreen] Live balance sync note:', cloudProfileErr);
+        }
+
+        // Sync cloud transaction ledger from backend
+        try {
+          const cloudTxns = await fraudShieldApi.getUserTransactions(u.vpa);
+          if (cloudTxns && Array.isArray(cloudTxns) && cloudTxns.length > 0) {
+            const formattedCloudTxns: WalletTransaction[] = cloudTxns.map(ct => ({
+              id: ct.id,
+              sender_vpa: ct.sender_vpa,
+              receiver_vpa: ct.receiver_vpa,
+              amount: ct.amount,
+              type: ct.type as 'DEBIT' | 'CREDIT',
+              status: ct.status === 'APPROVED' ? 'APPROVED' : 'REVIEW',
+              risk_score: ct.risk_score ?? 0.1,
+              decision: 'APPROVE',
+              fraud_reason: null,
+              created_at: ct.timestamp || new Date().toISOString(),
+            }));
+            
+            // Merge with local txns
+            const existingIds = new Set(t.map(item => item.id));
+            const newCloudItems = formattedCloudTxns.filter(item => !existingIds.has(item.id));
+            if (newCloudItems.length > 0) {
+              const merged = [...newCloudItems, ...t];
+              setTxns(merged.slice(0, 5));
+            }
+          }
+        } catch (cloudTxnErr) {
+          console.debug('[HomeScreen] Live txns sync note:', cloudTxnErr);
+        }
+      }
     } catch (e) {
       console.error('HomeScreen loadData:', e);
     }
   }, []);
+
 
   const checkBackend = useCallback(async () => {
     try {

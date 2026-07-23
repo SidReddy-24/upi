@@ -6,6 +6,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { AuthMode, AuthUser, AuthSession } from '../types/auth';
+import { authService } from './authService';
+import { updateUserVpa } from '../utils/walletDb';
+
 
 const rnBiometrics = new ReactNativeBiometrics();
 
@@ -129,7 +132,7 @@ class UnifiedAuthService {
   }
 
   /**
-   * Verify OTP and create session
+   * Verify OTP and create session in backend database
    */
   async verifyOtp(
     phone: string,
@@ -140,15 +143,46 @@ class UnifiedAuthService {
     try {
       // Mock mode: Accept 123456 as valid OTP
       if (useMock && otp !== '123456') {
-        return { success: false, error: 'Invalid OTP' };
+        return { success: false, error: 'Invalid OTP code. Use 123456' };
       }
 
-      // Create user and session
+      // 1. Call real backend to register/login user in PostgreSQL database
+      let backendUser: any = null;
+      let token = generateToken(phone);
+
+      try {
+        const defaultPassword = `SentinelPass_${phone.slice(-4)}!`;
+        const name = `User ${phone.slice(-4)}`;
+        const regRes = await authService.register(phone, defaultPassword, undefined, name);
+        backendUser = regRes.user;
+        token = regRes.access_token;
+      } catch (authErr: any) {
+        console.warn('[UnifiedAuth] Backend register attempt note:', authErr?.response?.data || authErr?.message);
+        // If already registered, try backend login
+        try {
+          const defaultPassword = `SentinelPass_${phone.slice(-4)}!`;
+          const loginRes = await authService.login(phone, defaultPassword);
+          backendUser = loginRes.user;
+          token = loginRes.access_token;
+        } catch (loginErr) {
+          console.warn('[UnifiedAuth] Fallback login note:', loginErr);
+        }
+      }
+
+      // Extract real backend VPA & ID or fallback to standard phone VPA format
+      const realId = backendUser?.id || generateToken(phone);
+      const realVpa = backendUser?.vpa || `${phone.slice(-10)}@sentinelpay`;
+      const realName = backendUser?.name || `User ${phone.slice(-4)}`;
+
+      // Update local wallet DB with real backend VPA and name
+      await updateUserVpa(realVpa, realName);
+
+      // Create session
       const user: AuthUser = {
-        id: generateToken(phone),
+        id: realId,
         phone,
-        name: `User ${phone.slice(-4)}`,
-        vpa: `${phone}@sentinelpay`,
+        name: realName,
+        vpa: realVpa,
         authMode: AuthMode.PHONE_OTP,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
@@ -157,7 +191,7 @@ class UnifiedAuthService {
 
       const session: AuthSession = {
         user,
-        token: generateToken(user.id),
+        token: token,
         refreshToken: generateToken(user.id + '_refresh'),
         expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
       };
@@ -172,6 +206,7 @@ class UnifiedAuthService {
       return { success: false, error: 'Failed to verify OTP' };
     }
   }
+
 
   // ==================== PIN AUTHENTICATION ====================
 
