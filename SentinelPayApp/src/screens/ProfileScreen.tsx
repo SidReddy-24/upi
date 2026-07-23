@@ -89,6 +89,7 @@ export default function ProfileScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container}>
+      {/* 1. USER PROFILE HEADER */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarBox}>
           <Text style={styles.avatarText}>👤</Text>
@@ -111,20 +112,15 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {/* 2. PAYMENT SAFETY DELAY & COOLDOWN TIMER */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🏦 Linked Bank Accounts (Mock)</Text>
-        <View style={styles.bankRow}>
-          <Text style={styles.bankName}>🏦 HDFC Bank •••• 4821</Text>
-          <Text style={styles.primaryBadge}>PRIMARY</Text>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>⏱️ Payment Delay & Safety Hold Timer</Text>
+          <View style={styles.featuredBadge}>
+            <Text style={styles.featuredBadgeText}>FEATURED</Text>
+          </View>
         </View>
-        <View style={styles.bankRow}>
-          <Text style={styles.bankName}>🏦 ICICI Bank •••• 9102</Text>
-        </View>
-      </View>
 
-      {/* ── SAFETY HOLD TIMER SETTINGS ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⏱️ Payment Delay & Safety Hold Timer</Text>
         <Text style={styles.sectionSubtitle}>
           After entering your UPI PIN, a safety delay countdown runs before money leaves your account. This gives you time to cancel if you are being coerced or scammed.
         </Text>
@@ -189,6 +185,7 @@ export default function ProfileScreen({ navigation }: Props) {
         )}
       </View>
 
+      {/* 3. GUARDIAN & BIOMETRIC PROTECTION */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🛡️ Security & Family Protection</Text>
         <View style={styles.toggleRow}>
@@ -208,8 +205,21 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {/* 4. LINKED BANK ACCOUNTS */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚙️ Wallet Tools & Session</Text>
+        <Text style={styles.sectionTitle}>🏦 Linked Bank Accounts (Mock)</Text>
+        <View style={styles.bankRow}>
+          <Text style={styles.bankName}>🏦 HDFC Bank •••• 4821</Text>
+          <Text style={styles.primaryBadge}>PRIMARY</Text>
+        </View>
+        <View style={styles.bankRow}>
+          <Text style={styles.bankName}>🏦 ICICI Bank •••• 9102</Text>
+        </View>
+      </View>
+
+      {/* 5. WALLET & SESSION ACTIONS */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>⚙️ Account & Session Management</Text>
         <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
           <Text style={styles.resetBtnText}>🔄 Reset Demo Wallet to ₹1,00,000 SPC</Text>
         </TouchableOpacity>
@@ -218,6 +228,8 @@ export default function ProfileScreen({ navigation }: Props) {
           <Text style={styles.logoutBtnText}>🚪 Sign Out / Logout</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
@@ -236,7 +248,10 @@ const styles = StyleSheet.create({
   simulatedPill: { marginTop: 12, backgroundColor: '#fef3c7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
   simulatedText: { fontSize: 11, fontWeight: '800', color: '#92400e' },
   section: { backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 6 },
+  sectionTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  featuredBadge: { backgroundColor: '#e0e7ff', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  featuredBadgeText: { fontSize: 9, fontWeight: '900', color: '#4f46e5' },
   sectionSubtitle: { fontSize: 12, color: '#64748b', lineHeight: 17, marginBottom: 12 },
   bankRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   bankName: { fontSize: 14, fontWeight: '600', color: '#374151' },
