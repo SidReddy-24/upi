@@ -17,15 +17,56 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ScanQR
 /**
  * Parse a UPI deep-link into VPA + amount.
  * Format: upi://pay?pa=vpa@bank&pn=Name&am=100&cu=INR
+ * 
+ * Handles multiple formats:
+ * - upi://pay?pa=...
+ * - UPI://pay?pa=...
+ * - Plain query string: pa=...&am=...
  */
 function parseUpiQr(raw: string): { vpa: string; amount?: number } | null {
   try {
-    const url = new URL(raw);
-    const pa = url.searchParams.get('pa');
-    const am = url.searchParams.get('am');
-    if (!pa) return null;
-    return { vpa: pa, amount: am ? parseFloat(am) : undefined };
-  } catch {
+    console.log('[ScanQR] Raw scanned data:', raw);
+
+    // Normalize: remove whitespace and convert to lowercase for scheme check
+    const normalized = raw.trim();
+    
+    // Extract query parameters from various formats
+    let queryString = '';
+    
+    if (normalized.toLowerCase().startsWith('upi://pay?')) {
+      // Standard UPI format: upi://pay?pa=...
+      queryString = normalized.split('?')[1] || '';
+    } else if (normalized.includes('?')) {
+      // Has query string but different scheme
+      queryString = normalized.split('?')[1] || '';
+    } else if (normalized.includes('pa=')) {
+      // Plain query string without scheme
+      queryString = normalized;
+    } else {
+      console.log('[ScanQR] Not a recognized UPI format');
+      return null;
+    }
+
+    console.log('[ScanQR] Extracted query string:', queryString);
+
+    // Parse query parameters manually
+    const params = new URLSearchParams(queryString);
+    const pa = params.get('pa');
+    const am = params.get('am');
+
+    if (!pa) {
+      console.log('[ScanQR] No "pa" parameter found in query string');
+      return null;
+    }
+
+    console.log('[ScanQR] Parsed VPA:', pa, 'Amount:', am);
+
+    return {
+      vpa: pa,
+      amount: am ? parseFloat(am) : undefined,
+    };
+  } catch (error) {
+    console.error('[ScanQR] Parse error:', error);
     return null;
   }
 }
@@ -46,17 +87,24 @@ export default function ScanQRScreen({ navigation }: Props) {
       const raw = codes[0].value ?? '';
       setScanned(true);
 
+      console.log('[ScanQR] QR Code scanned:', raw);
+
       const parsed = parseUpiQr(raw);
       if (parsed) {
+        console.log('[ScanQR] Successfully parsed UPI QR:', parsed);
         navigation.replace('SendMoney', {
           prefillVpa: parsed.vpa,
           prefillAmount: parsed.amount,
         });
       } else {
+        console.log('[ScanQR] Failed to parse as UPI QR');
         Alert.alert(
-          'Not a UPI QR',
-          `Scanned: ${raw.slice(0, 60)}`,
-          [{ text: 'Scan Again', onPress: () => setScanned(false) }],
+          'Invalid QR Code',
+          `This doesn't appear to be a valid UPI payment QR code.\n\nScanned data:\n${raw.slice(0, 100)}${raw.length > 100 ? '...' : ''}`,
+          [
+            { text: 'Scan Again', onPress: () => setScanned(false) },
+            { text: 'Cancel', onPress: () => navigation.goBack(), style: 'cancel' },
+          ],
         );
       }
     },

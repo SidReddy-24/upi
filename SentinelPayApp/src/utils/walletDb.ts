@@ -84,24 +84,112 @@ export async function executePayment(
   if (amount > user.balance) return { success: false, error: 'Insufficient SPC balance' };
   if (decision === 'REJECT') return { success: false, error: 'Payment blocked by fraud detection' };
 
+  // Deduct from sender's balance
   const newBalance = user.balance - amount;
   await updateBalance(newBalance);
 
-  const txn: WalletTransaction = {
-    id: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+  const txnId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+  const timestamp = new Date().toISOString();
+  const status = decision === 'APPROVE' ? 'APPROVED' : 'REVIEW';
+
+  // Create DEBIT transaction for sender
+  const debitTxn: WalletTransaction = {
+    id: txnId,
     sender_vpa: user.vpa,
     receiver_vpa: receiverVpa,
     amount,
     type: 'DEBIT',
-    status: decision === 'APPROVE' ? 'APPROVED' : 'REVIEW',
+    status,
     risk_score: riskScore,
     decision,
     fraud_reason: fraudReason,
     ...(callDuringPayment ? { call_during_payment: true } : {}),
+    created_at: timestamp,
+  };
+
+  await addTransaction(debitTxn);
+
+  // SIMULATED: If receiver is also using this app (has same VPA), credit their account
+  // This simulates a real-time transaction where receiver also has the app
+  // In production, this would be handled by a backend service
+  try {
+    const isReceiverSameApp = await checkIfReceiverHasApp(receiverVpa);
+    if (isReceiverSameApp) {
+      // Create CREDIT transaction for receiver (mirror transaction)
+      const creditTxn: WalletTransaction = {
+        id: `${txnId}_CREDIT`,
+        sender_vpa: user.vpa,
+        receiver_vpa: receiverVpa,
+        amount,
+        type: 'CREDIT',
+        status,
+        risk_score: riskScore,
+        decision,
+        fraud_reason: fraudReason,
+        created_at: timestamp,
+      };
+
+      await addTransaction(creditTxn);
+      console.log(`[walletDb] Simulated credit to receiver ${receiverVpa}: ₹${amount}`);
+    } else {
+      console.log(`[walletDb] Receiver ${receiverVpa} not using app - transaction sent to external UPI`);
+    }
+  } catch (error) {
+    console.error('[walletDb] Error processing receiver credit:', error);
+    // Don't fail the transaction if receiver credit fails (sender already debited)
+  }
+
+  return { success: true, newBalance };
+}
+
+/**
+ * Check if receiver VPA is registered in this app
+ * For demo purposes, we simulate this check
+ * In production, this would query a backend API
+ */
+async function checkIfReceiverHasApp(vpa: string): Promise<boolean> {
+  // For demo: Assume receiver has app if VPA ends with @sentinelpay
+  // In production: This would be an API call to check user registration
+  return vpa.endsWith('@sentinelpay');
+}
+
+/**
+ * Receive money (credit to balance)
+ * This would be triggered by a backend notification in production
+ * For demo, we expose it so the receiver can manually "accept" money
+ */
+export async function receivePayment(
+  senderVpa: string,
+  amount: number,
+  transactionId: string,
+  riskScore: number | null = null,
+  decision: string = 'APPROVED'
+): Promise<PaymentResult> {
+  const user = await getUser();
+
+  if (amount <= 0) return { success: false, error: 'Invalid amount' };
+
+  // Credit to receiver's balance
+  const newBalance = user.balance + amount;
+  await updateBalance(newBalance);
+
+  // Create CREDIT transaction for receiver
+  const creditTxn: WalletTransaction = {
+    id: `${transactionId}_CREDIT`,
+    sender_vpa: senderVpa,
+    receiver_vpa: user.vpa,
+    amount,
+    type: 'CREDIT',
+    status: 'APPROVED',
+    risk_score: riskScore,
+    decision,
+    fraud_reason: null,
     created_at: new Date().toISOString(),
   };
 
-  await addTransaction(txn);
+  await addTransaction(creditTxn);
+  console.log(`[walletDb] Received ₹${amount} from ${senderVpa}`);
+
   return { success: true, newBalance };
 }
 

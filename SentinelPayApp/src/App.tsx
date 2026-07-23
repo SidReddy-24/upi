@@ -29,22 +29,46 @@ import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import SmsTrackerScreen from './screens/SmsTrackerScreen';
+import SmsDetailScreen from './screens/SmsDetailScreen';
+import AuthModeSelector from './screens/AuthModeSelector';
+import PhoneAuthScreen from './screens/PhoneAuthScreen';
+import PinSetupScreen from './screens/PinSetupScreen';
+import PinLoginScreen from './screens/PinLoginScreen';
+import BiometricSetupScreen from './screens/BiometricSetupScreen';
 import { authService } from './services/authService';
+import unifiedAuthService from './services/unifiedAuthService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App(): React.JSX.Element {
-  const [initialRoute, setInitialRoute] = useState<'Onboarding' | 'Login' | 'Home' | null>(null);
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
 
   useEffect(() => {
     const checkState = async () => {
+      // Check if user has completed onboarding
       const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);
       if (onboarded !== 'true') {
         setInitialRoute('Onboarding');
         return;
       }
-      const loggedIn = await authService.isLoggedIn();
-      setInitialRoute(loggedIn ? 'Home' : 'Login');
+
+      // Check if user is authenticated with unified auth service
+      const isAuth = await unifiedAuthService.isAuthenticated();
+      if (isAuth) {
+        setInitialRoute('Home');
+        return;
+      }
+
+      // Check which auth mode was previously set
+      const authMode = await unifiedAuthService.getAuthMode();
+      if (authMode === 'pin_biometric') {
+        // User has PIN set up, go to PIN login
+        setInitialRoute('PinLogin');
+      } else {
+        // No auth mode set, show mode selector
+        setInitialRoute('AuthModeSelector');
+      }
     };
     checkState();
   }, []);
@@ -144,6 +168,41 @@ export default function App(): React.JSX.Element {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ title: 'Settings & Preferences' }}
+              />
+              <Stack.Screen
+                name="SmsTracker"
+                component={SmsTrackerScreen}
+                options={{ title: 'SMS Fraud Tracker' }}
+              />
+              <Stack.Screen
+                name="SmsDetail"
+                component={SmsDetailScreen}
+                options={{ title: 'SMS Details' }}
+              />
+              <Stack.Screen
+                name="AuthModeSelector"
+                component={AuthModeSelector}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="PhoneAuth"
+                component={PhoneAuthScreen}
+                options={{ title: 'Phone Authentication' }}
+              />
+              <Stack.Screen
+                name="PinSetup"
+                component={PinSetupScreen}
+                options={{ title: 'Setup PIN' }}
+              />
+              <Stack.Screen
+                name="PinLogin"
+                component={PinLoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="BiometricSetup"
+                component={BiometricSetupScreen}
+                options={{ title: 'Enable Biometric' }}
               />
 
             </Stack.Navigator>

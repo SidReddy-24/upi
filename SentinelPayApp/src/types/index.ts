@@ -7,7 +7,7 @@ export type RootStackParamList = {
   TransactionDetail: { txnId: string };
   ReceiveMoney: undefined;
   ScanQR: undefined;
-  ReportScam: undefined;
+  ReportScam: { entityType?: string; entityValue?: string; evidence?: string };
   ScamPassport: { entityId?: string };
   ScamAssistant: undefined;
   ScamHeatMap: undefined;
@@ -16,6 +16,13 @@ export type RootStackParamList = {
   GuardianManagement: undefined;
   Login: undefined;
   Register: undefined;
+  SmsTracker: undefined;
+  SmsDetail: { messageId: string };
+  AuthModeSelector: undefined;
+  PhoneAuth: { useMock?: boolean };
+  PinSetup: undefined;
+  PinLogin: undefined;
+  BiometricSetup: undefined;
 };
 
 // ─── Wallet / DB ──────────────────────────────────────────────────────────────

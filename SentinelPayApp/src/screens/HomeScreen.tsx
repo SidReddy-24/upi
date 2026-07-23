@@ -170,7 +170,14 @@ export default function HomeScreen({ navigation }: Props) {
 
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() => navigation.navigate('ReportScam')}>
+          onPress={() => navigation.navigate('SmsTracker')}>
+          <Text style={styles.actionIcon}>📱</Text>
+          <Text style={styles.actionLabel}>SMS Tracker</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('ReportScam', {})}>
           <Text style={styles.actionIcon}>🚨</Text>
           <Text style={styles.actionLabel}>Report Scam</Text>
         </TouchableOpacity>
@@ -188,7 +195,10 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.actionIcon}>👤</Text>
           <Text style={styles.actionLabel}>Profile</Text>
         </TouchableOpacity>
+      </View>
 
+      {/* ── SETTINGS ROW ── */}
+      <View style={[styles.actionsRow, { marginTop: 10 }]}>
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => navigation.navigate('Settings')}>
