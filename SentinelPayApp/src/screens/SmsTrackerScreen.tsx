@@ -52,7 +52,9 @@ export default function SmsTrackerScreen({ navigation }: Props): React.JSX.Eleme
     try {
       setLoading(true);
       const msgs = await getMessagesByClassification(filter);
-      setMessages(msgs);
+      // Strictly sort by timestamp descending (newest messages first)
+      const sorted = [...msgs].sort((a, b) => b.timestamp - a.timestamp);
+      setMessages(sorted);
     } catch (error) {
       console.error('[SmsTrackerScreen] Error loading messages:', error);
       Alert.alert('Error', 'Failed to load SMS messages');

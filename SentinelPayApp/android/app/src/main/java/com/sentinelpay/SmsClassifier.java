@@ -29,6 +29,44 @@ public class SmsClassifier {
      * Classifies the text and returns a fraud probability (0.0 to 1.0).
      */
     public float classify(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return 0.0f;
+        }
+
+        String lowerText = text.toLowerCase();
+
+        // 1. Phishing / Scam explicit keywords -> High Fraud Score
+        if (lowerText.contains("bit.ly") ||
+            lowerText.contains("tinyurl") ||
+            lowerText.contains("claim prize") ||
+            lowerText.contains("won lottery") ||
+            lowerText.contains("account suspended") ||
+            lowerText.contains("update kyc now") ||
+            lowerText.contains("part time job") ||
+            lowerText.contains("earn daily") ||
+            lowerText.contains("telegram.me") ||
+            lowerText.contains("click here to verify")) {
+            return 0.95f;
+        }
+
+        // 2. Real Bank Transaction keywords -> Safe / Genuine (0.0f)
+        boolean isBankTxn = lowerText.contains("debited") ||
+                            lowerText.contains("credited") ||
+                            lowerText.contains("transferred") ||
+                            lowerText.contains("received") ||
+                            lowerText.contains("available balance") ||
+                            lowerText.contains("avbl bal") ||
+                            lowerText.contains("a/c") ||
+                            lowerText.contains("acct") ||
+                            lowerText.contains("upi ref") ||
+                            lowerText.contains("vpa") ||
+                            lowerText.contains("spent on card") ||
+                            lowerText.contains("atm withdrawal");
+
+        if (isBankTxn && !lowerText.contains("share pin") && !lowerText.contains("share password")) {
+            return 0.0f;
+        }
+
         if (classifier == null) {
             Log.w(TAG, "Classifier is null, returning default score 0.0");
             return 0.0f;
@@ -36,18 +74,17 @@ public class SmsClassifier {
 
         try {
             List<Category> results = classifier.classify(text);
-            // The model returns Positive (index 1) and Negative (index 0) sentiments.
-            // We'll treat 'Negative' sentiment as Spam/Fraud for this demo, 
-            // but in reality we'd use a dedicated spam model.
             for (Category category : results) {
                 if (category.getLabel().equals("Negative") || category.getLabel().equals("1")) {
-                    return category.getScore();
+                    // Cap raw TFLite sentiment score at 0.3 for banking text
+                    float score = category.getScore();
+                    return isBankTxn ? Math.min(score, 0.2f) : score;
                 }
             }
             
-            // If labels are not named, assume index 1 is fraud
             if (results.size() > 1) {
-                return results.get(1).getScore();
+                float score = results.get(1).getScore();
+                return isBankTxn ? Math.min(score, 0.2f) : score;
             }
 
         } catch (Exception e) {
@@ -62,3 +99,4 @@ public class SmsClassifier {
         }
     }
 }
+

@@ -41,16 +41,15 @@ export interface SmsAnalysis {
 // ─── OTP detection regex ───────────────────────────────────────────────────────
 // Matches 4–8 digit codes, common OTP patterns in Indian banking SMS
 const OTP_PATTERNS = [
-  /\b(\d{4,8})\b.*(?:OTP|otp|one.?time|passcode|pin|code)/i,
-  /(?:OTP|otp|one.?time|passcode|pin|code).*\b(\d{4,8})\b/i,
-  /\b(\d{6})\b/,   // bare 6-digit fallback (most Indian bank OTPs are 6 digits)
+  /\b(\d{4,8})\b.*(?:OTP|otp|one.?time|passcode|pin|verification)/i,
+  /(?:OTP|otp|one.?time|passcode|pin|verification).*\b(\d{4,8})\b/i,
 ];
 
-// ─── Rule-based SMS classification (no TFLite yet) ────────────────────────────
+// ─── Rule-based SMS classification ─────────────────────────────────────────────
 const SCAM_KEYWORDS = [
   'won', 'winner', 'lottery', 'prize', 'claim now', 'click here', 'free gift',
-  'account suspended', 'verify immediately', 'urgent action', 'blocked',
-  'KYC expired', 'update KYC', 'your account will be', 'refund pending',
+  'account suspended', 'verify immediately', 'urgent action',
+  'KYC expired', 'update KYC', 'refund pending', 'part time job', 'earn daily',
 ];
 
 const PHISHING_KEYWORDS = [
@@ -59,25 +58,41 @@ const PHISHING_KEYWORDS = [
 ];
 
 const BANKING_SENDERS = [
-  'HDFCBK', 'ICICIBK', 'AXISBK', 'SBICRD', 'KOTAKB', 'PAYTMB',
-  'YESBNK', 'INDBNK', 'BOIIND', 'UNIONB', 'VM-ICICI', 'AD-HDFC',
+  'HDFC', 'ICICI', 'AXIS', 'SBI', 'KOTAK', 'PAYTM', 'YESBNK',
+  'INDBNK', 'BOI', 'UNION', 'FED', 'RBL', 'CANARA', 'PNB', 'IDFC', 'BOB',
 ];
 
 function classifySms(event: SmsEvent): SmsClass {
   const body   = event.body.toLowerCase();
   const sender = (event.sender || '').toUpperCase();
 
-  // OTP — check first, most common
-  if (OTP_PATTERNS.some(p => p.test(event.body))) return 'OTP';
-
-  // Phishing — link-based
+  // 1. Phishing — link-based
   if (PHISHING_KEYWORDS.some(k => body.includes(k.toLowerCase()))) return 'PHISHING';
 
-  // Scam — social engineering
+  // 2. Scam — social engineering
   if (SCAM_KEYWORDS.some(k => body.includes(k.toLowerCase()))) return 'SCAM';
 
-  // Known banking sender IDs
-  if (BANKING_SENDERS.some(s => sender.includes(s))) return 'BANKING';
+  // 3. Banking Transaction
+  const isBankKeywords =
+    body.includes('debited') ||
+    body.includes('credited') ||
+    body.includes('transferred') ||
+    body.includes('received') ||
+    body.includes('available balance') ||
+    body.includes('avbl bal') ||
+    body.includes('a/c') ||
+    body.includes('acct') ||
+    body.includes('upi ref') ||
+    body.includes('vpa');
+
+  const isBankSender =
+    /^[A-Z]{2}-[A-Z0-9]{3,8}$/.test(sender) ||
+    BANKING_SENDERS.some(s => sender.includes(s));
+
+  if (isBankKeywords || isBankSender) return 'BANKING';
+
+  // 4. OTP
+  if (OTP_PATTERNS.some(p => p.test(event.body))) return 'OTP';
 
   return 'LEGIT';
 }

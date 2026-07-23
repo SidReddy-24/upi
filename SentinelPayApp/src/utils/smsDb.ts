@@ -44,22 +44,69 @@ export function generateMessageId(sender: string, timestamp: number): string {
 }
 
 /**
- * Classify message based on fraud score
+ * Classify message based on fraud score, sender ID, and body text
  */
-export function classifyMessage(fraudScore: number): 'fraud' | 'suspicious' | 'genuine' {
+export function classifyMessage(
+  fraudScore: number,
+  sender?: string,
+  body?: string
+): 'fraud' | 'suspicious' | 'genuine' {
+  const text = (body || '').toLowerCase();
+  const snd = (sender || '').toUpperCase();
+
+  // 1. Phishing / Scam explicit keywords -> High Fraud
+  const isScamLinkOrPhish =
+    text.includes('bit.ly') ||
+    text.includes('tinyurl') ||
+    text.includes('claim prize') ||
+    text.includes('won lottery') ||
+    text.includes('account suspended') ||
+    text.includes('update kyc now') ||
+    text.includes('part time job') ||
+    text.includes('telegram.me') ||
+    text.includes('earn daily') ||
+    text.includes('click here to verify');
+
+  if (isScamLinkOrPhish) return 'fraud';
+
+  // 2. Real Bank Transaction keywords / senders -> Genuine (Safe)
+  const isBankKeywords =
+    text.includes('debited') ||
+    text.includes('credited') ||
+    text.includes('transferred') ||
+    text.includes('received') ||
+    text.includes('available balance') ||
+    text.includes('avbl bal') ||
+    text.includes('a/c') ||
+    text.includes('acct') ||
+    text.includes('upi ref') ||
+    text.includes('vpa') ||
+    text.includes('spent on card') ||
+    text.includes('atm withdrawal');
+
+  const isBankSender =
+    /^[A-Z]{2}-[A-Z0-9]{3,8}$/.test(snd) ||
+    ['HDFC', 'ICICI', 'AXIS', 'SBI', 'KOTAK', 'PAYTM', 'YESBNK', 'INDBNK', 'BOI', 'UNION', 'FED', 'RBL', 'CANARA', 'PNB', 'IDFC', 'BOB'].some((b) => snd.includes(b));
+
+  if ((isBankKeywords || isBankSender) && !text.includes('share pin') && !text.includes('share password')) {
+    return 'genuine';
+  }
+
+  // 3. Fallback based on ML score
   if (fraudScore >= 0.7) return 'fraud';
   if (fraudScore >= 0.4) return 'suspicious';
   return 'genuine';
 }
 
 /**
- * Get all SMS messages from storage
+ * Get all SMS messages from storage (strictly sorted newest first)
  */
 export async function getAllMessages(): Promise<SmsMessage[]> {
   try {
     const data = await AsyncStorage.getItem(SMS_STORAGE_KEY);
     if (!data) return [];
-    return JSON.parse(data);
+    const list: SmsMessage[] = JSON.parse(data);
+    return list.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
     console.error('[smsDb] Error reading messages:', error);
     return [];
@@ -78,7 +125,7 @@ export async function getMessagesPaginated(
 }
 
 /**
- * Get messages filtered by classification
+ * Get messages filtered by classification (sorted newest first)
  */
 export async function getMessagesByClassification(
   classification: 'fraud' | 'suspicious' | 'genuine' | 'all'
@@ -123,10 +170,11 @@ export async function storeMessage(message: SmsMessage): Promise<void> {
       // Update existing message
       messages[existingIndex] = message;
     } else {
-      // Add new message (prepend for newest first)
+      // Add new message
       messages.unshift(message);
     }
     
+    messages.sort((a, b) => b.timestamp - a.timestamp);
     await AsyncStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(messages));
     await updateStats();
   } catch (error) {
@@ -136,7 +184,7 @@ export async function storeMessage(message: SmsMessage): Promise<void> {
 }
 
 /**
- * Store multiple SMS messages in batch
+ * Store multiple SMS messages in batch (sorted newest first)
  */
 export async function storeMessagesBatch(messages: SmsMessage[]): Promise<void> {
   try {
@@ -147,7 +195,7 @@ export async function storeMessagesBatch(messages: SmsMessage[]): Promise<void> 
     const newMessages = messages.filter((m) => !existingIds.has(m.id));
     
     if (newMessages.length > 0) {
-      const updated = [...newMessages, ...existing];
+      const updated = [...existing, ...newMessages].sort((a, b) => b.timestamp - a.timestamp);
       await AsyncStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(updated));
       await updateStats();
     }

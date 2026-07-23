@@ -183,7 +183,7 @@ export function useSmsTracker() {
           body: raw.body,
           timestamp: raw.timestamp,
           fraudScore: raw.fraudScore,
-          classification: classifyMessage(raw.fraudScore),
+          classification: classifyMessage(raw.fraudScore, raw.sender, raw.body),
           scannedAt: Date.now(),
         }));
 
@@ -258,7 +258,7 @@ export function useSmsTracker() {
           body: data.body,
           timestamp: data.timestamp,
           fraudScore: data.fraudScore,
-          classification: classifyMessage(data.fraudScore),
+          classification: classifyMessage(data.fraudScore, data.sender, data.body),
           scannedAt: Date.now(),
         };
 
