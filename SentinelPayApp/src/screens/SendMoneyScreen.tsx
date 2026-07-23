@@ -29,6 +29,7 @@ import { useCallState } from '../hooks/useCallState';
 import { useDeviceFingerprint } from '../hooks/useDeviceFingerprint';
 import { getSettings } from '../utils/settingsDb';
 import guardianService from '../services/guardianService';
+import UpiPinModal from '../components/UpiPinModal';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SendMoney'>;
@@ -36,6 +37,7 @@ type Props = {
 };
 
 type Step = 'FORM' | 'SCORING' | 'RESULT' | 'HOLD' | 'SUCCESS' | 'BLOCKED' | 'AWAITING_GUARDIAN_APPROVAL';
+
 
 function genTxnId() {
   return `TXN_SP_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
@@ -317,24 +319,35 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
     }
   };
 
-  // ── Step 2: Execute payment after decision ─────────────────────────────────
+  const [showUpiPinModal, setShowUpiPinModal] = useState(false);
+
+  // ── Step 2: Open UPI PIN modal when user confirms payment ───────────
   const handleExecute = async () => {
     if (!score) return;
+    setShowUpiPinModal(true);
+  };
 
-    // Phase 9 — Check Transaction Hold settings
+  // ── Step 3: Handle successful UPI PIN entry ────────────────────────────────
+  const handleUpiPinSuccess = async () => {
+    setShowUpiPinModal(false);
+    if (!score) return;
+
+    // Check Transaction Hold / Safety Delay Timer settings
     const settings = await getSettings();
     if (settings.holdEnabled && amount >= settings.holdThresholdAmount) {
-      // Enter HOLD state
+      // Enter HOLD state with countdown timer
       setStep('HOLD');
       setHoldCountdown(settings.holdDuration);
       
+      if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+
       // Start hold countdown timer
       holdTimerRef.current = setInterval(() => {
         setHoldCountdown(prev => {
           if (prev <= 1) {
             clearInterval(holdTimerRef.current!);
-            // Auto-cancel when timer reaches 0
-            handleCancelHold();
+            // Proceed with payment automatically when timer hits 0
+            proceedWithPayment();
             return 0;
           }
           return prev - 1;
@@ -343,9 +356,10 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Continue with biometric and payment
+    // Continue with payment execution directly
     await proceedWithPayment();
   };
+
 
   // ── Phase 9: Proceed with payment (called after hold or directly) ──────────
   const proceedWithPayment = async () => {
@@ -777,6 +791,15 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       )}
 
       <View style={{ height: 40 }} />
+
+      {/* UPI PIN Modal */}
+      <UpiPinModal
+        visible={showUpiPinModal}
+        amount={amount}
+        receiverVpa={receiverVpa.trim()}
+        onSuccess={handleUpiPinSuccess}
+        onCancel={() => setShowUpiPinModal(false)}
+      />
     </ScrollView>
   );
 }
