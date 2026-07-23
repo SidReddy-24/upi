@@ -73,6 +73,9 @@ dependencies {
     // TFLite Text Classification
     implementation 'org.tensorflow:tensorflow-lite-task-text:0.4.4'
 
+    // ZXing QR Code Decoder for Gallery Image Scanning
+    implementation 'com.google.zxing:core:3.5.3'
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

@@ -20,6 +20,7 @@ class MainApplication : Application(), ReactApplication {
               add(SmsReceiverPackage())
               add(SmsReaderPackage())
               add(CallStatePackage())
+              add(QrDecoderPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"
