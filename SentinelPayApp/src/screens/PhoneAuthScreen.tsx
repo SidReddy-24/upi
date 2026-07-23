@@ -56,14 +56,6 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
       if (result.success && result.sessionId) {
         setSessionId(result.sessionId);
         setStep('otp');
-        
-        if (useMock) {
-          Alert.alert(
-            'OTP Sent (Mock Mode)',
-            'Use OTP: 123456\n\nIn production, you would receive this via SMS.',
-            [{ text: 'OK' }]
-          );
-        }
       } else {
         Alert.alert('Error', result.error || 'Failed to send OTP');
       }
@@ -89,20 +81,12 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
       const result = await unifiedAuthService.verifyOtp(phone, otp, sessionId, useMock);
       
       if (result.success) {
-        Alert.alert(
-          'Success!',
-          'You have been logged in successfully',
-          [
-            {
-              text: 'Continue',
-              onPress: () => navigation.replace('Home'),
-            },
-          ]
-        );
+        navigation.replace('Home');
       } else {
         Alert.alert('Verification Failed', result.error || 'Invalid OTP. Please try again.');
         setOtp('');
       }
+
     } catch (error) {
       console.error('[PhoneAuth] Verify OTP error:', error);
       Alert.alert('Error', 'Failed to verify OTP. Please try again.');
