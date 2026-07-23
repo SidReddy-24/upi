@@ -4,7 +4,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getUser, resetWallet } from '../utils/walletDb';
 import { WalletUser, RootStackParamList } from '../types';
 import { authService } from '../services/authService';
+import unifiedAuthService from '../services/unifiedAuthService';
 import { getSettings, updateSettings, UserSettings } from '../utils/settingsDb';
+
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Profile'>;
@@ -54,12 +56,14 @@ export default function ProfileScreen({ navigation }: Props) {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
+            await unifiedAuthService.logout();
             await authService.logout();
             navigation.reset({
               index: 0,
-              routes: [{ name: 'Login' }],
+              routes: [{ name: 'AuthModeSelector' }],
             });
           },
+
         },
       ]
     );

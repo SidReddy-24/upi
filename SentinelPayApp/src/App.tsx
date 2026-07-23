@@ -12,6 +12,9 @@ import { RootStackParamList } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import PanicButton from './components/PanicButton';
 import { ONBOARDING_KEY } from './screens/OnboardingScreen';
+import { getUser } from './utils/walletDb';
+
+
 
 // Screens
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -53,12 +56,14 @@ export default function App(): React.JSX.Element {
         return;
       }
 
-      // Check if user is authenticated with unified auth service
+      // Check if user is authenticated with unified auth service and has valid profile
       const isAuth = await unifiedAuthService.isAuthenticated();
-      if (isAuth) {
+      const user = await getUser();
+      if (isAuth && user) {
         setInitialRoute('Home');
         return;
       }
+
 
       // Check which auth mode was previously set
       const authMode = await unifiedAuthService.getAuthMode();

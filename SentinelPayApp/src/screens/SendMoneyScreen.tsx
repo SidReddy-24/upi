@@ -222,11 +222,12 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
     try {
       const user = await getUser();
-      if (amount > user.balance) {
-        setError('Insufficient SPC balance');
+      if (!user || amount > user.balance) {
+        setError(user ? 'Insufficient SPC balance' : 'User not logged in');
         setStep('FORM');
         return;
       }
+
 
       const txnId = genTxnId();
       const result = await fraudShieldApi.scoreTransaction({
@@ -374,7 +375,12 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
     try {
       const currentUser = await getUser();
+      if (!currentUser) {
+        Alert.alert('Error', 'User is not logged in');
+        return;
+      }
       const transferRes = await fraudShieldApi.executeP2PTransfer({
+
         sender_vpa: currentUser.vpa,
         receiver_vpa: receiverVpa.trim(),
         amount,

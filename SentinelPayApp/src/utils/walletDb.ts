@@ -22,26 +22,37 @@ const DEFAULT_USER: WalletUser = {
 
 // ─── User / Balance ────────────────────────────────────────────────────────────
 
-export async function getUser(): Promise<WalletUser> {
+export async function getUser(): Promise<WalletUser | null> {
   const raw = await AsyncStorage.getItem(KEYS.USER);
-  if (raw) return JSON.parse(raw);
-  // First launch — initialize with ₹1,00,000 SPC
-  await AsyncStorage.setItem(KEYS.USER, JSON.stringify(DEFAULT_USER));
-  return DEFAULT_USER;
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export async function updateBalance(newBalance: number): Promise<void> {
   const user = await getUser();
+  if (!user) return;
   user.balance = newBalance;
   await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
 }
 
-export async function updateUserVpa(vpa: string, name: string): Promise<void> {
-  const user = await getUser();
-  user.vpa = vpa;
-  user.name = name;
-  await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
+export async function updateUserVpa(vpa: string, name: string, balance: number = 100000): Promise<void> {
+  const existing = await getUser();
+  const updatedUser: WalletUser = {
+    id: existing?.id || 1,
+    vpa,
+    name,
+    balance: existing?.balance ?? balance,
+    created_at: existing?.created_at || new Date().toISOString(),
+  };
+  await AsyncStorage.setItem(KEYS.USER, JSON.stringify(updatedUser));
 }
+
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
@@ -79,6 +90,7 @@ export async function executePayment(
   callDuringPayment?: boolean, // Phase 5.2.4
 ): Promise<PaymentResult> {
   const user = await getUser();
+  if (!user) return { success: false, error: 'User not logged in' };
 
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
   if (amount > user.balance) return { success: false, error: 'Insufficient SPC balance' };
@@ -110,12 +122,9 @@ export async function executePayment(
   await addTransaction(debitTxn);
 
   // SIMULATED: If receiver is also using this app (has same VPA), credit their account
-  // This simulates a real-time transaction where receiver also has the app
-  // In production, this would be handled by a backend service
   try {
     const isReceiverSameApp = await checkIfReceiverHasApp(receiverVpa);
     if (isReceiverSameApp) {
-      // Create CREDIT transaction for receiver (mirror transaction)
       const creditTxn: WalletTransaction = {
         id: `${txnId}_CREDIT`,
         sender_vpa: user.vpa,
@@ -130,13 +139,9 @@ export async function executePayment(
       };
 
       await addTransaction(creditTxn);
-      console.log(`[walletDb] Simulated credit to receiver ${receiverVpa}: ₹${amount}`);
-    } else {
-      console.log(`[walletDb] Receiver ${receiverVpa} not using app - transaction sent to external UPI`);
     }
   } catch (error) {
     console.error('[walletDb] Error processing receiver credit:', error);
-    // Don't fail the transaction if receiver credit fails (sender already debited)
   }
 
   return { success: true, newBalance };
@@ -144,19 +149,13 @@ export async function executePayment(
 
 /**
  * Check if receiver VPA is registered in this app
- * For demo purposes, we simulate this check
- * In production, this would query a backend API
  */
 async function checkIfReceiverHasApp(vpa: string): Promise<boolean> {
-  // For demo: Assume receiver has app if VPA ends with @sentinelpay
-  // In production: This would be an API call to check user registration
   return vpa.endsWith('@sentinelpay');
 }
 
 /**
  * Receive money (credit to balance)
- * This would be triggered by a backend notification in production
- * For demo, we expose it so the receiver can manually "accept" money
  */
 export async function receivePayment(
   senderVpa: string,
@@ -166,6 +165,7 @@ export async function receivePayment(
   decision: string = 'APPROVED'
 ): Promise<PaymentResult> {
   const user = await getUser();
+  if (!user) return { success: false, error: 'User not logged in' };
 
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
 
@@ -187,8 +187,11 @@ export async function receivePayment(
     created_at: new Date().toISOString(),
   };
 
+
   await addTransaction(creditTxn);
   console.log(`[walletDb] Received ₹${amount} from ${senderVpa}`);
+
+
 
   return { success: true, newBalance };
 }

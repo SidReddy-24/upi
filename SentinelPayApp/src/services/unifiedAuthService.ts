@@ -403,12 +403,18 @@ class UnifiedAuthService {
     try {
       await AsyncStorage.removeItem(AUTH_SESSION_KEY);
       await AsyncStorage.removeItem(AUTH_MODE_KEY);
-      // Note: We keep PIN_HASH_KEY and BIOMETRIC_ENABLED_KEY for next login
+      await AsyncStorage.removeItem('sentinelpay_user');
+      try {
+        await authService.logout();
+      } catch (e) {
+        console.warn('Backend logout note:', e);
+      }
       console.log('[UnifiedAuth] Logged out successfully');
     } catch (error) {
       console.error('[UnifiedAuth] logout error:', error);
     }
   }
+
 }
 
 export default new UnifiedAuthService();

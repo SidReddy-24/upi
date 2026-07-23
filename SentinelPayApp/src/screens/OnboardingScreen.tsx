@@ -96,8 +96,9 @@ export default function OnboardingScreen({ navigation }: Props) {
       console.warn('Backend user registration fallback to local:', e);
     }
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    navigation.replace('Home');
+    navigation.replace('AuthModeSelector');
   };
+
 
   const slide = SLIDES[current];
   const isLast = current === SLIDES.length - 1;

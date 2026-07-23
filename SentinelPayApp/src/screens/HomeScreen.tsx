@@ -50,9 +50,14 @@ export default function HomeScreen({ navigation }: Props) {
   const loadData = useCallback(async () => {
     try {
       const u = await getUser();
+      if (!u) {
+        navigation.replace('AuthModeSelector');
+        return;
+      }
       const t = await getTransactions();
       setUser(u);
       setTxns(t.slice(0, 5));
+
 
       // Sync user profile & live balance from cloud backend
       if (u && u.vpa) {
