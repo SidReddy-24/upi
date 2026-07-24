@@ -255,17 +255,28 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
       setScore(result);
 
-      if (result.decision !== 'REJECT' && result.risk_score > 0.7) {
-        // Check active guardians count
+      setScore(result);
+
+      if (result.decision !== 'REJECT') {
+        // Fetch active guardians count & cumulative limit config
         let activeGuardiansCount = 0;
+        let remainingLimit = 5000;
+        let timeoutMinutes = 5;
+
         try {
           const listRes = await guardianService.listGuardians();
           activeGuardiansCount = listRes.guardians.filter(g => g.status === 'ACTIVE').length;
+          
+          const limitRes = await guardianService.getGuardianLimit();
+          remainingLimit = limitRes.remaining_limit;
+          timeoutMinutes = limitRes.timeout_minutes || 5;
         } catch (e) {
-          console.warn('Failed to fetch guardians list:', e);
+          console.warn('Failed to fetch guardians list/limit:', e);
         }
 
-        if (activeGuardiansCount > 0) {
+        const requiresApproval = activeGuardiansCount > 0 && (amount > remainingLimit || remainingLimit <= 0 || result.risk_score > 0.7);
+
+        if (requiresApproval) {
           try {
             const reqRes = await guardianService.requestApproval({
               transaction_id: txnId,
@@ -277,13 +288,14 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
             if (reqRes && reqRes.success) {
               setStep('AWAITING_GUARDIAN_APPROVAL');
-              setGuardianTimer(300);
+              const initialSeconds = timeoutMinutes * 60;
+              setGuardianTimer(initialSeconds);
               if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
               guardianTimerRef.current = setInterval(() => {
                 setGuardianTimer(prev => {
                   if (prev <= 1) {
                     clearInterval(guardianTimerRef.current!);
-                    Alert.alert('⏳ Guardian Request Expired', 'The guardian approval request timed out (5 minutes). Payment cancelled.');
+                    Alert.alert('⏳ Guardian Request Expired', `The guardian approval request timed out (${timeoutMinutes} minutes). Payment cancelled.`);
                     setStep('BLOCKED');
                     return 0;
                   }

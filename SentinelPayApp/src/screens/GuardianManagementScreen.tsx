@@ -45,6 +45,69 @@ export default function GuardianManagementScreen({ navigation }: Props) {
   // In-app notifications feed (verification codes)
   const [verificationLogs, setVerificationLogs] = useState<{ id: string; code: string; inviter: string; phone?: string }[]>([]);
 
+  // Ward Management Modal State
+  const [selectedWard, setSelectedWard] = useState<WardRelationship | null>(null);
+  const [wardModalVisible, setWardModalVisible] = useState(false);
+  const [wardDetailsLoading, setWardDetailsLoading] = useState(false);
+  const [wardDetailsData, setWardDetailsData] = useState<any>(null);
+  const [wardLimitInput, setWardLimitInput] = useState('5000');
+  const [wardTimeoutInput, setWardTimeoutInput] = useState('5');
+  const [wardSaving, setWardSaving] = useState(false);
+
+  const handleOpenWardModal = async (ward: WardRelationship) => {
+    setSelectedWard(ward);
+    setWardLimitInput(String(ward.spending_limit || 5000));
+    setWardTimeoutInput(String(ward.timeout_minutes || 5));
+    setWardModalVisible(true);
+    setWardDetailsLoading(true);
+
+    try {
+      const data = await guardianService.getWardDetails(ward.ward_vpa || ward.ward_phone);
+      setWardDetailsData(data);
+      if (data && data.config) {
+        setWardLimitInput(String(data.config.limit));
+        setWardTimeoutInput(String(data.config.timeout_minutes));
+      }
+    } catch (e) {
+      console.warn('Failed to load ward details:', e);
+    } finally {
+      setWardDetailsLoading(false);
+    }
+  };
+
+  const handleSaveWardConfig = async () => {
+    if (!selectedWard) return;
+    const limitNum = parseFloat(wardLimitInput);
+    const timeoutNum = parseInt(wardTimeoutInput, 10);
+
+    if (isNaN(limitNum) || limitNum <= 0) {
+      Alert.alert('Invalid Limit', 'Enter a valid limit amount (e.g. 5000)');
+      return;
+    }
+    if (isNaN(timeoutNum) || timeoutNum < 1 || timeoutNum > 60) {
+      Alert.alert('Invalid Timeout', 'Timeout must be between 1 and 60 minutes.');
+      return;
+    }
+
+    setWardSaving(true);
+    try {
+      await guardianService.setWardConfig({
+        ward_vpa: selectedWard.ward_vpa,
+        ward_phone: selectedWard.ward_phone,
+        limit: limitNum,
+        timeout_minutes: timeoutNum,
+      });
+
+      Alert.alert('Success', `Ward configuration updated: Limit ₹${limitNum.toLocaleString('en-IN')}, Timeout ${timeoutNum}m`);
+      setWardModalVisible(false);
+      fetchRelationships();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to save ward configuration.');
+    } finally {
+      setWardSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchRelationships();
     loadLimit();
@@ -525,57 +588,118 @@ export default function GuardianManagementScreen({ navigation }: Props) {
               <Text style={styles.cardTitle}>Users You Protect (Wards)</Text>
             </View>
             <Text style={styles.cardDescription}>
-              As a guardian, you will receive real-time notifications to review and approve high-risk or high-value transfers initiated by these users.
+              Configure cumulative spending limits, monitor financial activity, and review transaction approval requests for all your protected wards.
             </Text>
 
             {wards.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <AppIcon name="users" size={36} color="#475569" />
                 <Text style={styles.emptyTitle}>Not Protecting Anyone Yet</Text>
-                <Text style={styles.emptyText}>When another user adds you as their guardian, their requests will appear here.</Text>
+                <Text style={styles.emptyText}>When another user adds you as their guardian, their profile and spending controls will appear here.</Text>
               </View>
             ) : (
-              wards.map((item) => (
-                <View key={item.id} style={styles.itemRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: '#3B82F6' }]}>
-                    <Text style={styles.avatarLetter}>{(item.ward_name || 'W')[0].toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.ward_name || 'Sentinel Ward'}</Text>
-                    <Text style={styles.itemSub}>{item.ward_vpa || item.ward_phone}</Text>
-                  </View>
-                  <View style={styles.itemActions}>
-                    {item.status === 'PENDING' ? (
-                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                        {item.verification_code && (
-                          <View style={styles.otpFeedItem}>
-                            <Text style={styles.otpFeedUser}>Code to share with ward:</Text>
-                            <Text style={styles.otpFeedCode}>{item.verification_code}</Text>
+              wards.map((item) => {
+                const spent = item.cumulative_spent || 0;
+                const limit = item.spending_limit || 5000;
+                const remaining = item.remaining_limit !== undefined ? item.remaining_limit : Math.max(0, limit - spent);
+                const percentSpent = Math.min(100, Math.round((spent / limit) * 100));
+                const timeoutMins = item.timeout_minutes || 5;
+
+                return (
+                  <View key={item.id} style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#1E293B', marginBottom: 12 }]}>
+                    <View style={styles.itemRow}>
+                      <View style={[styles.avatarCircle, { backgroundColor: '#3B82F6' }]}>
+                        <Text style={styles.avatarLetter}>{(item.ward_name || 'W')[0].toUpperCase()}</Text>
+                      </View>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemName}>{item.ward_name || 'Sentinel Ward'}</Text>
+                        <Text style={styles.itemSub}>{item.ward_vpa || item.ward_phone}</Text>
+                      </View>
+                      <View style={styles.itemActions}>
+                        {item.status === 'PENDING' ? (
+                          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                            {item.verification_code && (
+                              <View style={styles.otpFeedItem}>
+                                <Text style={styles.otpFeedUser}>Code to share with ward:</Text>
+                                <Text style={styles.otpFeedCode}>{item.verification_code}</Text>
+                              </View>
+                            )}
+                            <TouchableOpacity
+                              style={styles.acceptBtn}
+                              onPress={() => handleAcceptInvite(item.id)}
+                            >
+                              <Text style={styles.acceptBtnText}>Accept & Link</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View style={styles.row}>
+                            <View style={[styles.activePill, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
+                              <Text style={[styles.activePillText, { color: '#60A5FA' }]}>PROTECTING</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={styles.removeBtn}
+                              onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
+                            >
+                              <AppIcon name="trash" size={16} color="#EF4444" />
+                            </TouchableOpacity>
                           </View>
                         )}
-                        <TouchableOpacity
-                          style={styles.acceptBtn}
-                          onPress={() => handleAcceptInvite(item.id)}
-                        >
-                          <Text style={styles.acceptBtnText}>Accept & Link</Text>
-                        </TouchableOpacity>
                       </View>
-                    ) : (
-                      <View style={styles.row}>
-                        <View style={[styles.activePill, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-                          <Text style={[styles.activePillText, { color: '#60A5FA' }]}>PROTECTING</Text>
+                    </View>
+
+                    {/* Ward Cumulative Spending Progress Bar */}
+                    {item.status === 'ACTIVE' && (
+                      <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '600' }}>Cumulative Spent</Text>
+                          <Text style={{ color: '#F8FAFC', fontSize: 12, fontWeight: '700' }}>
+                            ₹{spent.toLocaleString('en-IN')} / ₹{limit.toLocaleString('en-IN')}
+                          </Text>
                         </View>
+
+                        {/* Progress Bar Container */}
+                        <View style={{ height: 8, backgroundColor: '#334155', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                          <View
+                            style={{
+                              height: '100%',
+                              width: `${percentSpent}%`,
+                              backgroundColor: percentSpent >= 100 ? '#EF4444' : percentSpent >= 80 ? '#F59E0B' : '#10B981',
+                              borderRadius: 4,
+                            }}
+                          />
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ color: remaining <= 0 ? '#EF4444' : '#10B981', fontSize: 11, fontWeight: '600' }}>
+                            {remaining <= 0 ? '⚠️ Limit Exhausted (Approval Required for All Txns)' : `₹${remaining.toLocaleString('en-IN')} available limit`}
+                          </Text>
+                          <Text style={{ color: '#64748B', fontSize: 11 }}>Timeout: {timeoutMins}m</Text>
+                        </View>
+
+                        {/* Manage Ward Button */}
                         <TouchableOpacity
-                          style={styles.removeBtn}
-                          onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
+                          style={{
+                            marginTop: 10,
+                            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                            borderColor: '#3B82F6',
+                            borderWidth: 1,
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                          }}
+                          onPress={() => handleOpenWardModal(item)}
                         >
-                          <AppIcon name="trash" size={16} color="#EF4444" />
+                          <AppIcon name="settings" size={14} color="#60A5FA" />
+                          <Text style={{ color: '#60A5FA', fontWeight: '700', fontSize: 12 }}>Manage Limit & Transactions</Text>
                         </TouchableOpacity>
                       </View>
                     )}
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         )}
@@ -710,6 +834,140 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── WARD DETAIL & LIMIT MANAGEMENT MODAL ─── */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={wardModalVisible}
+        onRequestClose={() => setWardModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.cardTitleRow}>
+                <AppIcon name="users" size={18} color="#3B82F6" />
+                <Text style={styles.modalTitle}>{selectedWard?.ward_name || 'Ward Management'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setWardModalVisible(false)}>
+                <Text style={styles.modalCloseIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>
+              {selectedWard?.ward_vpa || selectedWard?.ward_phone}
+            </Text>
+
+            <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
+              {/* 1. Cumulative Spending Limit Config */}
+              <View style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#334155', marginBottom: 14 }]}>
+                <Text style={[styles.cardTitle, { fontSize: 13, marginBottom: 4 }]}>Configure Cumulative Spending Limit</Text>
+                <Text style={[styles.cardDescription, { fontSize: 11, marginBottom: 10 }]}>
+                  Set the total amount this ward can spend before explicit guardian approval is required for all transactions.
+                </Text>
+
+                <View style={styles.presetRow}>
+                  {['1000', '5000', '10000', '25000'].map((preset) => (
+                    <TouchableOpacity
+                      key={preset}
+                      style={[styles.presetChip, wardLimitInput === preset && styles.presetChipActive]}
+                      onPress={() => setWardLimitInput(preset)}
+                    >
+                      <Text style={[styles.presetChipText, wardLimitInput === preset && styles.presetChipTextActive]}>
+                        ₹{parseInt(preset).toLocaleString('en-IN')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.inputRow}>
+                  <View style={styles.currencyPrefix}>
+                    <Text style={styles.currencyText}>₹</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.input, { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]}
+                    placeholder="Limit Amount e.g. 5000"
+                    placeholderTextColor="#64748B"
+                    value={wardLimitInput}
+                    onChangeText={setWardLimitInput}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              {/* 2. Approval Request Timeout Config */}
+              <View style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#334155', marginBottom: 14 }]}>
+                <Text style={[styles.cardTitle, { fontSize: 13, marginBottom: 4 }]}>Configure Approval Request Timeout</Text>
+                <Text style={[styles.cardDescription, { fontSize: 11, marginBottom: 10 }]}>
+                  Duration for approval requests before unapproved transactions automatically expire and cancel.
+                </Text>
+
+                <View style={styles.presetRow}>
+                  {['1', '3', '5', '10'].map((preset) => (
+                    <TouchableOpacity
+                      key={preset}
+                      style={[styles.presetChip, wardTimeoutInput === preset && styles.presetChipActive]}
+                      onPress={() => setWardTimeoutInput(preset)}
+                    >
+                      <Text style={[styles.presetChipText, wardTimeoutInput === preset && styles.presetChipTextActive]}>
+                        {preset} min
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Timeout in minutes (1 - 60)"
+                    placeholderTextColor="#64748B"
+                    value={wardTimeoutInput}
+                    onChangeText={setWardTimeoutInput}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveLimitButton, wardSaving && styles.buttonDisabled, { width: '100%', marginBottom: 16 }]}
+                onPress={handleSaveWardConfig}
+                disabled={wardSaving}
+              >
+                {wardSaving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.saveLimitButtonText}>Save Ward Configuration</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* 3. Ward Transaction History */}
+              <View style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#334155' }]}>
+                <Text style={[styles.cardTitle, { fontSize: 13, marginBottom: 8 }]}>Ward Transaction History</Text>
+                {wardDetailsLoading ? (
+                  <ActivityIndicator color="#3B82F6" size="small" style={{ marginVertical: 12 }} />
+                ) : wardDetailsData && wardDetailsData.transactions && wardDetailsData.transactions.length > 0 ? (
+                  wardDetailsData.transactions.map((t: any) => (
+                    <View key={t.transaction_id} style={[styles.itemRow, { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#1E293B' }]}>
+                      <View style={styles.itemInfo}>
+                        <Text style={[styles.itemName, { fontSize: 13 }]}>{t.receiver_vpa}</Text>
+                        <Text style={[styles.itemSub, { fontSize: 10 }]}>{new Date(t.created_at || Date.now()).toLocaleDateString()}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: '#F8FAFC', fontWeight: '700', fontSize: 13 }}>₹{t.amount?.toLocaleString('en-IN')}</Text>
+                        <Text style={{ color: t.status === 'APPROVED' || t.status === 'SUCCESS' ? '#10B981' : '#EF4444', fontSize: 10, fontWeight: '600' }}>
+                          {t.status}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={{ color: '#64748B', fontSize: 12, textAlign: 'center', marginVertical: 10 }}>No transactions recorded for this ward yet.</Text>
+                )}
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

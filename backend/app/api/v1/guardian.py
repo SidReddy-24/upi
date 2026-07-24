@@ -31,9 +31,10 @@ from app.api.v1.auth import get_current_user, get_db, verify_access_token
 logger = logging.getLogger("fraudshield.api.guardian")
 router = APIRouter()
 
-# In-Memory stores for guardian verification & limits
+# In-Memory stores for guardian verification, limits & timeout configurations
 GUARDIAN_VERIFICATION_CODES: Dict[str, dict] = {} # rel_id -> { code, expires_at, guardian_phone }
-GUARDIAN_LIMITS_STORE: Dict[str, float] = {}        # user_id or phone -> limit float (default 5000.0)
+GUARDIAN_LIMITS_STORE: Dict[str, float] = {}        # user_id / phone / vpa -> limit float (default 5000.0)
+GUARDIAN_TIMEOUTS_STORE: Dict[str, int] = {}       # user_id / phone / vpa -> timeout_minutes int (default 5)
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
@@ -52,6 +53,14 @@ class SetGuardianLimitRequest(BaseModel):
     limit: float = Field(..., gt=0)
     ward_vpa: Optional[str] = None
     ward_phone: Optional[str] = None
+
+
+class SetWardConfigRequest(BaseModel):
+    ward_vpa: Optional[str] = None
+    ward_phone: Optional[str] = None
+    ward_id: Optional[str] = None
+    limit: float = Field(..., gt=0)
+    timeout_minutes: int = Field(5, ge=1, le=60)
 
 
 class RespondApprovalRequest(BaseModel):
@@ -193,6 +202,28 @@ async def list_guardians(current_user: dict = Depends(get_current_user)):
                 w['accepted_at'] = w['accepted_at'].isoformat() if w['accepted_at'] else None
                 if w_id in GUARDIAN_VERIFICATION_CODES:
                     w['verification_code'] = GUARDIAN_VERIFICATION_CODES[w_id].get("code")
+
+                # Calculate cumulative spent & remaining limit for ward
+                ward_vpa = (w.get('ward_vpa') or "").strip().lower()
+                ward_phone = (w.get('ward_phone') or "").strip()
+                
+                total_spent = 0.0
+                if ward_vpa:
+                    cursor.execute("""
+                        SELECT COALESCE(SUM(amount), 0.0) as total_spent
+                        FROM transactions
+                        WHERE sender_vpa = %s AND (status = 'APPROVED' OR status = 'SUCCESS')
+                    """, (ward_vpa,))
+                    spent_row = cursor.fetchone()
+                    total_spent = float(spent_row['total_spent']) if spent_row else 0.0
+
+                limit = GUARDIAN_LIMITS_STORE.get(ward_vpa) or GUARDIAN_LIMITS_STORE.get(ward_phone) or 5000.0
+                timeout_mins = GUARDIAN_TIMEOUTS_STORE.get(ward_vpa) or GUARDIAN_TIMEOUTS_STORE.get(ward_phone) or 5
+
+                w['cumulative_spent'] = total_spent
+                w['spending_limit'] = limit
+                w['remaining_limit'] = max(0.0, limit - total_spent)
+                w['timeout_minutes'] = timeout_mins
 
             return {
                 "guardians": my_guardians,
@@ -411,25 +442,154 @@ async def set_guardian_limit(req: SetGuardianLimitRequest, current_user: dict = 
     return {"success": True, "limit": req.limit, "message": f"Guardian transaction limit set to ₹{req.limit:,.2f}"}
 
 
+@router.post("/set-ward-config")
+async def set_ward_config(req: SetWardConfigRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Guardian configures spending limit and approval timeout duration for a ward.
+    """
+    key = (req.ward_vpa or req.ward_phone or req.ward_id or "").strip().lower()
+    if not key:
+        raise HTTPException(status_code=400, detail="Must provide ward_vpa or ward_phone")
+
+    GUARDIAN_LIMITS_STORE[key] = req.limit
+    GUARDIAN_TIMEOUTS_STORE[key] = req.timeout_minutes
+    if req.ward_phone:
+        GUARDIAN_LIMITS_STORE[req.ward_phone.strip()] = req.limit
+        GUARDIAN_TIMEOUTS_STORE[req.ward_phone.strip()] = req.timeout_minutes
+    if req.ward_vpa:
+        GUARDIAN_LIMITS_STORE[req.ward_vpa.strip().lower()] = req.limit
+        GUARDIAN_TIMEOUTS_STORE[req.ward_vpa.strip().lower()] = req.timeout_minutes
+
+    return {
+        "success": True,
+        "limit": req.limit,
+        "timeout_minutes": req.timeout_minutes,
+        "message": f"Ward config updated: Limit ₹{req.limit:,.2f}, Timeout {req.timeout_minutes}m"
+    }
+
+
 @router.get("/get-limit")
 async def get_guardian_limit(target_vpa: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """
-    Get user's maximum transaction spending limit threshold.
+    Get user's or target ward's spending limit threshold, cumulative spent, remaining limit, and timeout.
     """
-    keys = []
-    if target_vpa:
-        keys.append(target_vpa.strip().lower())
-    keys.extend([
-        str(current_user.get("user_id")),
-        current_user.get("phone"),
-        current_user.get("vpa")
-    ])
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            vpa_clean = (target_vpa or current_user.get("vpa") or "").strip().lower()
+            phone_clean = (current_user.get("phone") or "").strip()
+            user_id_str = str(current_user.get("user_id"))
 
-    for k in keys:
-        if k and k in GUARDIAN_LIMITS_STORE:
-            return {"limit": GUARDIAN_LIMITS_STORE[k]}
+            limit = 5000.0
+            for k in [vpa_clean, phone_clean, user_id_str]:
+                if k and k in GUARDIAN_LIMITS_STORE:
+                    limit = GUARDIAN_LIMITS_STORE[k]
+                    break
 
-    return {"limit": 5000.0}
+            timeout_mins = 5
+            for k in [vpa_clean, phone_clean, user_id_str]:
+                if k and k in GUARDIAN_TIMEOUTS_STORE:
+                    timeout_mins = GUARDIAN_TIMEOUTS_STORE[k]
+                    break
+
+            total_spent = 0.0
+            if vpa_clean:
+                cursor.execute("""
+                    SELECT COALESCE(SUM(amount), 0.0) as total_spent
+                    FROM transactions
+                    WHERE sender_vpa = %s AND (status = 'APPROVED' OR status = 'SUCCESS')
+                """, (vpa_clean,))
+                row = cursor.fetchone()
+                if row:
+                    total_spent = float(row['total_spent'])
+
+            remaining = max(0.0, limit - total_spent)
+
+            return {
+                "limit": limit,
+                "cumulative_spent": total_spent,
+                "remaining_limit": remaining,
+                "timeout_minutes": timeout_mins
+            }
+    except Exception as e:
+        logger.error(f"Failed to get limit: {e}")
+        return {"limit": 5000.0, "cumulative_spent": 0.0, "remaining_limit": 5000.0, "timeout_minutes": 5}
+    finally:
+        conn.close()
+
+
+@router.get("/ward-details/{identifier}")
+async def get_ward_details(identifier: str, current_user: dict = Depends(get_current_user)):
+    """
+    Fetch full profile, spending metrics, limit configuration, and transaction history for a specific ward.
+    """
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            clean_id = identifier.strip().lower()
+            
+            # Find ward user profile by VPA, Phone, or ID
+            cursor.execute("""
+                SELECT id, name, phone, vpa, balance FROM auth_users
+                WHERE LOWER(vpa) = %s OR phone = %s OR id::text = %s
+            """, (clean_id, clean_id, clean_id))
+            ward_profile = cursor.fetchone()
+
+            if not ward_profile:
+                raise HTTPException(status_code=404, detail="Ward profile not found")
+
+            ward_vpa = ward_profile['vpa']
+            ward_phone = ward_profile['phone']
+
+            # Fetch ward transactions
+            cursor.execute("""
+                SELECT transaction_id, sender_vpa, receiver_vpa, amount, currency, status, decision, risk_score, created_at
+                FROM transactions
+                WHERE sender_vpa = %s OR receiver_vpa = %s
+                ORDER BY created_at DESC
+                LIMIT 50
+            """, (ward_vpa, ward_vpa))
+            txns = cursor.fetchall()
+            for t in txns:
+                t['created_at'] = t['created_at'].isoformat() if t.get('created_at') else None
+
+            # Calculate metrics
+            limit = GUARDIAN_LIMITS_STORE.get(ward_vpa.lower()) or GUARDIAN_LIMITS_STORE.get(ward_phone) or 5000.0
+            timeout_mins = GUARDIAN_TIMEOUTS_STORE.get(ward_vpa.lower()) or GUARDIAN_TIMEOUTS_STORE.get(ward_phone) or 5
+
+            cursor.execute("""
+                SELECT COALESCE(SUM(amount), 0.0) as total_spent
+                FROM transactions
+                WHERE sender_vpa = %s AND (status = 'APPROVED' OR status = 'SUCCESS')
+            """, (ward_vpa,))
+            spent_row = cursor.fetchone()
+            total_spent = float(spent_row['total_spent']) if spent_row else 0.0
+
+            remaining = max(0.0, limit - total_spent)
+
+            return {
+                "ward": {
+                    "id": str(ward_profile['id']),
+                    "name": ward_profile['name'],
+                    "phone": ward_profile['phone'],
+                    "vpa": ward_profile['vpa'],
+                    "balance": float(ward_profile['balance'] or 0.0)
+                },
+                "config": {
+                    "limit": limit,
+                    "timeout_minutes": timeout_mins,
+                    "cumulative_spent": total_spent,
+                    "remaining_limit": remaining
+                },
+                "transactions": txns
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch ward details: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch ward details: {str(e)}")
+    finally:
+        conn.close()
 
 
 
@@ -550,8 +710,12 @@ async def request_approval(req: CreateApprovalRequest, current_user: dict = Depe
             if not guardians:
                 raise HTTPException(status_code=400, detail="You have no active guardians configured.")
 
-            # Create approval requests with 5-minute timeout
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+            # Determine dynamic timeout duration (configured by guardian or default 5 minutes)
+            vpa_clean = (current_user.get("vpa") or "").strip().lower()
+            phone_clean = (current_user.get("phone") or "").strip()
+            timeout_mins = GUARDIAN_TIMEOUTS_STORE.get(vpa_clean) or GUARDIAN_TIMEOUTS_STORE.get(phone_clean) or 5
+
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=timeout_mins)
             created_requests = []
 
             for g in guardians:

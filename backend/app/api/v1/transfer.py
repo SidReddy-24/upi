@@ -126,37 +126,37 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
                 
             receiver_phone = receiver_row['phone']
 
-                # Atomic Settlement: Deduct sender & Credit receiver
-                updated_sender_balance = sender_balance - amount
-                cursor.execute("UPDATE auth_users SET balance = %s WHERE phone = %s", (updated_sender_balance, sender_phone))
-                cursor.execute("UPDATE auth_users SET balance = COALESCE(balance, 100000.0) + %s WHERE phone = %s", (amount, receiver_phone))
+            # Atomic Settlement: Deduct sender & Credit receiver
+            updated_sender_balance = sender_balance - amount
+            cursor.execute("UPDATE auth_users SET balance = %s WHERE phone = %s", (updated_sender_balance, sender_phone))
+            cursor.execute("UPDATE auth_users SET balance = COALESCE(balance, 100000.0) + %s WHERE phone = %s", (amount, receiver_phone))
 
-                # Record Transaction in ledger
-                status_str = "APPROVED" if decision == "APPROVE" else "REVIEWED"
-                cursor.execute("""
-                    INSERT INTO transactions (transaction_id, sender_vpa, receiver_vpa, amount, currency, txn_type, status, decision, risk_score)
-                    VALUES (%s, %s, %s, %s, 'INR', 'P2P', %s, %s, %s)
-                    ON CONFLICT (transaction_id) DO NOTHING
-                """, (txn_id, sender_vpa, receiver_vpa, amount, status_str, decision, risk_score))
-                conn.commit()
+            # Record Transaction in ledger
+            status_str = "APPROVED" if decision == "APPROVE" else "REVIEWED"
+            cursor.execute("""
+                INSERT INTO transactions (transaction_id, sender_vpa, receiver_vpa, amount, currency, txn_type, status, decision, risk_score)
+                VALUES (%s, %s, %s, %s, 'INR', 'P2P', %s, %s, %s)
+                ON CONFLICT (transaction_id) DO NOTHING
+            """, (txn_id, sender_vpa, receiver_vpa, amount, status_str, decision, risk_score))
+            conn.commit()
 
-                logger.info(f"P2P Transfer settled: {sender_phone} → {receiver_phone} | ₹{amount} | Sender Balance: ₹{updated_sender_balance}")
-                
-                ts_str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            logger.info(f"P2P Transfer settled: {sender_phone} → {receiver_phone} | ₹{amount} | Sender Balance: ₹{updated_sender_balance}")
+            
+            ts_str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-                return P2PTransferResponse(
-                    transaction_id=txn_id,
-                    sender_vpa=sender_vpa,
-                    receiver_vpa=receiver_vpa,
-                    amount=amount,
-                    status="SUCCESS" if decision == "APPROVE" else "REVIEW_REQUIRED",
-                    decision=decision,
-                    risk_score=risk_score,
-                    updated_sender_balance=updated_sender_balance,
-                    message="Transfer successful" if decision == "APPROVE" else "Transfer under review",
-                    explanation_summary=explanation,
-                    timestamp=ts_str
-                )
+            return P2PTransferResponse(
+                transaction_id=txn_id,
+                sender_vpa=sender_vpa,
+                receiver_vpa=receiver_vpa,
+                amount=amount,
+                status="SUCCESS" if decision == "APPROVE" else "REVIEW_REQUIRED",
+                decision=decision,
+                risk_score=risk_score,
+                updated_sender_balance=updated_sender_balance,
+                message="Transfer successful" if decision == "APPROVE" else "Transfer under review",
+                explanation_summary=explanation,
+                timestamp=ts_str
+            )
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e

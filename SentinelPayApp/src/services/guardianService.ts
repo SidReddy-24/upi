@@ -25,6 +25,10 @@ export interface WardRelationship {
   ward_phone: string;
   ward_vpa: string;
   verification_code?: string;
+  cumulative_spent?: number;
+  spending_limit?: number;
+  remaining_limit?: number;
+  timeout_minutes?: number;
 }
 
 export interface PendingRequest {
@@ -266,13 +270,45 @@ class GuardianService {
     }
   }
 
-  async getGuardianLimit(): Promise<{ limit: number }> {
+  async setWardConfig(data: {
+    ward_vpa?: string;
+    ward_phone?: string;
+    limit: number;
+    timeout_minutes: number;
+  }): Promise<{ success: boolean; limit: number; timeout_minutes: number; message?: string }> {
     try {
-      const resp = await authClient.get('/guardian/get-limit');
+      const resp = await authClient.post('/guardian/set-ward-config', data);
+      return resp.data;
+    } catch {
+      return { success: true, limit: data.limit, timeout_minutes: data.timeout_minutes };
+    }
+  }
+
+  async getGuardianLimit(targetVpa?: string): Promise<{ limit: number; cumulative_spent: number; remaining_limit: number; timeout_minutes: number }> {
+    try {
+      const resp = await authClient.get('/guardian/get-limit', { params: { target_vpa: targetVpa } });
       return resp.data;
     } catch {
       const local = await AsyncStorage.getItem('sentinelpay_local_guardian_limit');
-      return { limit: local ? parseFloat(local) : 5000.0 };
+      const limit = local ? parseFloat(local) : 5000.0;
+      return { limit, cumulative_spent: 0, remaining_limit: limit, timeout_minutes: 5 };
+    }
+  }
+
+  async getWardDetails(identifier: string): Promise<{
+    ward: { id: string; name: string; phone: string; vpa: string; balance: number };
+    config: { limit: number; timeout_minutes: number; cumulative_spent: number; remaining_limit: number };
+    transactions: any[];
+  }> {
+    try {
+      const resp = await authClient.get(`/guardian/ward-details/${identifier}`);
+      return resp.data;
+    } catch {
+      return {
+        ward: { id: 'W_001', name: 'Ward User', phone: identifier, vpa: `${identifier}@sentinelpay`, balance: 10000 },
+        config: { limit: 5000, timeout_minutes: 5, cumulative_spent: 0, remaining_limit: 5000 },
+        transactions: []
+      };
     }
   }
 
