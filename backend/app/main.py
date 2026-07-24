@@ -40,6 +40,13 @@ async def lifespan(app: FastAPI):
     # 4. Restore Graph Persistence
     await graph_engine.restore_from_persistence()
     
+    # 5. Seed Demo Accounts & Blacklists in PostgreSQL + Redis
+    try:
+        from app.db.seed_demo import seed_demo
+        await seed_demo()
+    except Exception as e:
+        logger.warning(f"Startup demo seed warning: {e}")
+
     yield
     
     # Shutdown

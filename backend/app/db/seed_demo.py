@@ -1,178 +1,149 @@
-"""Demo Seeder script setting up pre-conditions for the 4 judge demo scenarios."""
+"""Demo Seeder script setting up pre-conditions for production-grade demo scenarios."""
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from sqlalchemy import text
-
-from app.db.database import engine, async_session_factory
-from app.services.redis_service import get_redis
+from datetime import datetime, timedelta, timezone
+import bcrypt
+import psycopg
+from psycopg.rows import dict_row
+from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("fraudshield.seed_demo")
 
+DEMO_USERS = [
+    {
+        "phone": "+919892150232",
+        "email": "demo@sentinelpay.ai",
+        "vpa": "demo@sentinelpay",
+        "name": "Demo User",
+        "balance": 100000.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919876543210",
+        "email": "alice@sentinelpay.ai",
+        "vpa": "alice@sentinelpay",
+        "name": "Alice Smith",
+        "balance": 50000.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919123456789",
+        "email": "bob@sentinelpay.ai",
+        "vpa": "bob@sentinelpay",
+        "name": "Bob Johnson",
+        "balance": 75000.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919988776655",
+        "email": "guardian@sentinelpay.ai",
+        "vpa": "guardian@sentinelpay",
+        "name": "Trusted Guardian",
+        "balance": 120000.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919111111111",
+        "email": "scammer@sentinelpay.ai",
+        "vpa": "scammer@sentinelpay",
+        "name": "Suspicious Lottery Scam",
+        "balance": 500.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919222222222",
+        "email": "phishing_merchant@sentinelpay.ai",
+        "vpa": "phishing_merchant@sentinelpay",
+        "name": "Fake Bank Support",
+        "balance": 0.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919333333333",
+        "email": "starbucks@sentinelpay.ai",
+        "vpa": "starbucks@sentinelpay",
+        "name": "Starbucks India",
+        "balance": 500000.0,
+        "upi_pin": "123456"
+    },
+    {
+        "phone": "+919444444444",
+        "email": "amazon@sentinelpay.ai",
+        "vpa": "amazon@sentinelpay",
+        "name": "Amazon Pay Merchant",
+        "balance": 1000000.0,
+        "upi_pin": "123456"
+    }
+]
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
 async def seed_demo():
-    logger.info("Starting demo seeding...")
+    logger.info("Starting demo database and Redis seeding...")
     
-    # 1. PostgreSQL Seeding
+    # 1. PostgreSQL Auth Users & Pre-loaded Transactions Seeding
     try:
-        async with async_session_factory() as session:
-            # Clean existing records
-            logger.info("Cleaning old database records...")
-            await session.execute(text("TRUNCATE feedback, risk_scores, fraud_cases, transactions, users, devices CASCADE"))
+        from app.api.v1.auth import get_db
+        conn = get_db()
+        with conn.cursor() as cursor:
+            default_pw_hash = hash_password("SentinelPass_1234!")
             
-            # Seed Users
-            logger.info("Inserting demo users...")
-            users_data = [
-                # Normal user Rahul Sharma
-                {
-                    "user_id": "u_rahul_sharma",
-                    "vpa": "rahul.sharma@upi",
-                    "phone_hash": "sha256_rahul_phone",
-                    "home_lat": 12.9716,
-                    "home_lon": 77.5946,
-                    "risk_level": "NORMAL",
-                    "total_txns": 45
-                },
-                # Normal user Amit Patel
-                {
-                    "user_id": "u_amit_patel",
-                    "vpa": "amit.patel@upi",
-                    "phone_hash": "sha256_amit_phone",
-                    "home_lat": 19.0760,
-                    "home_lon": 72.8777,
-                    "risk_level": "NORMAL",
-                    "total_txns": 12
-                },
-                # Flagged fraud user (Scenario 3 helper)
-                {
-                    "user_id": "u_fraud_mule",
-                    "vpa": "mule_account@upi",
-                    "phone_hash": "sha256_mule_phone",
-                    "home_lat": 28.6139,
-                    "home_lon": 77.2090,
-                    "risk_level": "HIGH",
-                    "total_txns": 82
-                }
+            for u in DEMO_USERS:
+                cursor.execute("""
+                    INSERT INTO auth_users (phone, email, password_hash, vpa, name, balance, upi_pin)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (phone) DO UPDATE SET
+                        vpa = EXCLUDED.vpa,
+                        name = EXCLUDED.name,
+                        email = EXCLUDED.email
+                """, (u["phone"], u["email"], default_pw_hash, u["vpa"], u["name"], u["balance"], u["upi_pin"]))
+            
+            # Seed historical P2P demo transactions
+            sample_txns = [
+                ("TXN_SEED_001", "demo@sentinelpay", "starbucks@sentinelpay", 450.0, "APPROVED", "APPROVE", 0.05),
+                ("TXN_SEED_002", "demo@sentinelpay", "amazon@sentinelpay", 2499.0, "APPROVED", "APPROVE", 0.08),
+                ("TXN_SEED_003", "alice@sentinelpay", "demo@sentinelpay", 1200.0, "APPROVED", "APPROVE", 0.02),
+                ("TXN_SEED_004", "bob@sentinelpay", "demo@sentinelpay", 3500.0, "APPROVED", "APPROVE", 0.03),
+                ("TXN_SEED_005", "demo@sentinelpay", "scammer@sentinelpay", 15000.0, "REVIEW", "REJECT", 0.88)
             ]
-            
-            for u in users_data:
-                await session.execute(
-                    text("""
-                        INSERT INTO users (user_id, vpa, phone_hash, account_created_at, home_lat, home_lon, risk_level, total_txns)
-                        VALUES (:user_id, :vpa, :phone_hash, NOW() - INTERVAL '30 days', :home_lat, :home_lon, :risk_level, :total_txns)
-                    """),
-                    u
-                )
-                
-            # Seed Devices
-            logger.info("Inserting demo devices...")
-            devices_data = [
-                {
-                    "device_id": "trusted_device_001",
-                    "fp_hash": "fp_rahul_trusted_hash",
-                    "os_type": "ANDROID",
-                    "os_version": "14",
-                    "app_version": "5.2.1",
-                    "is_rooted": False,
-                    "is_emulator": False,
-                    "risk_score": 0.02
-                },
-                {
-                    "device_id": "rooted_attacker_device",
-                    "fp_hash": "fp_attacker_rooted_hash",
-                    "os_type": "ANDROID",
-                    "os_version": "13",
-                    "app_version": "5.2.0",
-                    "is_rooted": True,
-                    "is_emulator": False,
-                    "risk_score": 0.65
-                }
-            ]
-            
-            for d in devices_data:
-                await session.execute(
-                    text("""
-                        INSERT INTO devices (device_id, fp_hash, os_type, os_version, app_version, is_rooted, is_emulator, risk_score)
-                        VALUES (:device_id, :fp_hash, :os_type, :os_version, :app_version, :is_rooted, :is_emulator, :risk_score)
-                    """),
-                    d
-                )
-                
-            # Seed 15 historical transactions to mule VPA to represent Fraud Ring (Scenario 3)
-            logger.info("Inserting 15 historical fraud ring helper transactions...")
-            for i in range(1, 16):
-                await session.execute(
-                    text("""
-                        INSERT INTO transactions (
-                            transaction_id, sender_vpa, receiver_vpa, amount, currency, 
-                            txn_type, device_id, ip_address, geo_lat, geo_lon, 
-                            risk_score, confidence, decision, created_at, scored_at, status
-                        ) VALUES (
-                            :txn_id, :sender, 'mule_account@upi', :amount, 'INR',
-                            'P2P', 'mule_device_id', '103.22.12.1', 28.6139, 77.2090,
-                            0.82, 0.90, 'REVIEW', NOW() - (:h_ago * INTERVAL '1 HOUR'), NOW() - (:h_ago * INTERVAL '1 HOUR'), 'SCORED'
-                        )
-                    """),
-                    {
-                        "txn_id": f"TXN_RING_{i:03d}",
-                        "sender": f"ring_sender_{i}@upi",
-                        "amount": 5000 + i * 500,
-                        "h_ago": 24 - i
-                    }
-                )
-                
-            await session.commit()
-            logger.info("PostgreSQL seeding completed.")
-    except Exception as e:
-        logger.error(f"PostgreSQL seeding failed: {str(e)}")
 
-    # 2. Redis Seeding (Profiles, Velocity counters)
+            for t_id, s_vpa, r_vpa, amt, st, dec, risk in sample_txns:
+                cursor.execute("""
+                    INSERT INTO transactions (transaction_id, sender_vpa, receiver_vpa, amount, currency, txn_type, status, decision, risk_score, created_at)
+                    VALUES (%s, %s, %s, %s, 'INR', 'P2P', %s, %s, %s, NOW() - INTERVAL '1 hour')
+                    ON CONFLICT (transaction_id) DO NOTHING
+                """, (t_id, s_vpa, r_vpa, amt, st, dec, risk))
+
+            conn.commit()
+            conn.close()
+            logger.info("PostgreSQL auth_users & demo transactions seeded successfully.")
+    except Exception as e:
+        logger.error(f"PostgreSQL demo seeding failed: {e}")
+
+    # 2. Redis Seeding (Blacklists & Graph Risks)
     try:
-        redis = await get_redis()
-        logger.info("Seeding Redis feature stores...")
-        
-        # User Profile for Rahul Sharma
-        profile_key = "user:rahul.sharma@upi:profile"
-        await redis.hset(profile_key, mapping={
-            "avg_amount_30d": "2150.50",
-            "std_amount_30d": "890.20",
-            "max_amount_30d": "15000.00",
-            "median_amount_30d": "1800.00",
-            "avg_txn_per_day_30d": "2.3",
-            "avg_txn_hour_30d": "14.5",
-            "std_txn_hour_30d": "3.2",
-            "home_lat": "12.9716",
-            "home_lon": "77.5946",
-            "home_radius_km": "15.0",
-            "receivers_30d": "grocerystore@paytm,mom@upi,landlord@ybl"
-        })
-        
-        # Last location for Rahul Sharma (20 minutes ago, in Bangalore)
-        last_loc_key = "user:rahul.sharma@upi:last_loc"
-        last_time = (datetime.utcnow() - timedelta(minutes=20)).isoformat() + "Z"
-        await redis.hset(last_loc_key, mapping={
-            "latitude": "12.9716",
-            "longitude": "77.5946",
-            "timestamp": last_time
-        })
-        
-        # Pre-seed Device Trusted Set for Rahul Sharma
-        await redis.sadd("device:trusted_device_001:users", "rahul.sharma@upi")
-        
-        # Graph Risk Score pre-seeding
-        await redis.set("graph:user:rahul.sharma@upi:risk", "0.02")
-        await redis.set("graph:user:mule_account@upi:risk", "0.85")
-        
-        # Blacklist receiver VPA (known fraud mule)
-        await redis.set("vpa:mule_account@upi:blacklisted", "1")
-        # Also blacklist the test fixture from API test suite
-        await redis.set("vpa:mule@okhdfc:blacklisted", "1")
-        
-        logger.info("Redis seeding completed.")
+        from app.services.redis_service import redis_service
+        await redis_service.connect()
+        client = await redis_service.get_client()
+        if client:
+            blacklisted_vpas = [
+                "scammer@sentinelpay",
+                "phishing_merchant@sentinelpay",
+                "mule_account@upi",
+                "mule@okhdfc"
+            ]
+            for vpa in blacklisted_vpas:
+                if hasattr(client, 'set'):
+                    await client.set(f"vpa:{vpa}:blacklisted", "1")
+                    await client.set(f"graph:user:{vpa}:risk", "0.95")
+            logger.info("Redis blacklist & risk scores seeded successfully.")
     except Exception as e:
-        logger.error(f"Redis seeding failed: {str(e)}")
+        logger.error(f"Redis demo seeding failed: {e}")
 
-    logger.info("Demo seeding completed successfully.")
+    logger.info("✨ Demo seeding completed successfully.")
 
 if __name__ == "__main__":
     asyncio.run(seed_demo())

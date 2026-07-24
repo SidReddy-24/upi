@@ -73,13 +73,10 @@ def init_db_tables(conn):
             """)
 
             cursor.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='auth_users' AND column_name='balance') THEN
-                        ALTER TABLE auth_users ADD COLUMN balance NUMERIC(12, 2) DEFAULT 100000.0;
-                    END IF;
-                END
-                $$;
+                ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+                ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS dob VARCHAR(20);
+                ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS upi_pin VARCHAR(10);
+                ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS balance NUMERIC(12, 2) DEFAULT 100000.0;
             """)
             
             cursor.execute("""

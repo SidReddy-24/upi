@@ -89,6 +89,29 @@ async def get_user_profile(identifier: str):
     finally:
         conn.close()
 
+@router.get("/user/search", dependencies=[Depends(verify_api_key)])
+async def search_users(q: str):
+    """
+    Search registered SentinelPay users by phone, VPA, or name.
+    """
+    q_str = f"%{q.strip()}%"
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT phone, vpa, name, balance, is_active
+                FROM auth_users
+                WHERE phone ILIKE %s OR vpa ILIKE %s OR name ILIKE %s
+                LIMIT 20
+            """, (q_str, q_str, q_str))
+            rows = cursor.fetchall()
+            return [{"phone": r["phone"], "vpa": r["vpa"], "name": r["name"] or "Sentinel User", "balance": float(r["balance"] or 100000.0)} for r in rows]
+    except Exception as e:
+        logger.error(f"Search users error: {e}")
+        return []
+    finally:
+        conn.close()
+
 @router.get("/user/transactions/{phone}", response_model=List[UserTxnItem], dependencies=[Depends(verify_api_key)])
 async def get_user_transactions(phone: str):
     """

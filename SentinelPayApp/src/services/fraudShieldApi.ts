@@ -108,6 +108,11 @@ const fraudShieldApi = {
     return resp.data;
   },
 
+  async searchUsers(q: string): Promise<any[]> {
+    const resp = await client.get(`/user/search?q=${encodeURIComponent(q)}`);
+    return resp.data;
+  },
+
   /**
    * Atomic Multi-User P2P Transfer API.
    */
