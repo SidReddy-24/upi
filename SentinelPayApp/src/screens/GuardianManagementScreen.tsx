@@ -58,7 +58,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
           ...prev,
         ]);
         Alert.alert(
-          '🔑 Guardian Verification OTP Code',
+          'Guardian Verification OTP Code',
           `Verification code for ${inviter_name || 'User'} (${inviter_phone || ''}): ${code}\n\nShare this code with your ward to complete guardian setup.`
         );
       } else if (event.type === 'GUARDIAN_LINKED' || event.type === 'APPROVAL_REQUEST' || event.type === 'APPROVAL_RESPONSE') {
@@ -181,7 +181,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
       if (res && res.success) {
         setOtpModalVisible(false);
         setOtpInput('');
-        Alert.alert('🎉 Guardian Verified', 'Your guardian has been successfully linked to your account!');
+        Alert.alert('Guardian Verified', 'Your guardian has been successfully linked to your account!');
         fetchRelationships();
       }
     } catch (error: any) {
@@ -259,11 +259,11 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         <View style={styles.heroCard}>
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroBadge}>
-              <View style={styles.heroBadgeDot} />
+              <AppIcon name="shield" size={12} color="#10B981" />
               <Text style={styles.heroBadgeText}>ACTIVE SAFETY NET</Text>
             </View>
             <TouchableOpacity onPress={fetchRelationships} style={styles.refreshBtnIcon}>
-              <Text style={styles.refreshIconText}>🔄</Text>
+              <AppIcon name="refresh" size={16} color="#94A3B8" />
             </TouchableOpacity>
           </View>
 
@@ -300,18 +300,24 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             style={[styles.segmentBtn, activeTab === 'guardians' && styles.segmentBtnActive]}
             onPress={() => setActiveTab('guardians')}
           >
-            <Text style={[styles.segmentText, activeTab === 'guardians' && styles.segmentTextActive]}>
-              🛡️ Guardians ({guardians.length})
-            </Text>
+            <View style={styles.tabIconRow}>
+              <AppIcon name="shield" size={14} color={activeTab === 'guardians' ? '#FFFFFF' : '#94A3B8'} />
+              <Text style={[styles.segmentText, activeTab === 'guardians' && styles.segmentTextActive]}>
+                Guardians ({guardians.length})
+              </Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.segmentBtn, activeTab === 'wards' && styles.segmentBtnActive]}
             onPress={() => setActiveTab('wards')}
           >
-            <Text style={[styles.segmentText, activeTab === 'wards' && styles.segmentTextActive]}>
-              👥 Wards ({wards.length})
-            </Text>
+            <View style={styles.tabIconRow}>
+              <AppIcon name="users" size={14} color={activeTab === 'wards' ? '#FFFFFF' : '#94A3B8'} />
+              <Text style={[styles.segmentText, activeTab === 'wards' && styles.segmentTextActive]}>
+                Wards ({wards.length})
+              </Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -319,8 +325,9 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             onPress={() => setActiveTab('approvals')}
           >
             <View style={styles.tabBadgeRow}>
+              <AppIcon name="zap" size={14} color={activeTab === 'approvals' ? '#FFFFFF' : '#94A3B8'} />
               <Text style={[styles.segmentText, activeTab === 'approvals' && styles.segmentTextActive]}>
-                ⚡ Requests
+                Requests
               </Text>
               {pendingApprovals.length > 0 && (
                 <View style={styles.tabCountPill}>
@@ -337,7 +344,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             {/* SPENDING LIMIT CONFIG */}
             <View style={styles.card}>
               <View style={styles.cardTitleRow}>
-                <AppIcon name="guardian" size={20} color="#10B981" />
+                <AppIcon name="coin" size={18} color="#10B981" />
                 <Text style={styles.cardTitle}>Maximum Spending Limit</Text>
               </View>
               <Text style={styles.cardDescription}>
@@ -389,7 +396,8 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             {/* ADD GUARDIAN CARD */}
             <View style={styles.card}>
               <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>📱 Link a Trusted Guardian</Text>
+                <AppIcon name="userPlus" size={18} color="#10B981" />
+                <Text style={styles.cardTitle}>Link a Trusted Guardian</Text>
               </View>
               <Text style={styles.cardDescription}>
                 Enter the registered phone number or VPA of a trusted SentinelPay user.
@@ -424,7 +432,10 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             {/* IN-APP OTP FEED */}
             {verificationLogs.length > 0 && (
               <View style={[styles.card, { borderColor: '#6366F1', borderWidth: 1.5 }]}>
-                <Text style={[styles.cardTitle, { color: '#818CF8' }]}>📩 Guardian OTP Notification Feed</Text>
+                <View style={styles.cardTitleRow}>
+                  <AppIcon name="mail" size={18} color="#818CF8" />
+                  <Text style={[styles.cardTitle, { color: '#818CF8' }]}>Guardian OTP Notification Feed</Text>
+                </View>
                 <Text style={styles.cardDescription}>
                   Recent verification codes generated for guardian linking:
                 </Text>
@@ -452,12 +463,15 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             {/* GUARDIANS LIST */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>🛡️ Active Guardians ({guardians.length}/5)</Text>
+                <View style={styles.cardTitleRow}>
+                  <AppIcon name="shield" size={18} color="#10B981" />
+                  <Text style={styles.cardTitle}>Active Guardians ({guardians.length}/5)</Text>
+                </View>
               </View>
 
               {guardians.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>🛡️</Text>
+                  <AppIcon name="shield" size={36} color="#475569" />
                   <Text style={styles.emptyTitle}>No Guardians Linked</Text>
                   <Text style={styles.emptyText}>Add a trusted family member or friend above to start protecting transactions.</Text>
                 </View>
@@ -481,7 +495,8 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                             setOtpModalVisible(true);
                           }}
                         >
-                          <Text style={styles.enterCodePillText}>🔑 Verify</Text>
+                          <AppIcon name="key" size={12} color="#FFFFFF" />
+                          <Text style={styles.enterCodePillText}> Verify</Text>
                         </TouchableOpacity>
                       ) : (
                         <View style={styles.activePill}>
@@ -492,7 +507,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                         style={styles.removeBtn}
                         onPress={() => handleRemoveRelationship(item.id, item.guardian_name || 'this user', 'guardian')}
                       >
-                        <Text style={styles.removeBtnText}>🗑️</Text>
+                        <AppIcon name="trash" size={16} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -505,14 +520,17 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         {/* ─── TAB 2: WARDS (USERS I PROTECT) ─── */}
         {activeTab === 'wards' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>👥 Users You Protect (Wards)</Text>
+            <View style={styles.cardTitleRow}>
+              <AppIcon name="users" size={18} color="#3B82F6" />
+              <Text style={styles.cardTitle}>Users You Protect (Wards)</Text>
+            </View>
             <Text style={styles.cardDescription}>
               As a guardian, you will receive real-time notifications to review and approve high-risk or high-value transfers initiated by these users.
             </Text>
 
             {wards.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>👥</Text>
+                <AppIcon name="users" size={36} color="#475569" />
                 <Text style={styles.emptyTitle}>Not Protecting Anyone Yet</Text>
                 <Text style={styles.emptyText}>When another user adds you as their guardian, their requests will appear here.</Text>
               </View>
@@ -543,7 +561,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                           style={styles.removeBtn}
                           onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
                         >
-                          <Text style={styles.removeBtnText}>🗑️</Text>
+                          <AppIcon name="trash" size={16} color="#EF4444" />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -558,15 +576,19 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         {activeTab === 'approvals' && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>⚡ Pending Payment Approvals</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('GuardianApproval')}>
-                <Text style={styles.fullScreenLink}>Full View ↗</Text>
+              <View style={styles.cardTitleRow}>
+                <AppIcon name="zap" size={18} color="#F59E0B" />
+                <Text style={styles.cardTitle}>Pending Payment Approvals</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('GuardianApproval')} style={styles.fullScreenLinkRow}>
+                <Text style={styles.fullScreenLink}>Full View </Text>
+                <AppIcon name="externalLink" size={12} color="#10B981" />
               </TouchableOpacity>
             </View>
 
             {pendingApprovals.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🎉</Text>
+                <AppIcon name="checkCircle" size={36} color="#10B981" />
                 <Text style={styles.emptyTitle}>All Clear!</Text>
                 <Text style={styles.emptyText}>No pending transactions require your guardian authorization right now.</Text>
               </View>
@@ -597,7 +619,10 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={styles.reqLabel}>EXPIRES</Text>
-                        <Text style={styles.reqTime}>{minsLeft} mins left</Text>
+                        <View style={styles.timerRow}>
+                          <AppIcon name="clock" size={12} color="#F59E0B" />
+                          <Text style={styles.reqTime}> {minsLeft} mins left</Text>
+                        </View>
                       </View>
                     </View>
 
@@ -633,7 +658,10 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🔑 Enter Guardian Code</Text>
+              <View style={styles.cardTitleRow}>
+                <AppIcon name="key" size={18} color="#10B981" />
+                <Text style={styles.modalTitle}>Enter Guardian Code</Text>
+              </View>
               <TouchableOpacity onPress={() => setOtpModalVisible(false)}>
                 <Text style={styles.modalCloseIcon}>✕</Text>
               </TouchableOpacity>
@@ -719,12 +747,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 6,
   },
-  heroBadgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
   heroBadgeText: {
     color: '#34D399',
     fontSize: 11,
@@ -733,9 +755,6 @@ const styles = StyleSheet.create({
   },
   refreshBtnIcon: {
     padding: 4,
-  },
-  refreshIconText: {
-    fontSize: 16,
   },
   heroTitle: {
     fontSize: 24,
@@ -796,8 +815,13 @@ const styles = StyleSheet.create({
   segmentBtnActive: {
     backgroundColor: '#10B981',
   },
+  tabIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   segmentText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#94A3B8',
   },
@@ -808,13 +832,14 @@ const styles = StyleSheet.create({
   tabBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   tabCountPill: {
     backgroundColor: '#EF4444',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
+    marginLeft: 2,
   },
   tabCountText: {
     color: '#FFF',
@@ -853,6 +878,10 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginBottom: 14,
     lineHeight: 18,
+  },
+  fullScreenLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   fullScreenLink: {
     color: '#10B981',
@@ -1005,11 +1034,18 @@ const styles = StyleSheet.create({
   },
   enterCodePill: {
     backgroundColor: '#3B82F6',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
   },
   enterCodePillText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pillText: {
     color: '#FFF',
     fontSize: 11,
     fontWeight: '700',
@@ -1030,23 +1066,17 @@ const styles = StyleSheet.create({
     padding: 6,
     marginLeft: 8,
   },
-  removeBtnText: {
-    fontSize: 15,
-  },
 
   /* EMPTY STATES */
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 24,
   },
-  emptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
   emptyTitle: {
     color: '#F8FAFC',
     fontSize: 15,
     fontWeight: '700',
+    marginTop: 10,
     marginBottom: 4,
   },
   emptyText: {
@@ -1138,11 +1168,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 2,
   },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   reqTime: {
     color: '#F59E0B',
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
   },
   reqActionsRow: {
     flexDirection: 'row',

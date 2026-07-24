@@ -1,7 +1,3 @@
-/**
- * AuthModeSelector.tsx - Choose authentication method
- */
-
 import React from 'react';
 import {
   View,
@@ -12,6 +8,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import AppIcon from '../components/AppIcon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AuthModeSelector'>;
 
@@ -20,7 +17,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.logo}>🛡️</Text>
+        <AppIcon name="shield" size={54} color="#10B981" />
         <Text style={styles.title}>SentinelPay AI</Text>
         <Text style={styles.subtitle}>Choose Your Login Method</Text>
       </View>
@@ -32,7 +29,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
           style={styles.optionCard}
           onPress={() => navigation.navigate('PhoneAuth', { useMock: true })}>
           <View style={styles.optionIcon}>
-            <Text style={styles.optionEmoji}>📱</Text>
+            <AppIcon name="phone" size={24} color="#10B981" />
           </View>
           <View style={styles.optionContent}>
             <Text style={styles.optionTitle}>Phone + OTP</Text>
@@ -43,7 +40,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
               <Text style={styles.badgeText}>MOCK MODE</Text>
             </View>
           </View>
-          <Text style={styles.optionArrow}>→</Text>
+          <AppIcon name="chevronRight" size={18} color="#64748B" />
         </TouchableOpacity>
 
         {/* PIN + Biometric */}
@@ -51,7 +48,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
           style={styles.optionCard}
           onPress={() => navigation.navigate('PinSetup')}>
           <View style={styles.optionIcon}>
-            <Text style={styles.optionEmoji}>🔐</Text>
+            <AppIcon name="lock" size={24} color="#10B981" />
           </View>
           <View style={styles.optionContent}>
             <Text style={styles.optionTitle}>PIN + Biometric</Text>
@@ -62,7 +59,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
               <Text style={[styles.badgeText, styles.badgeRecommendedText]}>RECOMMENDED</Text>
             </View>
           </View>
-          <Text style={styles.optionArrow}>→</Text>
+          <AppIcon name="chevronRight" size={18} color="#64748B" />
         </TouchableOpacity>
 
         {/* Google Sign-In (Coming Soon) */}
@@ -70,7 +67,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
           style={[styles.optionCard, styles.optionDisabled]}
           disabled>
           <View style={styles.optionIcon}>
-            <Text style={styles.optionEmoji}>🔵</Text>
+            <AppIcon name="profile" size={24} color="#64748B" />
           </View>
           <View style={styles.optionContent}>
             <Text style={styles.optionTitle}>Google Sign-In</Text>
@@ -81,7 +78,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
               <Text style={styles.badgeText}>COMING SOON</Text>
             </View>
           </View>
-          <Text style={styles.optionArrow}>→</Text>
+          <AppIcon name="chevronRight" size={18} color="#475569" />
         </TouchableOpacity>
       </View>
 
@@ -89,17 +86,8 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
       <View style={styles.footer}>
         <Text style={styles.footerText}>Already have a backend account?</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.footerLink}>Login with Password</Text>
+          <Text style={styles.loginLink}>Sign in with Password →</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Info */}
-      <View style={styles.infoCard}>
-        <Text style={styles.infoIcon}>💡</Text>
-        <Text style={styles.infoText}>
-          <Text style={styles.infoBold}>Mock Mode: </Text>
-          Phone OTP uses a fixed code (123456) for testing without real SMS services.
-        </Text>
       </View>
     </ScrollView>
   );
@@ -108,129 +96,98 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a', // Slate 900
+    backgroundColor: '#0F172A',
   },
   content: {
-    padding: 20,
-    paddingTop: 40,
+    padding: 24,
+    paddingTop: 60,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    fontSize: 64,
-    marginBottom: 12,
+    marginBottom: 36,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 8,
+    color: '#F8FAFC',
+    marginTop: 12,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#94a3b8',
-    textAlign: 'center',
+    fontSize: 15,
+    color: '#94A3B8',
+    marginTop: 4,
   },
   options: {
-    marginBottom: 32,
+    gap: 16,
   },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b', // Slate 800
+    backgroundColor: '#1E293B',
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#334155',
   },
   optionDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   optionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
-  },
-  optionEmoji: {
-    fontSize: 40,
   },
   optionContent: {
     flex: 1,
   },
   optionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 4,
+    color: '#F8FAFC',
   },
   optionDescription: {
-    fontSize: 13,
-    color: '#94a3b8',
-    lineHeight: 18,
-    marginBottom: 8,
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+    marginBottom: 6,
   },
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#334155',
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 6,
-  },
-  badgeRecommended: {
-    backgroundColor: '#22c55e',
-  },
-  badgeDisabled: {
-    backgroundColor: '#475569',
   },
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94a3b8',
-    letterSpacing: 0.5,
+    color: '#818CF8',
+  },
+  badgeRecommended: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
   },
   badgeRecommendedText: {
-    color: '#fff',
+    color: '#34D399',
   },
-  optionArrow: {
-    fontSize: 24,
-    color: '#6366f1',
-    marginLeft: 12,
+  badgeDisabled: {
+    backgroundColor: 'rgba(100, 116, 139, 0.2)',
   },
   footer: {
+    marginTop: 40,
     alignItems: 'center',
-    marginBottom: 24,
+    gap: 8,
   },
   footerText: {
     fontSize: 14,
-    color: '#94a3b8',
-    marginBottom: 8,
+    color: '#94A3B8',
   },
-  footerLink: {
-    fontSize: 15,
+  loginLink: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#6366f1',
-  },
-  infoCard: {
-    flexDirection: 'row',
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#94a3b8',
-    lineHeight: 18,
-  },
-  infoBold: {
-    fontWeight: '700',
-    color: '#f8fafc',
+    color: '#10B981',
   },
 });

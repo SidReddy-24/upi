@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
 import { authService } from '../services/authService';
+import AppIcon from '../components/AppIcon';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -129,7 +130,7 @@ export default function LoginScreen({ navigation }: Props) {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.headerContainer}>
-          <Text style={styles.logoEmoji}>🛡️</Text>
+          <AppIcon name="shield" size={54} color="#10B981" />
           <Text style={styles.title}>SentinelPay AI</Text>
           <Text style={styles.subtitle}>India's First AI-Native Secure Wallet</Text>
         </View>

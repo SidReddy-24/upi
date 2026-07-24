@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet, Alert, Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import AppIcon from './AppIcon';
 
 export const PANIC_FROZEN_KEY = 'sentinelpay_wallet_frozen';
 
@@ -13,7 +14,7 @@ export default function PanicButton() {
     setIsFrozen(true);
     setModalVisible(false);
     Alert.alert(
-      '🚨 EMERGENCY PANIC ACTIVATED',
+      'EMERGENCY PANIC ACTIVATED',
       'Wallet payments have been instantly frozen. Your bank & guardian alerts (simulated) have been dispatched. Incident report generated.',
       [{ text: 'OK' }]
     );
@@ -22,7 +23,7 @@ export default function PanicButton() {
   const handleUnfreeze = async () => {
     await AsyncStorage.removeItem(PANIC_FROZEN_KEY);
     setIsFrozen(false);
-    Alert.alert('🛡️ Wallet Unfrozen', 'Payments restored.');
+    Alert.alert('Wallet Unfrozen', 'Payments restored.');
   };
 
   return (
@@ -30,13 +31,16 @@ export default function PanicButton() {
       <TouchableOpacity
         style={[styles.panicFab, isFrozen && styles.frozenFab]}
         onPress={() => (isFrozen ? handleUnfreeze() : setModalVisible(true))}>
-        <Text style={styles.panicFabText}>{isFrozen ? '🔓' : '🚨'}</Text>
+        <AppIcon name={isFrozen ? 'lock' : 'siren'} size={24} color="#FFFFFF" />
       </TouchableOpacity>
 
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>🚨 Emergency Panic Button</Text>
+            <View style={styles.modalTitleRow}>
+              <AppIcon name="siren" size={22} color="#DC2626" />
+              <Text style={styles.modalTitle}>Emergency Panic Button</Text>
+            </View>
             <Text style={styles.modalDesc}>
               Are you currently being coerced or scammed? Activating Emergency Panic will:
             </Text>
@@ -83,9 +87,6 @@ const styles = StyleSheet.create({
   frozenFab: {
     backgroundColor: '#16a34a',
   },
-  panicFabText: {
-    fontSize: 26,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -97,11 +98,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
   },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#dc2626',
-    marginBottom: 12,
   },
   modalDesc: {
     fontSize: 14,

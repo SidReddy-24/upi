@@ -121,11 +121,11 @@ export default function SmsDetailScreen({ route, navigation }: Props): React.JSX
   const getBadgeText = () => {
     switch (message.classification) {
       case 'fraud':
-        return '🚨 FRAUD DETECTED';
+        return 'FRAUD DETECTED';
       case 'suspicious':
-        return '⚠️ SUSPICIOUS';
+        return 'SUSPICIOUS';
       case 'genuine':
-        return '✓ GENUINE';
+        return 'GENUINE';
     }
   };
 

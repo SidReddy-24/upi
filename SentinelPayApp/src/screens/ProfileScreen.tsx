@@ -198,7 +198,10 @@ export default function ProfileScreen({ navigation }: Props) {
 
       {/* 3. GUARDIAN & BIOMETRIC PROTECTION */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🛡️ Security & Family Protection</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <AppIcon name="shield" size={18} color="#10B981" />
+          <Text style={styles.sectionTitle}>Security & Family Protection</Text>
+        </View>
         <View style={styles.toggleRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.toggleTitle}>Secure Mode</Text>

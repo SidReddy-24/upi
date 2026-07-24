@@ -5,6 +5,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import fraudShieldApi from '../services/fraudShieldApi';
+import AppIcon from '../components/AppIcon';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ReportScam'>;
@@ -43,7 +44,7 @@ export default function ReportScamScreen({ navigation }: Props) {
       });
 
       Alert.alert(
-        '🛡️ Report Filed',
+        'Report Filed',
         `Thank you for contributing to community safety!\n\nEntity Trust Score penalized to ${res.updated_trust_score}/100.`,
         [{ text: 'View Scam Passport', onPress: () => navigation.navigate('ScamPassport', { entityId: entityId.trim() }) }]
       );
@@ -57,7 +58,10 @@ export default function ReportScamScreen({ navigation }: Props) {
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.card}>
-        <Text style={styles.headerTitle}>🚨 Report a Fraudster / Scam</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <AppIcon name="report" size={20} color="#EF4444" />
+          <Text style={styles.headerTitle}>Report a Fraudster / Scam</Text>
+        </View>
         <Text style={styles.headerSubtitle}>
           Community reports immediately update AI Trust Scores across the SentinelPay network.
         </Text>

@@ -1,14 +1,3 @@
-/**
- * OnboardingScreen — Phase 8.1.5
- *
- * 3-card first-launch disclosure screen:
- *  1. Welcome — "SentinelPay Credits (SPC) — Not real money"
- *  2. AI Shield — What FraudShield checks
- *  3. Privacy — "SMS classification 100% on-device"
- *
- * On completion: sets `sentinelpay_onboarded = true` in AsyncStorage
- * and navigates to HomeScreen. Never shown again after first completion.
- */
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
@@ -18,18 +7,24 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
 import fraudShieldApi from '../services/fraudShieldApi';
+import AppIcon, { IconName } from '../components/AppIcon';
 
 export const ONBOARDING_KEY = 'sentinelpay_onboarded';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
-};
+interface Slide {
+  icon: IconName;
+  title: string;
+  subtitle: string;
+  body: string;
+  accent: string;
+  bg: string;
+}
 
-const SLIDES = [
+const SLIDES: Slide[] = [
   {
-    emoji: '🪙',
+    icon: 'coin',
     title: 'Welcome to SentinelPay',
     subtitle: 'SentinelPay Credits (SPC)',
     body: 'This is a simulation app. All transactions use SentinelPay Credits (SPC) — not real Indian Rupees. No real money is transferred at any point.',
@@ -37,15 +32,15 @@ const SLIDES = [
     bg: '#FAF7F0',
   },
   {
-    emoji: '🛡️',
+    icon: 'shield',
     title: 'AI Fraud Shield',
     subtitle: 'Real-time, 6ms decisions',
-    body: 'Every payment is scored by FraudShield AI before it executes.\n\n✅ Machine Learning model\n✅ 10 rule engine checks\n✅ Behavioural anomaly detection\n✅ Transaction graph analysis\n✅ Device & call-state signals',
-    accent: '#E8C4B8',
+    body: 'Every payment is scored by FraudShield AI before it executes.\n\n• Machine Learning model\n• 10 rule engine checks\n• Behavioural anomaly detection\n• Transaction graph analysis\n• Device & call-state signals',
+    accent: '#2D6A4F',
     bg: '#FAF7F0',
   },
   {
-    emoji: '🔒',
+    icon: 'lock',
     title: 'Your Privacy is Protected',
     subtitle: '100% on-device processing',
     body: 'SMS messages are read locally for OTP detection only — no message content is ever uploaded to any server.\n\nCall state detection is used solely to flag potential social engineering attacks.',
@@ -54,49 +49,54 @@ const SLIDES = [
   },
 ];
 
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
+};
+
 export default function OnboardingScreen({ navigation }: Props) {
   const [current, setCurrent] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const goToSlide = (next: number) => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0.3, duration: 120, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 0.95, friction: 8, useNativeDriver: true }),
-    ]).start(() => {
-      setCurrent(next);
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
-      ]).start();
-    });
-  };
-
-  const handleNext = () => {
-    if (current < SLIDES.length - 1) {
-      goToSlide(current + 1);
-    } else {
-      handleComplete();
-    }
-  };
-
-  const handleComplete = async () => {
-    try {
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    } catch (e) {
-      console.warn('Failed setting onboarding key:', e);
-    } finally {
-      navigation.replace('PhoneAuth', { useMock: true });
-    }
-  };
-
 
   const slide = SLIDES[current];
   const isLast = current === SLIDES.length - 1;
 
+  const animateToSlide = (index: number) => {
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+    setCurrent(index);
+  };
+
+  const handleNext = async () => {
+    if (isLast) {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      navigation.replace('Home');
+    } else {
+      animateToSlide(current + 1);
+    }
+  };
+
+  const goToSlide = (index: number) => {
+    if (index >= 0 && index < SLIDES.length) {
+      animateToSlide(index);
+    }
+  };
+
   return (
-    <View style={[styles.root, { backgroundColor: slide.bg }]}>
-      {/* Dots */}
+    <View style={[styles.container, { backgroundColor: slide.bg }]}>
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <Text style={styles.stepText}>Step {current + 1} of {SLIDES.length}</Text>
+        <TouchableOpacity onPress={async () => {
+          await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+          navigation.replace('Home');
+        }}>
+          <Text style={styles.skipBtnText}>Skip</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Progress Dots */}
       <View style={styles.dotsRow}>
         {SLIDES.map((_, i) => (
           <View
@@ -113,7 +113,9 @@ export default function OnboardingScreen({ navigation }: Props) {
 
       {/* Card */}
       <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
-        <Text style={styles.emoji}>{slide.emoji}</Text>
+        <View style={styles.iconWrapper}>
+          <AppIcon name={slide.icon} size={48} color={slide.accent} />
+        </View>
         <Text style={[styles.title, { color: slide.accent }]}>{slide.title}</Text>
         <Text style={styles.subtitle}>{slide.subtitle}</Text>
         <View style={styles.divider} />
@@ -134,21 +136,15 @@ export default function OnboardingScreen({ navigation }: Props) {
           style={[styles.nextBtn, { backgroundColor: slide.accent }]}
           onPress={handleNext}>
           <Text style={styles.nextBtnText}>
-            {isLast ? '🚀 Get Started' : 'Next →'}
+            {isLast ? 'Get Started' : 'Next →'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Skip (not on last slide) */}
-      {!isLast && (
-        <TouchableOpacity style={styles.skipBtn} onPress={handleComplete}>
-          <Text style={styles.skipBtnText}>Skip</Text>
-        </TouchableOpacity>
-      )}
-
-      <View style={styles.disclaimer}>
-        <Text style={styles.disclaimerText}>
-          🧪 SIMULATION ONLY — Not affiliated with NPCI or any bank
+      {/* Footer Simulation Warning */}
+      <View style={styles.footerNote}>
+        <Text style={styles.footerNoteText}>
+          SentinelPay AI — Simulation Mode • No Real Currency
         </Text>
       </View>
     </View>
@@ -156,132 +152,143 @@ export default function OnboardingScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: {
+  container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 40,
-    backgroundColor: '#FAF7F0',
+    paddingTop: 56,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
   },
+
+  /* Top Bar */
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  stepText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#7A8B7B',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  skipBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7A8B7B',
+  },
+
+  /* Dots */
   dotsRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
     gap: 8,
-    marginBottom: 32,
+    marginVertical: 12,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#2D6A4F',
   },
   dotInactive: {
-    width: 8,
-    backgroundColor: '#E8C4B8',
+    width: 6,
+    backgroundColor: '#D1D5DB',
   },
+
+  /* Card */
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    borderRadius: 24,
     padding: 28,
-    width: '100%',
-    maxWidth: 420,
-    shadowColor: '#1A1A2E',
-    shadowOpacity: 0.08,
+    shadowColor: '#2D6A4F',
     shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 20,
-    elevation: 6,
-    marginBottom: 32,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#E8C4B8',
+    borderColor: '#EAF0EB',
+    alignItems: 'center',
   },
-  emoji: {
-    fontSize: 60,
-    textAlign: 'center',
+  iconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FAF7F0',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 22,
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 4,
-    color: '#1A1A2E',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#2D6A4F',
+    color: '#7A8B7B',
     textAlign: 'center',
     marginBottom: 16,
   },
   divider: {
-    height: 1,
-    backgroundColor: '#E8C4B8',
+    width: 40,
+    height: 3,
+    backgroundColor: '#EAF0EB',
+    borderRadius: 2,
     marginBottom: 16,
   },
   body: {
     fontSize: 14,
-    color: '#1A1A2E',
+    color: '#374151',
     lineHeight: 22,
-    textAlign: 'left',
+    textAlign: 'center',
   },
+
+  /* Navigation Row */
   navRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-    maxWidth: 420,
-    marginBottom: 12,
+    marginTop: 12,
   },
   backBtn: {
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     minWidth: 80,
   },
   backBtnText: {
     fontSize: 15,
-    color: '#64748b',
     fontWeight: '600',
+    color: '#7A8B7B',
   },
   nextBtn: {
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 32,
-    backgroundColor: '#2D6A4F',
-    shadowColor: '#2D6A4F',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   nextBtnText: {
-    color: '#FAF7F0',
     fontSize: 16,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
-  skipBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    marginBottom: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E8C4B8',
+
+  /* Footer Note */
+  footerNote: {
+    alignItems: 'center',
+    marginTop: 8,
   },
-  skipBtnText: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  disclaimer: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-  },
-  disclaimerText: {
+  footerNoteText: {
     fontSize: 11,
-    color: '#9ca3af',
-    textAlign: 'center',
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });
-

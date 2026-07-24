@@ -13,6 +13,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import guardianService, { PendingRequest } from '../services/guardianService';
+import AppIcon from '../components/AppIcon';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -33,10 +34,9 @@ export default function GuardianApprovalScreen() {
     
     // Subscribe to real-time WebSocket updates
     const unsubscribe = guardianService.subscribe((event) => {
-      console.log('[GuardianApprovalScreen] WebSocket update received:', event);
       if (event.type === 'APPROVAL_REQUEST') {
         fetchRequests();
-        Alert.alert('🚨 SECURITY NOTICE', `New high-risk transaction request received from ward: ${event.data.requester_name || 'Sentinel User'}`);
+        Alert.alert('SECURITY NOTICE', `New high-risk transaction request received from ward: ${event.data.requester_name || 'Sentinel User'}`);
       } else if (event.type === 'APPROVAL_RESPONSE') {
         fetchRequests();
       }
@@ -120,11 +120,14 @@ export default function GuardianApprovalScreen() {
 
         {item.risk_signals && item.risk_signals.length > 0 && (
           <View style={styles.signalsContainer}>
-            <Text style={styles.signalsLabel}>DETECTED RISK SIGNALS:</Text>
+            <View style={styles.signalTitleRow}>
+              <AppIcon name="alert" size={12} color="#EF4444" />
+              <Text style={styles.signalsLabel}>DETECTED RISK SIGNALS:</Text>
+            </View>
             <View style={styles.signalsList}>
               {item.risk_signals.map((sig, idx) => (
                 <View key={idx} style={styles.signalBadge}>
-                  <Text style={styles.signalBadgeText}>⚠️ {sig.replace(/_/g, ' ')}</Text>
+                  <Text style={styles.signalBadgeText}>{sig.replace(/_/g, ' ')}</Text>
                 </View>
               ))}
             </View>
@@ -132,8 +135,9 @@ export default function GuardianApprovalScreen() {
         )}
 
         <View style={styles.expiryRow}>
+          <AppIcon name="clock" size={14} color="#F59E0B" />
           <Text style={styles.expiryText}>
-            ⏱️ Expires in: <Text style={styles.expiryTime}>{minsLeft} mins</Text>
+            {' '}Expires in: <Text style={styles.expiryTime}>{minsLeft} mins</Text>
           </Text>
         </View>
 
@@ -176,7 +180,7 @@ export default function GuardianApprovalScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🛡️</Text>
+              <AppIcon name="checkCircle" size={40} color="#10B981" />
               <Text style={styles.emptyTitle}>All Clear!</Text>
               <Text style={styles.emptyText}>No pending transactions require your guardian authorization.</Text>
             </View>
@@ -371,11 +375,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1E293B',
   },
+  signalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
   signalsLabel: {
     fontSize: 10,
     color: '#EF4444',
     fontWeight: '700',
-    marginBottom: 6,
     letterSpacing: 0.5,
   },
   signalsList: {
@@ -441,14 +450,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 60,
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
   emptyTitle: {
     color: '#F8FAFC',
     fontSize: 16,
     fontWeight: '700',
+    marginTop: 10,
     marginBottom: 4,
   },
   emptyText: {

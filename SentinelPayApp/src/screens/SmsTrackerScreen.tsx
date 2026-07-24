@@ -193,11 +193,11 @@ export default function SmsTrackerScreen({ navigation }: Props): React.JSX.Eleme
       const getBadgeText = () => {
         switch (item.classification) {
           case 'fraud':
-            return '🚨 FRAUD';
+            return 'FRAUD';
           case 'suspicious':
-            return '⚠️ SUSPICIOUS';
+            return 'SUSPICIOUS';
           case 'genuine':
-            return '✓ GENUINE';
+            return 'GENUINE';
         }
       };
 

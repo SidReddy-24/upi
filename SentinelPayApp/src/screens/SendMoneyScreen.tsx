@@ -523,7 +523,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
     return (
       <View style={styles.centeredState}>
         <Animated.View style={[styles.skeletonIcon, { opacity: pulseAnim }]}>
-          <Text style={{ fontSize: 40 }}>🛡️</Text>
+          <AppIcon name="shield" size={44} color="#10B981" />
         </Animated.View>
         <Text style={styles.scoringTitle}>Analysing transaction…</Text>
         <Text style={styles.scoringSubtitle}>Running ML + rule engine checks</Text>
@@ -636,7 +636,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
     return (
       <View style={styles.centeredState}>
         <View style={styles.guardianIconContainer}>
-          <Text style={{ fontSize: 44 }}>🛡️</Text>
+          <AppIcon name="shield" size={48} color="#10B981" />
         </View>
         <Text style={styles.holdTitle}>Guardian Review Required</Text>
         <Text style={styles.holdSubtitle}>
@@ -768,7 +768,10 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
             style={[styles.primaryBtn, (!vpaValid || !amountValid) && styles.disabledBtn]}
             onPress={handleScore}
             disabled={!vpaValid || !amountValid}>
-            <Text style={styles.primaryBtnText}>🛡️ Check & Pay</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <AppIcon name="shield" size={18} color="#FFFFFF" />
+              <Text style={styles.primaryBtnText}>Check & Pay</Text>
+            </View>
           </TouchableOpacity>
 
           <Text style={styles.hint}>
