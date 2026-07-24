@@ -622,9 +622,9 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
                 SELECT gar.id, gar.transaction_id, gar.user_id, gar.status, gar.expires_at,
                        gr.guardian_user_id
                 FROM guardian_approval_requests gar
-                JOIN guardian_relationships gr ON gar.guardian_id = gr.id
-                WHERE gar.id = %s AND gr.guardian_user_id = %s
-            """, (req.request_id, current_user['user_id']))
+                LEFT JOIN guardian_relationships gr ON gar.guardian_id = gr.id
+                WHERE (gar.id::text = %s OR gar.transaction_id = %s)
+            """, (req.request_id, req.request_id))
             approval_req = cursor.fetchone()
 
             if not approval_req:
@@ -641,8 +641,8 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
                 cursor.execute("""
                     UPDATE guardian_approval_requests
                     SET status = 'EXPIRED'
-                    WHERE id = %s
-                """, (req.request_id,))
+                    WHERE id::text = %s OR transaction_id = %s
+                """, (req.request_id, req.request_id))
                 conn.commit()
                 raise HTTPException(status_code=400, detail="Request has expired")
 
@@ -650,8 +650,8 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
             cursor.execute("""
                 UPDATE guardian_approval_requests
                 SET status = %s, responded_at = NOW(), response_note = %s
-                WHERE id = %s
-            """, (req.decision, req.note, req.request_id))
+                WHERE id::text = %s OR transaction_id = %s
+            """, (req.decision, req.note, req.request_id, req.request_id))
             conn.commit()
 
             # Push response to requester via WebSocket

@@ -63,13 +63,48 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
     if sender_vpa == receiver_vpa:
         raise HTTPException(status_code=400, detail="Cannot transfer funds to the same VPA account.")
 
+    # 1. Score transaction with FraudShield AI Engine first (non-blocking for DB locks)
+    score_payload = TransactionRequest(
+        transaction_id=txn_id,
+        sender_vpa=sender_vpa,
+        receiver_vpa=receiver_vpa,
+        amount=amount,
+        currency="INR",
+        transaction_type="P2P",
+        timestamp=datetime.utcnow(),
+        device=DeviceInfo(
+            device_id=payload.device_id or "DEV_DEFAULT",
+            os_type="ANDROID",
+            is_emulator=False
+        ),
+        location=LocationInfo(
+            latitude=payload.geo_lat or 12.9716,
+            longitude=payload.geo_lon or 77.5946
+        ),
+        network=NetworkInfo(
+            ip_address=payload.ip_address or "127.0.0.1"
+        ),
+        metadata=TransactionMetadata(
+            org_id="SentinelPayApp"
+        )
+    )
+
+    score_result = await score_transaction(score_payload)
+    decision = score_result.decision
+    risk_score = score_result.risk_score
+    explanation = score_result.explanation.nl_summary if score_result.explanation else "Legitimate transaction"
+
+    if decision == "REJECT":
+        raise HTTPException(
+            status_code=403,
+            detail=f"🚨 TRANSACTION BLOCKED BY AI: {explanation}"
+        )
+
     conn = get_db()
-    
     try:
-        # Start transaction block
+        # Start short DB transaction block ONLY for atomic balances & ledger insert
         with conn.transaction():
             with conn.cursor() as cursor:
-                # 1. Ensure sender exists and lock row
                 cursor.execute("SELECT phone, balance FROM auth_users WHERE vpa = %s FOR UPDATE", (sender_vpa,))
                 sender_row = cursor.fetchone()
                 
@@ -79,14 +114,12 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
                 sender_phone = sender_row['phone']
                 sender_balance = float(sender_row['balance']) if sender_row['balance'] is not None else 100000.0
 
-                # 2. Check sufficient balance
                 if sender_balance < amount:
                     raise HTTPException(
                         status_code=400,
                         detail=f"Insufficient balance. Available: ₹{sender_balance:,.2f} SPC, Required: ₹{amount:,.2f} SPC."
                     )
 
-                # 3. Ensure receiver exists and lock row
                 cursor.execute("SELECT phone FROM auth_users WHERE vpa = %s FOR UPDATE", (receiver_vpa,))
                 receiver_row = cursor.fetchone()
                 
@@ -95,55 +128,18 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
                     
                 receiver_phone = receiver_row['phone']
 
-                # 4. Score transaction with FraudShield AI Engine
-                score_payload = TransactionRequest(
-                    transaction_id=txn_id,
-                    sender_vpa=sender_vpa,
-                    receiver_vpa=receiver_vpa,
-                    amount=amount,
-                    currency="INR",
-                    transaction_type="P2P",
-                    timestamp=datetime.utcnow(),
-                    device=DeviceInfo(
-                        device_id=payload.device_id or "DEV_DEFAULT",
-                        os_type="ANDROID",
-                        is_emulator=False
-                    ),
-                    location=LocationInfo(
-                        latitude=payload.geo_lat or 12.9716,
-                        longitude=payload.geo_lon or 77.5946
-                    ),
-                    network=NetworkInfo(
-                        ip_address=payload.ip_address or "127.0.0.1"
-                    ),
-                    metadata=TransactionMetadata(
-                        org_id="SentinelPayApp"
-                    )
-                )
-
-                score_result = await score_transaction(score_payload)
-                decision = score_result.decision
-                risk_score = score_result.risk_score
-                explanation = score_result.explanation.nl_summary if score_result.explanation else "Legitimate transaction"
-
-                if decision == "REJECT":
-                    raise HTTPException(
-                        status_code=403,
-                        detail=f"🚨 TRANSACTION BLOCKED BY AI: {explanation}"
-                    )
-
-                # 5. Atomic Settlement: Deduct sender & Credit receiver
+                # Atomic Settlement: Deduct sender & Credit receiver
                 updated_sender_balance = sender_balance - amount
                 cursor.execute("UPDATE auth_users SET balance = %s WHERE phone = %s", (updated_sender_balance, sender_phone))
                 cursor.execute("UPDATE auth_users SET balance = COALESCE(balance, 100000.0) + %s WHERE phone = %s", (amount, receiver_phone))
 
-                # 6. Record Transaction in ledger
-                status = "APPROVED" if decision == "APPROVE" else "REVIEWED"
+                # Record Transaction in ledger
+                status_str = "APPROVED" if decision == "APPROVE" else "REVIEWED"
                 cursor.execute("""
                     INSERT INTO transactions (transaction_id, sender_vpa, receiver_vpa, amount, currency, txn_type, status, decision, risk_score)
                     VALUES (%s, %s, %s, %s, 'INR', 'P2P', %s, %s, %s)
                     ON CONFLICT (transaction_id) DO NOTHING
-                """, (txn_id, sender_vpa, receiver_vpa, amount, status, decision, risk_score))
+                """, (txn_id, sender_vpa, receiver_vpa, amount, status_str, decision, risk_score))
 
                 logger.info(f"P2P Transfer settled: {sender_phone} → {receiver_phone} | ₹{amount} | Sender Balance: ₹{updated_sender_balance}")
                 
