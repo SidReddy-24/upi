@@ -48,6 +48,16 @@ class P2PTransferResponse(BaseModel):
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────
 
+import secrets
+import string
+
+def generate_transaction_id() -> str:
+    """Generate realistic financial reference ID, e.g., SP250726X91M84."""
+    date_str = datetime.utcnow().strftime("%d%m%y")
+    rand_part = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    return f"SP{date_str}{rand_part}"
+
+
 @router.post("/transfer", response_model=P2PTransferResponse, dependencies=[Depends(verify_api_key)])
 async def execute_p2p_transfer(payload: P2PTransferRequest):
     """
@@ -58,7 +68,7 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
     receiver_vpa = payload.receiver_vpa.strip().lower()
     
     amount = payload.amount
-    txn_id = payload.transaction_id or f"TXN_{uuid.uuid4().hex[:8].upper()}"
+    txn_id = payload.transaction_id or generate_transaction_id()
 
     if sender_vpa == receiver_vpa:
         raise HTTPException(status_code=400, detail="Cannot transfer funds to the same VPA account.")

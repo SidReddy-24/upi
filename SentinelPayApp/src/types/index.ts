@@ -24,6 +24,10 @@ export type RootStackParamList = {
   PinSetup: undefined;
   PinLogin: undefined;
   BiometricSetup: undefined;
+  Notifications: undefined;
+  AiRiskHistory: undefined;
+  DeviceTrust: undefined;
+  AdminAnalytics: undefined;
 };
 
 // ─── Wallet / DB ──────────────────────────────────────────────────────────────

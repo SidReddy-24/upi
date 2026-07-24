@@ -151,6 +151,9 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.brandSubtitle}>AI CYBERSECURITY WALLET</Text>
         </View>
         <View style={styles.topHeaderIcons}>
+          <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Notifications')}>
+            <AppIcon name="bell" size={18} color="#181818" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Profile')}>
             <AppIcon name="profile" size={18} color="#181818" />
           </TouchableOpacity>
@@ -180,9 +183,9 @@ export default function HomeScreen({ navigation }: Props) {
         {/* Protection Score Ring & Main Balance */}
         <View style={styles.heroBodyGrid}>
           <View style={styles.balanceCol}>
-            <Text style={styles.balanceLabel}>AVAILABLE BALANCE</Text>
+            <Text style={styles.balanceLabel}>SENTINEL WALLET BALANCE</Text>
             <Text style={styles.balanceValue}>{formatAmount(balance)}</Text>
-            <Text style={styles.balanceSubtext}>{balancePct}% of ₹1,00,000 SPC available</Text>
+            <Text style={styles.balanceSubtext}>{balancePct}% of ₹1,00,000 Sentinel Credits available</Text>
           </View>
 
           {/* Protection Score Ring Widget */}
@@ -284,6 +287,40 @@ export default function HomeScreen({ navigation }: Props) {
               <AppIcon name="heatmap" size={20} color="#2E8B57" />
             </View>
             <Text style={styles.actionCardText}>Threat Map</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── 5.5 ENTERPRISE INTELLIGENCE ── */}
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionTitle}>Enterprise Intelligence</Text>
+        <View style={styles.quickGrid}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('AiRiskHistory')}>
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="cpu" size={20} color="#2E8B57" />
+            </View>
+            <Text style={styles.actionCardText}>AI History</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('DeviceTrust')}>
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="shieldCheck" size={20} color="#2E8B57" />
+            </View>
+            <Text style={styles.actionCardText}>Device Trust</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('AdminAnalytics')}>
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="barChart2" size={20} color="#2E8B57" />
+            </View>
+            <Text style={styles.actionCardText}>Ops Analytics</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('Notifications')}>
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="bell" size={20} color="#2E8B57" />
+            </View>
+            <Text style={styles.actionCardText}>Alerts</Text>
           </TouchableOpacity>
         </View>
       </View>

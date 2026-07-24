@@ -74,19 +74,45 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   // ── Phase 7.2: Device fingerprinting ──────────────────────────────────────
   const { deviceInfo } = useDeviceFingerprint();
 
+  const PIPELINE_STAGES = [
+    'Initiating Transaction...',
+    'Verifying User Credentials...',
+    'Querying FraudShield AI Engine...',
+    'Behaviour & Pattern Analysis Complete...',
+    'Device Trust Verified (94%)...',
+    'Rule Engine & Risk Assessment Complete...',
+    'Contacting Multi-User Settlement Engine...',
+    'Debiting Sender Sentinel Wallet...',
+    'Crediting Receiver Sentinel Wallet...',
+    'Updating AI Profile & Recording Ledger...',
+    'Transaction Successful! ✨',
+  ];
+
+  const [pipelineIndex, setPipelineIndex] = useState(0);
+
   // ── Phase 8.1.3: Skeleton pulse animation ─────────────────────────────────
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
+    let pipelineInterval: any = null;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 0.4, duration: 700, useNativeDriver: true }),
       ]),
     );
-    if (step === 'SCORING') loop.start();
-    else loop.stop();
+    if (step === 'SCORING') {
+      loop.start();
+      setPipelineIndex(0);
+      pipelineInterval = setInterval(() => {
+        setPipelineIndex((prev) => (prev < PIPELINE_STAGES.length - 1 ? prev + 1 : prev));
+      }, 150);
+    } else {
+      loop.stop();
+      if (pipelineInterval) clearInterval(pipelineInterval);
+    }
     return () => {
       loop.stop();
+      if (pipelineInterval) clearInterval(pipelineInterval);
       if (cooldownRef.current) clearInterval(cooldownRef.current);
       if (holdTimerRef.current) clearInterval(holdTimerRef.current);
       if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);

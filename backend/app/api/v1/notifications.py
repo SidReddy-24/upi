@@ -54,17 +54,38 @@ async def send_transaction_sms(
             send_to_receiver=(req.status == "APPROVED"),
         )
         
-        return {
-            "success": True,
-            "transaction_id": req.transaction_id,
-            "notifications_sent": results,
-        }
-        
-    except Exception as e:
-        logger.error(f"Error sending transaction notification: {str(e)}", exc_info=True)
-        # Don't fail the request - notifications are non-critical
-        return {
-            "success": False,
-            "error": str(e),
-            "transaction_id": req.transaction_id,
-        }
+# In-memory notification store for real-time app feed
+NOTIFICATIONS_STORE = []
+
+def add_notification_item(title: str, body: str, type_str: str, txn_id: Optional[str] = None, user_key: Optional[str] = None):
+    from datetime import datetime
+    item = {
+        "id": f"NOTIF_{len(NOTIFICATIONS_STORE) + 1}_{secrets_rand_hex()}",
+        "title": title,
+        "body": body,
+        "type": type_str,
+        "transaction_id": txn_id,
+        "user_key": (user_key or "").lower(),
+        "timestamp": datetime.utcnow().isoformat(),
+        "read": False
+    }
+    NOTIFICATIONS_STORE.insert(0, item)
+    if len(NOTIFICATIONS_STORE) > 100:
+        NOTIFICATIONS_STORE.pop()
+    return item
+
+def secrets_rand_hex():
+    import secrets
+    return secrets.token_hex(4)
+
+
+@router.get("/notifications/list")
+async def get_user_notifications(user_key: Optional[str] = None):
+    """
+    Fetch persistent notifications feed for user.
+    """
+    if not user_key:
+        return {"notifications": NOTIFICATIONS_STORE[:25]}
+    clean_key = user_key.strip().lower()
+    filtered = [n for n in NOTIFICATIONS_STORE if not n.get("user_key") or n.get("user_key") == clean_key]
+    return {"notifications": filtered[:25]}

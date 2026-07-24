@@ -286,10 +286,10 @@ export function useSmsTracker() {
         // Trigger Truecaller-style pop-up notification for incoming SMS
         console.log(`[useSmsTracker] Realtime SMS received from ${message.sender}, classification: ${message.classification}`);
         notificationService.showSmsFraudAlert(
+          message.body,
           message.sender,
           message.classification,
-          message.fraudScore,
-          message.body
+          message.fraudScore
         );
       });
 

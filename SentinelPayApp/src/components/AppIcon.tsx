@@ -35,7 +35,23 @@ export type IconName =
   | 'chevronLeft'
   | 'siren'
   | 'info'
-  | 'externalLink';
+  | 'externalLink'
+  | 'bell'
+  | 'cpu'
+  | 'shieldCheck'
+  | 'shieldAlert'
+  | 'barChart2'
+  | 'arrowDownLeft'
+  | 'arrowUpRight'
+  | 'creditCard'
+  | 'xCircle'
+  | 'pieChart'
+  | 'alertTriangle'
+  | 'userCheck'
+  | 'flag'
+  | 'qrCode'
+  | 'messageSquare'
+  | 'activity';
 
 interface AppIconProps {
   name: IconName;
@@ -278,6 +294,10 @@ export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconP
         </Svg>
       );
     default:
-      return null;
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </Svg>
+      );
   }
 }
