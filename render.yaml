@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: upi
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: PYTHONPATH=backend gunicorn -w 1 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

@@ -85,7 +85,7 @@ Once executed, all tables and indexes will be successfully created in your datab
 2. Create a new **Web Service** and connect your GitHub repository.
 3. Configure the following build & environment details:
    - **Build Command**: `pip install -r backend/requirements.txt`
-   - **Start Command**: `PYTHONPATH=backend gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT`
+   - **Start Command**: `PYTHONPATH=backend gunicorn -w 1 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT`
    - **Environment Variables**:
      - `DATABASE_URL`: Set to your **Supabase Connection URI**.
        > [!IMPORTANT]
