@@ -1,14 +1,7 @@
 /**
- * HomeScreen — Wallet dashboard
- *
- * Shows:
- *  - "SIMULATED" badge (always visible, legal requirement)
- *  - SPC balance (₹1,00,000 initial)
- *  - Quick actions: Send Money, Receive, History
- *  - Backend health status dot
- *  - Recent transactions (last 5)
+ * HomeScreen — SentinelPay Wallet Dashboard
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -16,15 +9,16 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
-  Alert,
   StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, WalletUser, WalletTransaction } from '../types';
-import { getUser, getTransactions, updateBalance } from '../utils/walletDb';
+import { getUser, getTransactions, syncCloudTransactions } from '../utils/walletDb';
+import { parseSafeDate } from '../utils/parsers';
 import fraudShieldApi from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
+import AppIcon from '../components/AppIcon';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
@@ -33,7 +27,7 @@ function formatAmount(n: number) {
 }
 
 function formatTime(iso: string) {
-  const d = new Date(iso);
+  const d = parseSafeDate(iso);
   return d.toLocaleString('en-IN', {
     day: '2-digit', month: 'short',
     hour: '2-digit', minute: '2-digit',
@@ -54,59 +48,35 @@ export default function HomeScreen({ navigation }: Props) {
         navigation.replace('AuthModeSelector');
         return;
       }
-      const t = await getTransactions();
-      setUser(u);
-      setTxns(t.slice(0, 5));
-
-
-      // Sync user profile & live balance from cloud backend
-      if (u && u.vpa) {
-        try {
-          const profile = await fraudShieldApi.getUserProfile(u.vpa);
-          if (profile && typeof profile.balance === 'number') {
-            if (profile.balance !== u.balance) {
-              await updateBalance(profile.balance);
-              setUser(prev => prev ? { ...prev, balance: profile.balance } : null);
-            }
-          }
-        } catch (cloudProfileErr) {
-          console.debug('[HomeScreen] Live balance sync note:', cloudProfileErr);
+      
+      setUser(prev => {
+        if (!prev || Math.abs(prev.balance - u.balance) > 0.01 || prev.vpa !== u.vpa) {
+          return u;
         }
+        return prev;
+      });
+      
+      const localT = await getTransactions();
+      setTxns(localT.slice(0, 5));
 
-        // Sync cloud transaction ledger from backend
-        try {
-          const cloudTxns = await fraudShieldApi.getUserTransactions(u.vpa);
-          if (cloudTxns && Array.isArray(cloudTxns) && cloudTxns.length > 0) {
-            const formattedCloudTxns: WalletTransaction[] = cloudTxns.map(ct => ({
-              id: ct.id,
-              sender_vpa: ct.sender_vpa,
-              receiver_vpa: ct.receiver_vpa,
-              amount: ct.amount,
-              type: ct.type as 'DEBIT' | 'CREDIT',
-              status: ct.status === 'APPROVED' ? 'APPROVED' : 'REVIEW',
-              risk_score: ct.risk_score ?? 0.1,
-              decision: 'APPROVE',
-              fraud_reason: null,
-              created_at: ct.timestamp || new Date().toISOString(),
-            }));
-            
-            // Merge with local txns
-            const existingIds = new Set(t.map(item => item.id));
-            const newCloudItems = formattedCloudTxns.filter(item => !existingIds.has(item.id));
-            if (newCloudItems.length > 0) {
-              const merged = [...newCloudItems, ...t];
-              setTxns(merged.slice(0, 5));
+      if (u.vpa) {
+        const synced = await syncCloudTransactions(u.vpa);
+        setTxns(synced.slice(0, 5));
+        
+        const updatedUser = await getUser();
+        if (updatedUser) {
+          setUser(prev => {
+            if (!prev || Math.abs(prev.balance - updatedUser.balance) > 0.01) {
+              return updatedUser;
             }
-          }
-        } catch (cloudTxnErr) {
-          console.debug('[HomeScreen] Live txns sync note:', cloudTxnErr);
+            return prev;
+          });
         }
       }
     } catch (e) {
       console.error('HomeScreen loadData:', e);
     }
   }, []);
-
 
   const checkBackend = useCallback(async () => {
     try {
@@ -117,11 +87,16 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, []);
 
-  // Reload when screen comes into focus (e.g. after a payment)
   useFocusEffect(
     useCallback(() => {
       loadData();
       checkBackend();
+
+      const timer = setInterval(() => {
+        loadData();
+      }, 12000);
+
+      return () => clearInterval(timer);
     }, [loadData, checkBackend]),
   );
 
@@ -132,165 +107,152 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const balance = user?.balance ?? 0;
-  const balancePct = Math.round((balance / 100000) * 100);
+  const balancePct = Math.min(100, Math.max(0, Math.round((balance / 100000) * 100)));
 
   return (
     <ScrollView
       style={styles.root}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}>
-      <StatusBar barStyle="light-content" backgroundColor="#6366f1" />
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" />}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F0" />
 
-      {/* ── SIMULATED BADGE ── */}
-      <View style={styles.simulatedBanner}>
-        <Text style={styles.simulatedText}>🧪 SIMULATED WALLET — NOT REAL MONEY</Text>
+      {/* ── TOP HEADER BAR ── */}
+      <View style={styles.topHeader}>
+        <View>
+          <Text style={styles.appTitle}>SentinelPay</Text>
+          <Text style={styles.simulatedSubtitle}>Simulated Credit Wallet</Text>
+        </View>
+        <View style={styles.topHeaderIcons}>
+          <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Profile')}>
+            <AppIcon name="profile" size={20} color="#1A1A2E" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Settings')}>
+            <AppIcon name="settings" size={20} color="#1A1A2E" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* ── BALANCE CARD ── */}
+      {/* ── MAIN BALANCE CARD ── */}
       <View style={styles.balanceCard}>
         {user && (
-          <View style={{ marginBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.15)', paddingBottom: 10 }}>
-            <Text style={{ fontSize: 11, fontWeight: '800', color: '#c7d2fe', letterSpacing: 0.5 }}>
-              🆔 USER ID: USR_{user.vpa.split('@')[0].toUpperCase()}
-            </Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginTop: 2 }}>
-              💳 UPI ID: {user.vpa}
-            </Text>
+          <View style={styles.userHeaderRow}>
+            <Text style={styles.vpaText}>UPI: {user.vpa}</Text>
+            <View style={styles.statusPill}>
+              <View style={[styles.statusDot, { backgroundColor: backendStatus === 'UP' ? '#4ADE80' : '#F87171' }]} />
+              <Text style={styles.statusPillText}>{backendStatus === 'UP' ? 'Online' : 'Offline'}</Text>
+            </View>
           </View>
         )}
-        <Text style={styles.balanceLabel}>SPC Balance</Text>
-        <Text style={styles.balanceAmount}>{formatAmount(balance)}</Text>
-        <Text style={styles.balanceSub}>SentinelPay Credits · Cloud Account</Text>
 
-        {/* balance bar */}
+        <Text style={styles.balanceLabel}>Available Balance</Text>
+        <Text style={styles.balanceAmount}>{formatAmount(balance)}</Text>
+
         <View style={styles.balanceBarBg}>
           <View style={[styles.balanceBarFill, { width: `${balancePct}%` as any }]} />
         </View>
-        <Text style={styles.balanceBarLabel}>{balancePct}% of ₹1,00,000 remaining</Text>
+        <Text style={styles.balanceBarLabel}>{balancePct}% of ₹1,00,000 SPC remaining</Text>
+      </View>
 
-        {/* backend status */}
-        <View style={styles.statusRow}>
-          <View style={[styles.statusDot, {
-            backgroundColor: backendStatus === 'UP' ? '#4ade80' : backendStatus === 'DOWN' ? '#f87171' : '#fbbf24',
-          }]} />
-          <Text style={styles.statusText}>
-            FraudShield {backendStatus === 'CHECKING' ? 'connecting…' : backendStatus === 'UP' ? 'online ✓' : 'offline ✗'}
-          </Text>
+      {/* ── QUICK PAY ACTIONS ── */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionHeaderTitle}>Quick Pay</Text>
+        <View style={styles.actionsGrid}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('SendMoney', {})}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="send" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>Send</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ReceiveMoney')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="receive" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>Receive</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ScanQR')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="scan" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>Scan QR</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('TransactionHistory')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="history" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>History</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── QUICK ACTIONS ── */}
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('SendMoney', {})}>
-          <Text style={styles.actionIcon}>↑</Text>
-          <Text style={styles.actionLabel}>Send</Text>
-        </TouchableOpacity>
+      {/* ── AI & SAFETY SUITE ── */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionHeaderTitle}>Safety & Security Suite</Text>
+        <View style={styles.actionsGrid}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('GuardianManagement')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="guardian" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>Guardians</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('ReceiveMoney')}>
-          <Text style={styles.actionIcon}>↓</Text>
-          <Text style={styles.actionLabel}>Receive</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('SmsTracker')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="sms" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>SMS Shield</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('ScanQR')}>
-          <Text style={styles.actionIcon}>⊞</Text>
-          <Text style={styles.actionLabel}>Scan QR</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ScamAssistant')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="assistant" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>Assistant</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('TransactionHistory')}>
-          <Text style={styles.actionIcon}>☰</Text>
-          <Text style={styles.actionLabel}>History</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── SECURITY INTELLIGENCE TOOLS ── */}
-      <View style={[styles.actionsRow, { marginTop: 10 }]}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('ScamAssistant')}>
-          <Text style={styles.actionIcon}>🤖</Text>
-          <Text style={styles.actionLabel}>AI Assistant</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('SmsTracker')}>
-          <Text style={styles.actionIcon}>📱</Text>
-          <Text style={styles.actionLabel}>SMS Tracker</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('ReportScam', {})}>
-          <Text style={styles.actionIcon}>🚨</Text>
-          <Text style={styles.actionLabel}>Report Scam</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('ScamHeatMap')}>
-          <Text style={styles.actionIcon}>🗺️</Text>
-          <Text style={styles.actionLabel}>Heat Map</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('Profile')}>
-          <Text style={styles.actionIcon}>👤</Text>
-          <Text style={styles.actionLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── SETTINGS ROW ── */}
-      <View style={[styles.actionsRow, { marginTop: 10 }]}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.actionIcon}>⚙️</Text>
-          <Text style={styles.actionLabel}>Settings</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ScamHeatMap')}>
+            <View style={styles.iconCircle}>
+              <AppIcon name="heatmap" size={22} color="#2D6A4F" />
+            </View>
+            <Text style={styles.actionTitle}>Threat Map</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── RECENT TRANSACTIONS ── */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeaderTitle}>Recent Activity</Text>
           {txns.length > 0 && (
             <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
-              <Text style={styles.seeAll}>See all →</Text>
+              <Text style={styles.seeAllText}>See all →</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {txns.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>💸</Text>
+          <View style={styles.emptyCard}>
+            <AppIcon name="coin" size={32} color="#94a3b8" />
             <Text style={styles.emptyText}>No transactions yet</Text>
-            <Text style={styles.emptySubText}>Send money to get started</Text>
           </View>
         ) : (
           txns.map(txn => (
             <TouchableOpacity
               key={txn.id}
-              style={styles.txnRow}
+              style={styles.txnCard}
               onPress={() => navigation.navigate('TransactionDetail', { txnId: txn.id })}>
-              <View style={styles.txnIcon}>
-                <Text style={styles.txnIconText}>{txn.type === 'DEBIT' ? '↑' : '↓'}</Text>
+              <View style={[styles.txnTypeCircle, { backgroundColor: txn.type === 'DEBIT' ? '#FEE2E2' : '#D1FAE5' }]}>
+                <AppIcon name={txn.type === 'DEBIT' ? 'send' : 'receive'} size={16} color={txn.type === 'DEBIT' ? '#E63946' : '#2D6A4F'} />
               </View>
-              <View style={styles.txnInfo}>
+              <View style={styles.txnMain}>
                 <Text style={styles.txnVpa} numberOfLines={1}>
                   {txn.type === 'DEBIT' ? txn.receiver_vpa : txn.sender_vpa}
                 </Text>
-                <Text style={styles.txnTime}>{formatTime(txn.created_at)}</Text>
+                <Text style={styles.txnDate}>{formatTime(txn.created_at)}</Text>
               </View>
               <View style={styles.txnRight}>
-                <Text style={[styles.txnAmount, { color: txn.type === 'DEBIT' ? '#dc2626' : '#16a34a' }]}>
+                <Text style={[styles.txnAmount, { color: txn.type === 'DEBIT' ? '#E63946' : '#2D6A4F' }]}>
                   {txn.type === 'DEBIT' ? '-' : '+'}{formatAmount(txn.amount)}
                 </Text>
                 {txn.decision && (
@@ -302,12 +264,14 @@ export default function HomeScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* ── FRAUD SHIELD INFO ── */}
+      {/* ── FRAUD SHIELD FOOTER ── */}
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>🛡️ Protected by FraudShield AI</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <AppIcon name="shield" size={18} color="#2D6A4F" />
+          <Text style={styles.infoTitle}>Protected by FraudShield AI</Text>
+        </View>
         <Text style={styles.infoText}>
-          Every transaction is scored in real-time using ML, rule engines, behavioural
-          analysis and graph intelligence — all in under 200ms.
+          Real-time transaction scoring via machine learning, rule checks, and behavioral intelligence in under 200ms.
         </Text>
       </View>
 
@@ -316,102 +280,244 @@ export default function HomeScreen({ navigation }: Props) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
-
-  simulatedBanner: {
-    backgroundColor: '#fef3c7',
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#fde68a',
-  },
-  simulatedText: { fontSize: 12, fontWeight: '700', color: '#92400e', letterSpacing: 0.5 },
-
-  balanceCard: {
-    backgroundColor: '#6366f1',
-    margin: 16,
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#6366f1',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  balanceLabel: { color: '#c7d2fe', fontSize: 13, fontWeight: '500', marginBottom: 4 },
-  balanceAmount: { color: '#fff', fontSize: 36, fontWeight: '800', letterSpacing: -1 },
-  balanceSub: { color: '#a5b4fc', fontSize: 12, marginTop: 2, marginBottom: 16 },
-  balanceBarBg: { height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, marginBottom: 4 },
-  balanceBarFill: { height: 4, backgroundColor: '#fff', borderRadius: 2 },
-  balanceBarLabel: { color: '#c7d2fe', fontSize: 11, marginBottom: 12 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { color: '#e0e7ff', fontSize: 12 },
-
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  actionBtn: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+  root: {
     flex: 1,
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: '#FAF7F0',
   },
-  actionIcon: { fontSize: 22, color: '#6366f1', fontWeight: '700', marginBottom: 4 },
-  actionLabel: { fontSize: 12, color: '#374151', fontWeight: '600' },
-
-  section: { marginHorizontal: 16, marginTop: 16 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  seeAll: { fontSize: 13, color: '#6366f1', fontWeight: '600' },
-
-  emptyBox: { alignItems: 'center', paddingVertical: 32, backgroundColor: '#fff', borderRadius: 16 },
-  emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  emptySubText: { fontSize: 13, color: '#9ca3af', marginTop: 4 },
-
-  txnRow: {
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  appTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#1A1A2E',
+  },
+  simulatedSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2D6A4F',
+  },
+  topHeaderIcons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  headerIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+  },
+  balanceCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 24,
+    padding: 22,
+    backgroundColor: '#2D6A4F',
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  userHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(250, 247, 240, 0.2)',
+  },
+  vpaText: {
+    color: '#FAF7F0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
+    gap: 6,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusPillText: {
+    color: '#FAF7F0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  balanceLabel: {
+    color: '#E8C4B8',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  balanceAmount: {
+    color: '#FAF7F0',
+    fontSize: 36,
+    fontWeight: '900',
+    marginVertical: 4,
+  },
+  balanceBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  balanceBarFill: {
+    height: '100%',
+    backgroundColor: '#E8C4B8',
+    borderRadius: 3,
+  },
+  balanceBarLabel: {
+    color: 'rgba(250, 247, 240, 0.75)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sectionContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A2E',
+    marginBottom: 10,
+  },
+  seeAllText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2D6A4F',
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+    elevation: 2,
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowRadius: 6,
+  },
+  iconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FAF7F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  actionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+  },
+  emptyText: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  txnCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
     elevation: 1,
   },
-  txnIcon: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  txnTypeCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  txnIconText: { fontSize: 18, color: '#6366f1', fontWeight: '700' },
-  txnInfo: { flex: 1 },
-  txnVpa: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  txnTime: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  txnRight: { alignItems: 'flex-end', gap: 4 },
-  txnAmount: { fontSize: 15, fontWeight: '700' },
-
+  txnMain: {
+    flex: 1,
+  },
+  txnVpa: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  txnDate: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  txnRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  txnAmount: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
   infoCard: {
-    margin: 16,
-    backgroundColor: '#eef2ff',
-    borderRadius: 12,
+    marginHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: '#E8C4B8',
   },
-  infoTitle: { fontSize: 14, fontWeight: '700', color: '#4338ca', marginBottom: 6 },
-  infoText: { fontSize: 13, color: '#4b5563', lineHeight: 19 },
+  infoTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1A1A2E',
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 18,
+  },
 });

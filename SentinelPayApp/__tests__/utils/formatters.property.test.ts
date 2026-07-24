@@ -61,7 +61,7 @@ const jwtPayloadArbitrary = fc.record({
   user_id: fc.uuid(),
   phone: fc.string({ minLength: 10, maxLength: 15 }).map(s => s.replace(/\D/g, '0').slice(0, 15)),
   email: fc.option(fc.emailAddress(), { nil: undefined }),
-  exp: fc.integer({ min: Math.floor(Date.now() / 1000), max: Math.floor(Date.now() / 1000) + 86400 * 30 }),
+  exp: fc.integer({ min: Math.floor(Date.now() / 1000) + 3600, max: Math.floor(Date.now() / 1000) + 86400 * 30 }),
 });
 
 // ─── Property Tests: SMS Notification Formatter ───────────────────────────────

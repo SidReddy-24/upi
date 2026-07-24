@@ -4,29 +4,73 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
   StyleSheet,
   ActivityIndicator,
   Alert,
   ScrollView,
+  Modal,
+  RefreshControl,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
-import guardianService, { GuardianRelationship, WardRelationship } from '../services/guardianService';
+import guardianService, { GuardianRelationship, WardRelationship, PendingRequest } from '../services/guardianService';
+import { getSettings, updateSettings } from '../utils/settingsDb';
+import AppIcon from '../components/AppIcon';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'GuardianManagement'>;
 };
 
 export default function GuardianManagementScreen({ navigation }: Props) {
+  const [activeTab, setActiveTab] = useState<'guardians' | 'wards' | 'approvals'>('guardians');
+
   const [guardians, setGuardians] = useState<GuardianRelationship[]>([]);
   const [wards, setWards] = useState<WardRelationship[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingRequest[]>([]);
+  
   const [inviteInput, setInviteInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
 
+  // OTP Verification state
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [verifyingRelId, setVerifyingRelId] = useState<string>('');
+  const [otpInput, setOtpInput] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  // Spending Limit state
+  const [spendingLimit, setSpendingLimit] = useState<string>('5000');
+  const [limitLoading, setLimitLoading] = useState(false);
+
+  // In-app notifications feed (verification codes)
+  const [verificationLogs, setVerificationLogs] = useState<{ id: string; code: string; inviter: string; phone?: string }[]>([]);
+
   useEffect(() => {
     fetchRelationships();
+    loadLimit();
+
+    // Subscribe to real-time guardian events
+    const unsubscribe = guardianService.subscribe((event) => {
+      if (event.type === 'GUARDIAN_VERIFICATION_CODE') {
+        const { relationship_id, code, inviter_name, inviter_phone } = event.data;
+        setVerificationLogs((prev) => [
+          { id: relationship_id || String(Date.now()), code, inviter: inviter_name || 'Sentinel User', phone: inviter_phone },
+          ...prev,
+        ]);
+        Alert.alert(
+          '🔑 Guardian Verification OTP Code',
+          `Verification code for ${inviter_name || 'User'} (${inviter_phone || ''}): ${code}\n\nShare this code with your ward to complete guardian setup.`
+        );
+      } else if (event.type === 'GUARDIAN_LINKED' || event.type === 'APPROVAL_REQUEST' || event.type === 'APPROVAL_RESPONSE') {
+        fetchRelationships();
+      }
+    });
+
+    guardianService.initialize();
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const fetchRelationships = async () => {
@@ -35,18 +79,62 @@ export default function GuardianManagementScreen({ navigation }: Props) {
       const data = await guardianService.listGuardians();
       setGuardians(data.guardians);
       setWards(data.wards);
+
+      // Also fetch pending approvals
+      try {
+        const reqs = await guardianService.getPendingRequests();
+        setPendingApprovals(reqs.incoming || []);
+      } catch (err) {
+        console.warn('Failed to load pending requests:', err);
+      }
     } catch (e: any) {
       console.warn('Failed to load relationships:', e);
-      Alert.alert('Error', 'Could not load guardian data. Make sure backend is running.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLimit = async () => {
+    try {
+      const res = await guardianService.getGuardianLimit();
+      if (res && res.limit) {
+        setSpendingLimit(String(res.limit));
+      } else {
+        const local = await getSettings();
+        if (local.guardianThresholdAmount) {
+          setSpendingLimit(String(local.guardianThresholdAmount));
+        }
+      }
+    } catch (e) {
+      console.warn('Load limit failed:', e);
+    }
+  };
+
+  const handleSaveLimit = async (customVal?: string) => {
+    const targetVal = customVal !== undefined ? customVal : spendingLimit;
+    const num = parseFloat(targetVal);
+    if (isNaN(num) || num <= 0) {
+      Alert.alert('Invalid Limit', 'Please enter a valid limit amount (e.g. 5000)');
+      return;
+    }
+
+    setSpendingLimit(String(num));
+    setLimitLoading(true);
+    try {
+      await guardianService.setGuardianLimit(num);
+      await updateSettings({ guardianThresholdAmount: num });
+      Alert.alert('Success', `Maximum transaction spending limit set to ₹${num.toLocaleString('en-IN')}`);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to save limit.');
+    } finally {
+      setLimitLoading(false);
     }
   };
 
   const handleSendInvite = async () => {
     const input = inviteInput.trim();
     if (!input) {
-      Alert.alert('Validation Error', 'Please enter a VPA or phone number');
+      Alert.alert('Validation Error', 'Please enter a registered mobile number or VPA');
       return;
     }
 
@@ -56,16 +144,51 @@ export default function GuardianManagementScreen({ navigation }: Props) {
       const payload = isVpa ? { vpa: input } : { phone: input };
       
       const res = await guardianService.addGuardian(payload.phone, payload.vpa);
-      if (res) {
-        Alert.alert('Invite Sent', 'Guardian invitation sent successfully!');
+      if (res && res.relationship_id) {
         setInviteInput('');
         fetchRelationships();
+
+        if (res.verification_code) {
+          setVerificationLogs((prev) => [
+            { id: res.relationship_id, code: res.verification_code!, inviter: 'You', phone: input },
+            ...prev,
+          ]);
+        }
+
+        // Open OTP verification modal
+        setVerifyingRelId(res.relationship_id);
+        setOtpInput('');
+        setOtpModalVisible(true);
       }
     } catch (error: any) {
-      const msg = error.response?.data?.detail || 'Failed to send guardian invitation. Account may not exist.';
+      const msg = error.response?.data?.detail || error.message || 'Failed to send guardian invitation.';
       Alert.alert('Invitation Failed', msg);
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  const handleVerifyOtpCode = async () => {
+    const code = otpInput.trim();
+    if (!code || code.length < 6) {
+      Alert.alert('Validation Error', 'Please enter the 6-digit OTP verification code');
+      return;
+    }
+
+    setOtpLoading(true);
+    try {
+      const res = await guardianService.verifyGuardianCode(verifyingRelId, code);
+      if (res && res.success) {
+        setOtpModalVisible(false);
+        setOtpInput('');
+        Alert.alert('🎉 Guardian Verified', 'Your guardian has been successfully linked to your account!');
+        fetchRelationships();
+      }
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || error.message || 'Verification failed. Incorrect code.';
+      Alert.alert('Verification Failed', msg);
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -108,120 +231,452 @@ export default function GuardianManagementScreen({ navigation }: Props) {
     );
   };
 
+  const handleRespondApproval = async (reqId: string, decision: 'APPROVED' | 'REJECTED') => {
+    try {
+      setLoading(true);
+      await guardianService.respondToRequest(reqId, decision, 'Responded via Safety Net Dashboard');
+      Alert.alert('Response Saved', `Transaction has been ${decision.toLowerCase()}.`);
+      fetchRelationships();
+    } catch (e: any) {
+      Alert.alert('Action Failed', e?.response?.data?.detail || 'Failed to update request.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeGuardianCount = guardians.filter(g => g.status === 'ACTIVE').length;
+  const activeWardCount = wards.filter(w => w.status === 'ACTIVE').length;
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} refreshControl={
-        <ActivityIndicator animating={loading && guardians.length === 0} color="#6366f1" style={{ marginVertical: 12 }} />
-      }>
-        <View style={styles.header}>
-          <Text style={styles.title}>Guardian Safety net</Text>
-          <Text style={styles.subtitle}>
-            Add trusted users (guardians) to approve high-risk payments, or accept invitations to protect other users.
-          </Text>
-        </View>
-
-        {/* ─── ADD GUARDIAN FORM ─── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Invite a Guardian</Text>
-          <Text style={styles.cardDescription}>
-            Enter the VPA or Mobile Number of a user with a SentinelPay account. They must accept your invite before they can protect your transactions.
-          </Text>
-
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 9999999902 or name@sentinelpay"
-              placeholderTextColor="#94a3b8"
-              value={inviteInput}
-              onChangeText={setInviteInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!inviteLoading}
-            />
-            <TouchableOpacity
-              style={[styles.inviteButton, inviteLoading && styles.buttonDisabled]}
-              onPress={handleSendInvite}
-              disabled={inviteLoading}
-            >
-              {inviteLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.inviteButtonText}>Invite</Text>
-              )}
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={fetchRelationships} tintColor="#10B981" />
+        }
+      >
+        {/* ─── 1. HERO SAFETY DASHBOARD ─── */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroHeaderRow}>
+            <View style={styles.heroBadge}>
+              <View style={styles.heroBadgeDot} />
+              <Text style={styles.heroBadgeText}>ACTIVE SAFETY NET</Text>
+            </View>
+            <TouchableOpacity onPress={fetchRelationships} style={styles.refreshBtnIcon}>
+              <Text style={styles.refreshIconText}>🔄</Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* ─── LIST OF GUARDIANS (PROTECTING ME) ─── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>My Guardians (Protecting Me)</Text>
-            <Text style={styles.countBadge}>{guardians.length}/5</Text>
+          <Text style={styles.heroTitle}>Guardian Safety Net</Text>
+          <Text style={styles.heroSubtitle}>
+            Protect your funds with trusted guardians. Payments above your limit require instant guardian approval.
+          </Text>
+
+          <View style={styles.metricsGrid}>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricVal}>{activeGuardianCount}/5</Text>
+              <Text style={styles.metricLabel}>Guardians</Text>
+            </View>
+
+            <View style={styles.metricDivider} />
+
+            <View style={styles.metricBox}>
+              <Text style={styles.metricVal}>₹{parseFloat(spendingLimit || '0').toLocaleString('en-IN')}</Text>
+              <Text style={styles.metricLabel}>Limit Threshold</Text>
+            </View>
+
+            <View style={styles.metricDivider} />
+
+            <View style={styles.metricBox}>
+              <Text style={styles.metricVal}>{activeWardCount}</Text>
+              <Text style={styles.metricLabel}>Wards Protected</Text>
+            </View>
           </View>
-          
-          {guardians.length === 0 ? (
-            <Text style={styles.emptyText}>No guardians configured. Add one above to enable secure transaction coverage.</Text>
-          ) : (
-            guardians.map((item) => (
-              <View key={item.id} style={styles.itemRow}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{item.guardian_name || 'Sentinel User'}</Text>
-                  <Text style={styles.itemSub}>{item.guardian_vpa || item.guardian_phone}</Text>
-                </View>
-                <View style={styles.itemActions}>
-                  <Text style={[styles.statusText, item.status === 'ACTIVE' ? styles.statusActive : styles.statusPending]}>
-                    {item.status}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => handleRemoveRelationship(item.id, item.guardian_name || 'this user', 'guardian')}
-                  >
-                    <Text style={styles.removeBtnText}>🗑️</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
         </View>
 
-        {/* ─── LIST OF WARDS (ME PROTECTING THEM) ─── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Users I am Protecting (Wards)</Text>
-          
-          {wards.length === 0 ? (
-            <Text style={styles.emptyText}>You are not currently protecting any wards.</Text>
-          ) : (
-            wards.map((item) => (
-              <View key={item.id} style={styles.itemRow}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{item.ward_name || 'Sentinel User'}</Text>
-                  <Text style={styles.itemSub}>{item.ward_vpa || item.ward_phone}</Text>
+        {/* ─── 2. SEGMENTED TAB SELECTOR ─── */}
+        <View style={styles.segmentedContainer}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'guardians' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('guardians')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'guardians' && styles.segmentTextActive]}>
+              🛡️ Guardians ({guardians.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'wards' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('wards')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'wards' && styles.segmentTextActive]}>
+              👥 Wards ({wards.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'approvals' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('approvals')}
+          >
+            <View style={styles.tabBadgeRow}>
+              <Text style={[styles.segmentText, activeTab === 'approvals' && styles.segmentTextActive]}>
+                ⚡ Requests
+              </Text>
+              {pendingApprovals.length > 0 && (
+                <View style={styles.tabCountPill}>
+                  <Text style={styles.tabCountText}>{pendingApprovals.length}</Text>
                 </View>
-                <View style={styles.itemActions}>
-                  {item.status === 'PENDING' ? (
-                    <TouchableOpacity
-                      style={styles.acceptBtn}
-                      onPress={() => handleAcceptInvite(item.id)}
-                    >
-                      <Text style={styles.acceptBtnText}>Accept Invite</Text>
-                    </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* ─── TAB 1: GUARDIANS & LIMIT SETTINGS ─── */}
+        {activeTab === 'guardians' && (
+          <>
+            {/* SPENDING LIMIT CONFIG */}
+            <View style={styles.card}>
+              <View style={styles.cardTitleRow}>
+                <AppIcon name="guardian" size={20} color="#10B981" />
+                <Text style={styles.cardTitle}>Maximum Spending Limit</Text>
+              </View>
+              <Text style={styles.cardDescription}>
+                Any transfer exceeding this threshold will automatically require guardian authorization.
+              </Text>
+
+              {/* Preset Limit Shortcuts */}
+              <View style={styles.presetRow}>
+                {['1000', '5000', '10000', '25000'].map((preset) => (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[styles.presetChip, spendingLimit === preset && styles.presetChipActive]}
+                    onPress={() => handleSaveLimit(preset)}
+                  >
+                    <Text style={[styles.presetChipText, spendingLimit === preset && styles.presetChipTextActive]}>
+                      ₹{parseInt(preset).toLocaleString('en-IN')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.inputRow}>
+                <View style={styles.currencyPrefix}>
+                  <Text style={styles.currencyText}>₹</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]}
+                  placeholder="Custom Limit e.g. 5000"
+                  placeholderTextColor="#64748B"
+                  value={spendingLimit}
+                  onChangeText={setSpendingLimit}
+                  keyboardType="numeric"
+                  editable={!limitLoading}
+                />
+                <TouchableOpacity
+                  style={[styles.saveLimitButton, limitLoading && styles.buttonDisabled]}
+                  onPress={() => handleSaveLimit()}
+                  disabled={limitLoading}
+                >
+                  {limitLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <View style={styles.row}>
-                      <Text style={[styles.statusText, styles.statusActive]}>PROTECTING</Text>
+                    <Text style={styles.saveLimitButtonText}>Set Limit</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ADD GUARDIAN CARD */}
+            <View style={styles.card}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>📱 Link a Trusted Guardian</Text>
+              </View>
+              <Text style={styles.cardDescription}>
+                Enter the registered phone number or VPA of a trusted SentinelPay user.
+              </Text>
+
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Phone (e.g. 9876543210) or VPA"
+                  placeholderTextColor="#64748B"
+                  value={inviteInput}
+                  onChangeText={setInviteInput}
+                  keyboardType="phone-pad"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!inviteLoading}
+                />
+                <TouchableOpacity
+                  style={[styles.inviteButton, inviteLoading && styles.buttonDisabled]}
+                  onPress={handleSendInvite}
+                  disabled={inviteLoading}
+                >
+                  {inviteLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.inviteButtonText}>Send Code</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* IN-APP OTP FEED */}
+            {verificationLogs.length > 0 && (
+              <View style={[styles.card, { borderColor: '#6366F1', borderWidth: 1.5 }]}>
+                <Text style={[styles.cardTitle, { color: '#818CF8' }]}>📩 Guardian OTP Notification Feed</Text>
+                <Text style={styles.cardDescription}>
+                  Recent verification codes generated for guardian linking:
+                </Text>
+                {verificationLogs.map((log) => (
+                  <View key={log.id} style={styles.otpFeedItem}>
+                    <View>
+                      <Text style={styles.otpFeedUser}>{log.inviter} ({log.phone || 'Phone'})</Text>
+                      <Text style={styles.otpFeedCode}>OTP: {log.code}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.verifyDirectBtn}
+                      onPress={() => {
+                        setVerifyingRelId(log.id);
+                        setOtpInput(log.code);
+                        setOtpModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.verifyDirectBtnText}>Enter Code</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* GUARDIANS LIST */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>🛡️ Active Guardians ({guardians.length}/5)</Text>
+              </View>
+
+              {guardians.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyIcon}>🛡️</Text>
+                  <Text style={styles.emptyTitle}>No Guardians Linked</Text>
+                  <Text style={styles.emptyText}>Add a trusted family member or friend above to start protecting transactions.</Text>
+                </View>
+              ) : (
+                guardians.map((item) => (
+                  <View key={item.id} style={styles.itemRow}>
+                    <View style={styles.avatarCircle}>
+                      <Text style={styles.avatarLetter}>{(item.guardian_name || 'G')[0].toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>{item.guardian_name || 'Sentinel Guardian'}</Text>
+                      <Text style={styles.itemSub}>{item.guardian_vpa || item.guardian_phone}</Text>
+                    </View>
+                    <View style={styles.itemActions}>
+                      {item.status === 'PENDING_VERIFICATION' || item.status === 'PENDING' ? (
+                        <TouchableOpacity
+                          style={styles.enterCodePill}
+                          onPress={() => {
+                            setVerifyingRelId(item.id);
+                            setOtpInput('');
+                            setOtpModalVisible(true);
+                          }}
+                        >
+                          <Text style={styles.enterCodePillText}>🔑 Verify</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.activePill}>
+                          <Text style={styles.activePillText}>ACTIVE</Text>
+                        </View>
+                      )}
                       <TouchableOpacity
                         style={styles.removeBtn}
-                        onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
+                        onPress={() => handleRemoveRelationship(item.id, item.guardian_name || 'this user', 'guardian')}
                       >
                         <Text style={styles.removeBtnText}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </>
+        )}
+
+        {/* ─── TAB 2: WARDS (USERS I PROTECT) ─── */}
+        {activeTab === 'wards' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>👥 Users You Protect (Wards)</Text>
+            <Text style={styles.cardDescription}>
+              As a guardian, you will receive real-time notifications to review and approve high-risk or high-value transfers initiated by these users.
+            </Text>
+
+            {wards.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>👥</Text>
+                <Text style={styles.emptyTitle}>Not Protecting Anyone Yet</Text>
+                <Text style={styles.emptyText}>When another user adds you as their guardian, their requests will appear here.</Text>
               </View>
-            ))
-          )}
-        </View>
+            ) : (
+              wards.map((item) => (
+                <View key={item.id} style={styles.itemRow}>
+                  <View style={[styles.avatarCircle, { backgroundColor: '#3B82F6' }]}>
+                    <Text style={styles.avatarLetter}>{(item.ward_name || 'W')[0].toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.ward_name || 'Sentinel Ward'}</Text>
+                    <Text style={styles.itemSub}>{item.ward_vpa || item.ward_phone}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    {item.status === 'PENDING' ? (
+                      <TouchableOpacity
+                        style={styles.acceptBtn}
+                        onPress={() => handleAcceptInvite(item.id)}
+                      >
+                        <Text style={styles.acceptBtnText}>Accept Invite</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.row}>
+                        <View style={[styles.activePill, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
+                          <Text style={[styles.activePillText, { color: '#60A5FA' }]}>PROTECTING</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.removeBtn}
+                          onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
+                        >
+                          <Text style={styles.removeBtnText}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {/* ─── TAB 3: PENDING APPROVAL REQUESTS ─── */}
+        {activeTab === 'approvals' && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>⚡ Pending Payment Approvals</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('GuardianApproval')}>
+                <Text style={styles.fullScreenLink}>Full View ↗</Text>
+              </TouchableOpacity>
+            </View>
+
+            {pendingApprovals.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🎉</Text>
+                <Text style={styles.emptyTitle}>All Clear!</Text>
+                <Text style={styles.emptyText}>No pending transactions require your guardian authorization right now.</Text>
+              </View>
+            ) : (
+              pendingApprovals.map((req) => {
+                const expiresDate = new Date(req.expires_at);
+                const minsLeft = Math.max(0, Math.round((expiresDate.getTime() - Date.now()) / 60000));
+                const isHighRisk = req.fraud_score > 0.7;
+
+                return (
+                  <View key={req.id} style={styles.reqCardInner}>
+                    <View style={styles.reqHeaderRow}>
+                      <View>
+                        <Text style={styles.reqWardName}>{req.requester_name || 'Sentinel Ward'}</Text>
+                        <Text style={styles.reqWardSub}>+{req.requester_phone}</Text>
+                      </View>
+                      <View style={[styles.riskChip, { backgroundColor: isHighRisk ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
+                        <Text style={[styles.riskChipText, { color: isHighRisk ? '#EF4444' : '#F59E0B' }]}>
+                          Risk {(req.fraud_score * 100).toFixed(0)}%
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.reqBodyRow}>
+                      <View>
+                        <Text style={styles.reqLabel}>AMOUNT</Text>
+                        <Text style={styles.reqAmount}>₹{req.amount.toLocaleString('en-IN')}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.reqLabel}>EXPIRES</Text>
+                        <Text style={styles.reqTime}>{minsLeft} mins left</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.reqActionsRow}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.rejectActionBtn]}
+                        onPress={() => handleRespondApproval(req.id, 'REJECTED')}
+                      >
+                        <Text style={styles.rejectActionText}>Reject</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.approveActionBtn]}
+                        onPress={() => handleRespondApproval(req.id, 'APPROVED')}
+                      >
+                        <Text style={styles.approveActionText}>Approve & Sign</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {/* ─── OTP CODE VERIFICATION MODAL ─── */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={otpModalVisible}
+        onRequestClose={() => setOtpModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🔑 Enter Guardian Code</Text>
+              <TouchableOpacity onPress={() => setOtpModalVisible(false)}>
+                <Text style={styles.modalCloseIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>
+              Enter the 6-digit verification code received by your guardian to complete account linking.
+            </Text>
+
+            <TextInput
+              style={styles.otpInput}
+              placeholder="123456"
+              placeholderTextColor="#475569"
+              value={otpInput}
+              onChangeText={setOtpInput}
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setOtpModalVisible(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, otpLoading && styles.buttonDisabled]}
+                onPress={handleVerifyOtpCode}
+                disabled={otpLoading}
+              >
+                {otpLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Verify & Link</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -229,118 +684,305 @@ export default function GuardianManagementScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0B0F17',
   },
   scrollContainer: {
-    padding: 20,
+    padding: 18,
+    paddingBottom: 40,
   },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#f8fafc',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  card: {
-    backgroundColor: '#1e293b',
+
+  /* HERO DASHBOARD */
+  heroCard: {
+    backgroundColor: '#161F30',
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#1E293B',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 6,
+  },
+  heroBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  heroBadgeText: {
+    color: '#34D399',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  refreshBtnIcon: {
+    padding: 4,
+  },
+  refreshIconText: {
+    fontSize: 16,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    backgroundColor: '#0B0F17',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginTop: 16,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  metricBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricVal: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  metricLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  metricDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#1E293B',
+  },
+
+  /* SEGMENTED TAB SELECTOR */
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#161F30',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 20,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#10B981',
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  segmentTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  tabBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabCountPill: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  tabCountText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  /* CARDS */
+  card: {
+    backgroundColor: '#161F30',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#1E293B',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  countBadge: {
-    backgroundColor: '#334155',
-    color: '#38bdf8',
-    fontWeight: 'bold',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 12,
+    color: '#F8FAFC',
   },
   cardDescription: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#94A3B8',
+    marginBottom: 14,
     lineHeight: 18,
-    marginBottom: 16,
   },
+  fullScreenLink: {
+    color: '#10B981',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  /* PRESETS & INPUTS */
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  presetChip: {
+    flex: 1,
+    backgroundColor: '#0B0F17',
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  presetChipActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: '#10B981',
+  },
+  presetChipText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  presetChipTextActive: {
+    color: '#34D399',
+  },
+
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  input: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginRight: 12,
-  },
-  inviteButton: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+  currencyPrefix: {
+    backgroundColor: '#1E293B',
+    height: 48,
+    paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
   },
-  buttonDisabled: {
-    opacity: 0.7,
+  currencyText: {
+    color: '#10B981',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#0B0F17',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    color: '#F8FAFC',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  inviteButton: {
+    backgroundColor: '#10B981',
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
   },
   inviteButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 15,
+    fontSize: 13,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-    textAlign: 'center',
-    paddingVertical: 12,
+  saveLimitButton: {
+    backgroundColor: '#059669',
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
   },
+  saveLimitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
+  /* LIST ITEMS */
   itemRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#1E293B',
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#059669',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarLetter: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#f8fafc',
+    fontWeight: '700',
+    color: '#F8FAFC',
   },
   itemSub: {
     fontSize: 12,
-    color: '#64748b',
-    marginTop: 4,
+    color: '#94A3B8',
+    marginTop: 2,
   },
   itemActions: {
     flexDirection: 'row',
@@ -350,37 +992,261 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
+  activePill: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 12,
+  },
+  activePillText: {
+    color: '#34D399',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  enterCodePill: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  enterCodePillText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  acceptBtn: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     marginRight: 8,
   },
-  statusActive: {
-    backgroundColor: '#10b98122',
-    color: '#10b981',
-  },
-  statusPending: {
-    backgroundColor: '#f59e0b22',
-    color: '#f59e0b',
+  acceptBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   removeBtn: {
     padding: 6,
+    marginLeft: 8,
   },
   removeBtnText: {
-    fontSize: 18,
+    fontSize: 15,
   },
-  acceptBtn: {
-    backgroundColor: '#10b981',
-    borderRadius: 8,
+
+  /* EMPTY STATES */
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  emptyText: {
+    color: '#64748B',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  /* OTP FEED */
+  otpFeedItem: {
+    backgroundColor: '#0B0F17',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  otpFeedUser: {
+    color: '#CBD5E1',
+    fontSize: 12,
+  },
+  otpFeedCode: {
+    color: '#38BDF8',
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  verifyDirectBtn: {
+    backgroundColor: '#6366F1',
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: 8,
   },
-  acceptBtnText: {
-    color: '#fff',
-    fontWeight: '700',
+  verifyDirectBtnText: {
+    color: '#FFF',
     fontSize: 12,
+    fontWeight: '700',
+  },
+
+  /* APPROVAL CARDS IN TAB */
+  reqCardInner: {
+    backgroundColor: '#0B0F17',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  reqHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  reqWardName: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reqWardSub: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  riskChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  riskChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  reqBodyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reqLabel: {
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  reqAmount: {
+    color: '#10B981',
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  reqTime: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  reqActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  rejectActionBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  rejectActionText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  approveActionBtn: {
+    backgroundColor: '#10B981',
+  },
+  approveActionText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  /* MODAL */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#161F30',
+    borderRadius: 20,
+    padding: 22,
+    width: '100%',
+    maxWidth: 380,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
+  modalCloseIcon: {
+    color: '#94A3B8',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  otpInput: {
+    backgroundColor: '#0B0F17',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#10B981',
+    height: 54,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#34D399',
+    textAlign: 'center',
+    letterSpacing: 8,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  modalCancelBtnText: {
+    color: '#94A3B8',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalSubmitBtn: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  modalSubmitBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

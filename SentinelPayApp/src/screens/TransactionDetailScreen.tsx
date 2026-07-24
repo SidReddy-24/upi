@@ -9,13 +9,14 @@ import {
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, WalletTransaction } from '../types';
 import { getTransactionById } from '../utils/walletDb';
+import { parseSafeDate } from '../utils/parsers';
 import RiskBadge from '../components/RiskBadge';
 import FraudExplanationCard from '../components/FraudExplanationCard';
 
 type Props = { route: RouteProp<RootStackParamList, 'TransactionDetail'> };
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleString('en-IN', {
+  return parseSafeDate(iso).toLocaleString('en-IN', {
     weekday: 'short', day: '2-digit', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
   });

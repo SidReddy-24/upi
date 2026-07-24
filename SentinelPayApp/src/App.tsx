@@ -39,6 +39,8 @@ import PhoneAuthScreen from './screens/PhoneAuthScreen';
 import PinSetupScreen from './screens/PinSetupScreen';
 import PinLoginScreen from './screens/PinLoginScreen';
 import BiometricSetupScreen from './screens/BiometricSetupScreen';
+import GuardianManagementScreen from './screens/GuardianManagementScreen';
+import GuardianApprovalScreen from './screens/GuardianApprovalScreen';
 import { authService } from './services/authService';
 import unifiedAuthService from './services/unifiedAuthService';
 
@@ -65,15 +67,8 @@ export default function App(): React.JSX.Element {
       }
 
 
-      // Check which auth mode was previously set
-      const authMode = await unifiedAuthService.getAuthMode();
-      if (authMode === 'pin_biometric') {
-        // User has PIN set up, go to PIN login
-        setInitialRoute('PinLogin');
-      } else {
-        // No auth mode set, show mode selector
-        setInitialRoute('AuthModeSelector');
-      }
+      // Mandatory phone auth if not logged in
+      setInitialRoute('PhoneAuth');
     };
     checkState();
   }, []);
@@ -94,9 +89,12 @@ export default function App(): React.JSX.Element {
             <Stack.Navigator
               initialRouteName={initialRoute}
               screenOptions={{
-                headerStyle: { backgroundColor: '#6366f1' },
-                headerTintColor: '#fff',
-                headerTitleStyle: { fontWeight: 'bold' },
+                animation: 'slide_from_right',
+                animationDuration: 250,
+                headerStyle: { backgroundColor: '#FAF7F0' },
+                headerTintColor: '#1A1A2E',
+                headerTitleStyle: { fontWeight: '800' },
+                headerShadowVisible: false,
               }}>
 
               <Stack.Screen
@@ -208,6 +206,16 @@ export default function App(): React.JSX.Element {
                 name="BiometricSetup"
                 component={BiometricSetupScreen}
                 options={{ title: 'Enable Biometric' }}
+              />
+              <Stack.Screen
+                name="GuardianManagement"
+                component={GuardianManagementScreen}
+                options={{ title: 'Manage Guardians' }}
+              />
+              <Stack.Screen
+                name="GuardianApproval"
+                component={GuardianApprovalScreen}
+                options={{ title: 'Pending Approvals' }}
               />
 
             </Stack.Navigator>

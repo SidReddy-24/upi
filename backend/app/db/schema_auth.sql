@@ -117,6 +117,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS enforce_max_guardians ON guardian_relationships;
 CREATE TRIGGER enforce_max_guardians
     BEFORE INSERT OR UPDATE ON guardian_relationships
     FOR EACH ROW

@@ -56,11 +56,12 @@ async def health_check(
         components["postgresql"] = {"status": "DOWN", "error": str(e)}
         
     # 4. ML Inference engine
-    ml_status = "UP" if ml_engine.is_loaded else "DEGRADED"
+    is_healthy = getattr(ml_engine, "is_loaded", False) or getattr(ml_engine.registry, "is_healthy", False)
+    ml_status = "UP" if is_healthy else "DEGRADED"
     components["ml_inference"] = {
         "status": ml_status,
-        "latency_ms": 5 if ml_engine.is_loaded else 0,
-        "model_version": settings.MODEL_VERSION if ml_engine.is_loaded else "mock_fallback"
+        "latency_ms": 5 if is_healthy else 0,
+        "model_version": settings.MODEL_VERSION if is_healthy else "mock_fallback"
     }
     
     # 5. Rule Engine

@@ -105,6 +105,7 @@ const fraudShieldApi = {
    * Atomic Multi-User P2P Transfer API.
    */
   async executeP2PTransfer(data: {
+    transaction_id?: string;
     sender_vpa: string;
     receiver_vpa: string;
     amount: number;

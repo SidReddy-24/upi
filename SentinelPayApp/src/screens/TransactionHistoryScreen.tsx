@@ -11,13 +11,14 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, WalletTransaction } from '../types';
-import { getTransactions } from '../utils/walletDb';
+import { getTransactions, getUser, syncCloudTransactions } from '../utils/walletDb';
+import { parseSafeDate } from '../utils/parsers';
 import RiskBadge from '../components/RiskBadge';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'TransactionHistory'> };
 
 function formatTime(iso: string) {
-  const d = new Date(iso);
+  const d = parseSafeDate(iso);
   return d.toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true,
@@ -30,10 +31,10 @@ function formatAmount(n: number) {
 
 function statusColor(status: string) {
   switch (status) {
-    case 'APPROVED': return '#16a34a';
-    case 'REJECTED': return '#dc2626';
-    case 'REVIEW':   return '#d97706';
-    default:         return '#6b7280';
+    case 'APPROVED': return '#2D6A4F';
+    case 'REJECTED': return '#E63946';
+    case 'REVIEW':   return '#F4A261';
+    default:         return '#64748b';
   }
 }
 
@@ -42,8 +43,14 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const data = await getTransactions();
+    const user = await getUser();
+    let data = await getTransactions();
     setTxns(data);
+
+    if (user && user.vpa) {
+      const synced = await syncCloudTransactions(user.vpa);
+      setTxns(synced);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -59,8 +66,8 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
       style={styles.row}
       onPress={() => navigation.navigate('TransactionDetail', { txnId: item.id })}>
       {/* left icon */}
-      <View style={[styles.icon, { backgroundColor: item.type === 'DEBIT' ? '#fee2e2' : '#dcfce7' }]}>
-        <Text style={[styles.iconText, { color: item.type === 'DEBIT' ? '#dc2626' : '#16a34a' }]}>
+      <View style={[styles.icon, { backgroundColor: item.type === 'DEBIT' ? '#FEE2E2' : '#D1FAE5' }]}>
+        <Text style={[styles.iconText, { color: item.type === 'DEBIT' ? '#E63946' : '#2D6A4F' }]}>
           {item.type === 'DEBIT' ? '↑' : '↓'}
         </Text>
       </View>
@@ -78,7 +85,7 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
 
       {/* right amount + badge */}
       <View style={styles.right}>
-        <Text style={[styles.amount, { color: item.type === 'DEBIT' ? '#dc2626' : '#16a34a' }]}>
+        <Text style={[styles.amount, { color: item.type === 'DEBIT' ? '#E63946' : '#2D6A4F' }]}>
           {item.type === 'DEBIT' ? '-' : '+'}{formatAmount(item.amount)}
         </Text>
         {item.decision && item.risk_score != null && (
@@ -109,26 +116,26 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
           <Text style={styles.statNum}>
             {txns.filter(t => t.decision === 'APPROVE').length}
           </Text>
-          <Text style={[styles.statLabel, { color: '#16a34a' }]}>Approved</Text>
+          <Text style={[styles.statLabel, { color: '#2D6A4F' }]}>Approved</Text>
         </View>
         <View style={styles.stat}>
           <Text style={styles.statNum}>
             {txns.filter(t => t.decision === 'REVIEW').length}
           </Text>
-          <Text style={[styles.statLabel, { color: '#d97706' }]}>Reviewed</Text>
+          <Text style={[styles.statLabel, { color: '#F4A261' }]}>Reviewed</Text>
         </View>
         <View style={styles.stat}>
           <Text style={styles.statNum}>
             {txns.filter(t => t.decision === 'REJECT').length}
           </Text>
-          <Text style={[styles.statLabel, { color: '#dc2626' }]}>Blocked</Text>
+          <Text style={[styles.statLabel, { color: '#E63946' }]}>Blocked</Text>
         </View>
       </View>
     ) : null;
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#6366f1" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F0" />
       <FlatList
         data={txns}
         keyExtractor={item => item.id}
@@ -137,7 +144,7 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
         ListEmptyComponent={ListEmpty}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" />
         }
       />
     </View>
@@ -145,24 +152,24 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
+  root: { flex: 1, backgroundColor: '#FAF7F0' },
   list: { padding: 16, paddingBottom: 32 },
 
   statsBar: {
     flexDirection: 'row', justifyContent: 'space-around',
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05,
-    shadowRadius: 6, elevation: 2,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
+    marginBottom: 16, shadowColor: '#1A1A2E', shadowOpacity: 0.06,
+    shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#E8C4B8',
   },
   stat: { alignItems: 'center' },
-  statNum: { fontSize: 22, fontWeight: '800', color: '#111827' },
-  statLabel: { fontSize: 12, color: '#6b7280', fontWeight: '600', marginTop: 2 },
+  statNum: { fontSize: 22, fontWeight: '800', color: '#1A1A2E' },
+  statLabel: { fontSize: 12, color: '#64748b', fontWeight: '600', marginTop: 2 },
 
   row: {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#fff', borderRadius: 14, padding: 14,
-    marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04,
-    shadowRadius: 4, elevation: 1,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
+    marginBottom: 10, shadowColor: '#1A1A2E', shadowOpacity: 0.04,
+    shadowRadius: 4, elevation: 1, borderWidth: 1, borderColor: '#E8C4B8',
   },
   icon: {
     width: 44, height: 44, borderRadius: 22,
@@ -170,7 +177,7 @@ const styles = StyleSheet.create({
   },
   iconText: { fontSize: 20, fontWeight: '700' },
   info: { flex: 1, paddingRight: 8 },
-  vpa: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  vpa: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
   time: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   statusLabel: { fontSize: 12, fontWeight: '600', marginTop: 4 },
   right: { alignItems: 'flex-end' },
@@ -178,6 +185,7 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyIcon: { fontSize: 52, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A2E' },
   emptySub: { fontSize: 14, color: '#9ca3af', marginTop: 4 },
 });
+

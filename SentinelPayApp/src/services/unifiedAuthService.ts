@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { AuthMode, AuthUser, AuthSession } from '../types/auth';
 import { authService } from './authService';
-import { updateUserVpa } from '../utils/walletDb';
+import { updateUserVpa, saveUser } from '../utils/walletDb';
 
 
 const rnBiometrics = new ReactNativeBiometrics();
@@ -138,7 +138,10 @@ class UnifiedAuthService {
     phone: string,
     otp: string,
     sessionId: string,
-    useMock: boolean = true
+    useMock: boolean = true,
+    mode: 'signup' | 'login' = 'login',
+    name?: string,
+    dob?: string
   ): Promise<{ success: boolean; session?: AuthSession; error?: string }> {
     try {
       // Mock mode: Accept 123456 as valid OTP
@@ -149,23 +152,26 @@ class UnifiedAuthService {
       // 1. Call real backend to register/login user in PostgreSQL database
       let backendUser: any = null;
       let token = generateToken(phone);
+      const defaultPassword = `SentinelPass_${phone.slice(-4)}!`;
 
-      try {
-        const defaultPassword = `SentinelPass_${phone.slice(-4)}!`;
-        const name = `User ${phone.slice(-4)}`;
-        const regRes = await authService.register(phone, defaultPassword, undefined, name);
-        backendUser = regRes.user;
-        token = regRes.access_token;
-      } catch (authErr: any) {
-        console.warn('[UnifiedAuth] Backend register attempt note:', authErr?.response?.data || authErr?.message);
-        // If already registered, try backend login
+      if (mode === 'signup') {
         try {
-          const defaultPassword = `SentinelPass_${phone.slice(-4)}!`;
+          const regRes = await authService.register(phone, defaultPassword, undefined, name || `User ${phone.slice(-4)}`);
+          backendUser = regRes.user;
+          token = regRes.access_token;
+        } catch (authErr: any) {
+          const detailMsg = authErr?.response?.data?.detail || authErr?.message;
+          return { success: false, error: detailMsg || 'Mobile number is already registered. Please log in instead.' };
+        }
+      } else {
+        // Login mode
+        try {
           const loginRes = await authService.login(phone, defaultPassword);
           backendUser = loginRes.user;
           token = loginRes.access_token;
-        } catch (loginErr) {
-          console.warn('[UnifiedAuth] Fallback login note:', loginErr);
+        } catch (loginErr: any) {
+          const detailMsg = loginErr?.response?.data?.detail || loginErr?.message;
+          return { success: false, error: detailMsg || 'No account registered with this mobile number. Please sign up.' };
         }
       }
 
@@ -174,8 +180,9 @@ class UnifiedAuthService {
       const realVpa = backendUser?.vpa || `${phone.slice(-10)}@sentinelpay`;
       const realName = backendUser?.name || `User ${phone.slice(-4)}`;
 
-      // Update local wallet DB with real backend VPA and name
-      await updateUserVpa(realVpa, realName);
+      // Update local wallet DB with real backend VPA, name, and balance
+      const realBalance = backendUser?.balance !== undefined && backendUser?.balance !== null ? parseFloat(backendUser.balance) : undefined;
+      await updateUserVpa(realVpa, realName, realBalance);
 
       // Create session
       const user: AuthUser = {
@@ -204,6 +211,98 @@ class UnifiedAuthService {
     } catch (error) {
       console.error('[UnifiedAuth] verifyOtp error:', error);
       return { success: false, error: 'Failed to verify OTP' };
+    }
+  }
+
+  /**
+   * Complete mandatory registration/login with phone primary key, name, DOB, UPI PIN & Biometrics
+   */
+  async registerOrLoginWithPhone(
+    phone: string,
+    name: string,
+    dob: string,
+    upiPin?: string,
+    biometricEnabled: boolean = false
+  ): Promise<{ success: boolean; session?: AuthSession; error?: string }> {
+    try {
+      const cleanPhone = phone.trim();
+      const cleanName = name.trim() || `User ${cleanPhone.slice(-4)}`;
+      const cleanDob = dob.trim();
+
+      // Call real backend API to create/fetch account in Supabase PostgreSQL
+      let backendUser: any = null;
+      let token = generateToken(cleanPhone);
+
+      try {
+        const regRes = await authService.register(
+          cleanPhone,
+          'SentinelPass@123',
+          undefined,
+          cleanName
+        );
+        backendUser = regRes.user;
+        token = regRes.access_token;
+      } catch (authErr: any) {
+        console.warn('[UnifiedAuth] Backend register/sync note:', authErr?.message);
+        try {
+          const loginRes = await authService.login(cleanPhone, 'SentinelPass@123');
+          backendUser = loginRes.user;
+          token = loginRes.access_token;
+        } catch (loginErr) {
+          console.warn('[UnifiedAuth] Login fallback note:', loginErr);
+        }
+      }
+
+      const realId = cleanPhone; // Phone number is the PRIMARY KEY!
+      const realVpa = backendUser?.vpa || `${cleanPhone}@sentinelpay`;
+      const realName = backendUser?.name || cleanName;
+
+      // Save user profile in local walletDb
+      await saveUser({
+        id: realId,
+        phone: cleanPhone,
+        name: realName,
+        dob: cleanDob,
+        vpa: realVpa,
+        upiPin: upiPin || '1234',
+        balance: 100000.0,
+        created_at: new Date().toISOString(),
+      });
+
+      if (upiPin) {
+        const pinHash = simpleHash(upiPin);
+        await AsyncStorage.setItem(PIN_HASH_KEY, pinHash);
+      }
+
+      if (biometricEnabled) {
+        await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+      }
+
+      const user: AuthUser = {
+        id: realId,
+        phone: cleanPhone,
+        name: realName,
+        vpa: realVpa,
+        authMode: AuthMode.PHONE_OTP,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        biometricEnabled,
+      };
+
+      const session: AuthSession = {
+        user,
+        token,
+        refreshToken: generateToken(realId + '_refresh'),
+        expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+      };
+
+      await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      await AsyncStorage.setItem(AUTH_MODE_KEY, AuthMode.PHONE_OTP);
+
+      return { success: true, session };
+    } catch (error) {
+      console.error('[UnifiedAuth] registerOrLoginWithPhone error:', error);
+      return { success: false, error: 'Registration failed' };
     }
   }
 

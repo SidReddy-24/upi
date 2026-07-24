@@ -14,8 +14,8 @@ async def get_model_status(
     Returns metadata about active production ML model and training metrics.
     Based on SRD Section 15.5.
     """
-    is_loaded = ml_engine.is_loaded
-    feature_count = len(ml_engine.feature_cols) if is_loaded else 26
+    is_loaded = ml_engine.registry.is_healthy
+    feature_count = len(ml_engine.registry.feature_cols) if is_loaded else 26
     
     return {
         "production_model": {

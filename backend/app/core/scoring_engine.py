@@ -6,67 +6,64 @@ import uuid
 import numpy as np
 from datetime import datetime
 
-
 from app.config import settings
 from app.models.transaction import TransactionRequest
 from app.models.scoring_result import ScoringResponse, Signals
 from app.features.feature_store import extract_features
+from app.features.feature_validator import feature_validator
 from app.engines.rule_engine import rule_engine
 from app.engines.ml_engine import ml_engine
 from app.engines.behavioral_engine import compute_behavioral_deviation
 from app.engines.graph_engine import graph_engine
+from app.engines.device_trust_engine import device_trust_engine
+from app.engines.calibration_engine import calibration_engine
+from app.engines.decision_engine import decision_engine
 from app.engines.xai_engine import generate_explanation
 
 logger = logging.getLogger("fraudshield.scoring")
 
+
 async def score_transaction(txn: TransactionRequest) -> ScoringResponse:
     """
-    Orchestrates the synchronous scoring path in under 200ms.
-    Based on SRD Section 12.2.
+    Orchestrates the synchronous scoring path in under 200ms across 5 parallel engines.
     """
     start_time = time.time()
     request_id = f"req_{uuid.uuid4().hex[:12]}"
-    
-    # 1. Feature Extraction (Phase 1)
-    # This queries Redis and compiles the 40+ feature vector.
-    features = await extract_features(txn)
-    
-    # Extract user profile directly from features (or we fetch it inside feature store)
-    # The feature store fetches profile hash. Let's pass it to behavioral engine.
-    # In feature_store, we fetched the profile. To avoid re-fetching, let's rebuild a basic profile dict
-    # from feature values or we can fetch/re-fetch. Let's rebuild/extract profile data from features.
+
+    # 1. Feature Extraction & Schema Validation
+    raw_features = await extract_features(txn)
+    features, anomalies = feature_validator.validate_and_clean(raw_features)
+    if anomalies:
+        logger.info(f"Feature validation notices: {anomalies}")
+
     profile = {
-        "avg_amount_30d": features.get("amount_vs_user_avg_ratio", 1.0) / max(txn.amount, 1.0), # inverse
-        "std_amount_30d": 1000.0, # fallback std
+        "avg_amount_30d": features.get("amount_vs_user_avg_ratio", 1.0) / max(txn.amount, 1.0),
+        "std_amount_30d": 1000.0,
         "home_lat": txn.location.latitude if txn.location else 12.9716,
         "home_lon": txn.location.longitude if txn.location else 77.5946,
         "home_radius_km": 15.0,
         "pct_new_receivers_7d": 0.1
     }
-    
-    # 2. Parallel Engines Execution (Phase 2)
+
+    # 2. Parallel Engines Execution (120ms timeout budget)
     async def run_rules():
         return rule_engine.evaluate(features)
-        
+
     async def run_ml():
-        # Predict returns (ensemble_score, iso_score, shap_values)
         return ml_engine.predict(features)
-        
+
     async def run_behavioral():
         return compute_behavioral_deviation(txn, profile)
-        
+
     async def run_graph():
-        # Check node risk returns dict
         return graph_engine.check_node_risk(
             txn.sender_vpa, 
             txn.receiver_vpa, 
             txn.device.device_id
         )
 
-    # Gather tasks concurrently
     try:
-        # Hard timeout budget for parallel execution
-        timeout_sec = 0.12  # 120ms timeout budget for parallel section
+        timeout_sec = 0.12  # 120ms budget
         rule_res, ml_res, beh_res, grp_res = await asyncio.wait_for(
             asyncio.gather(
                 run_rules(),
@@ -77,7 +74,7 @@ async def score_transaction(txn: TransactionRequest) -> ScoringResponse:
             timeout=timeout_sec
         )
     except asyncio.TimeoutError:
-        logger.error("Scoring engines timed out. Using degraded/fallback responses.")
+        logger.error("Scoring engines timed out. Executing safe defaults.")
         rule_res = ([], False)
         ml_res = (0.05, 0.05, {})
         beh_res = compute_behavioral_deviation(txn, {})
@@ -87,87 +84,76 @@ async def score_transaction(txn: TransactionRequest) -> ScoringResponse:
     ensemble_ml_score, iso_score, shap_values = ml_res
     behavior_result = beh_res
     graph_result = grp_res
-    
-    # 3. Risk Aggregation & overrides (SRD Section 5.1.10)
+
+    # Device Trust Engine scoring
+    dev_trust_res = device_trust_engine.score_device(txn.device, graph_result)
+
+    # 3. Risk Aggregation
     rule_risk = 0.0
     if rule_flags:
-        # Score rule risk based on maximum severity
         severity_risk = {"CRITICAL": 1.0, "HIGH": 0.8, "MEDIUM": 0.5, "LOW": 0.2}
         rule_risk = max(severity_risk.get(f.severity, 0.0) for f in rule_flags)
-        
+
     deviation_score = behavior_result.deviation_score
     graph_risk = graph_result["graph_risk_score"]
-    
-    # Weighted aggregation
-    composite_risk = (
+
+    raw_composite = (
         settings.WEIGHT_ML * ensemble_ml_score +
         settings.WEIGHT_RULES * rule_risk +
         settings.WEIGHT_BEHAVIOR * deviation_score +
         settings.WEIGHT_GRAPH * graph_risk
     )
-    
-    # Aggregator Override Logic
-    if has_critical_rule:
-        composite_risk = max(composite_risk, 0.95)
-    if graph_result["fraud_ring_flag"]:
-        composite_risk = max(composite_risk, 0.90)
-    if ensemble_ml_score > 0.99:
-        composite_risk = 0.99
-        
-    composite_risk = float(np.clip(composite_risk, 0.0, 1.0))
 
-    # 4. Confidence calculation (SRD Section 5.1.10)
-    # Penalize confidence if ML and Anomaly (Isolation Forest) scores diverge
+    # 4. Probability Calibration (Platt Scaling)
+    calibrated_risk = calibration_engine.calibrate(raw_composite)
+
+    # 5. Confidence Calculation
     disagreement = abs(ensemble_ml_score - iso_score)
-    confidence = 1.0 - (0.5 * disagreement)
-    # Ensure minimum confidence boundaries
-    confidence = float(np.clip(confidence, 0.1, 1.0))
+    confidence = float(np.clip(1.0 - (0.5 * disagreement), 0.1, 1.0))
 
-    # 5. Decision Engine Thresholding (SRD Section 5.1.11)
-    if composite_risk >= settings.THRESHOLD_REJECT:
-        decision = "REJECT"
-    elif composite_risk >= settings.THRESHOLD_APPROVE:
-        decision = "REVIEW"
-    else:
-        decision = "APPROVE"
+    # 6. Dynamic Decision Engine
+    decision, threshold_used, decision_reason = decision_engine.evaluate_decision(
+        composite_risk=calibrated_risk,
+        confidence=confidence,
+        has_critical_rule=has_critical_rule,
+        fraud_ring_flag=graph_result["fraud_ring_flag"],
+        device_risk=dev_trust_res.device_risk_score
+    )
 
-    # 6. Explainability Engine Generation
+    # 7. Explainability Generation
     explanation = generate_explanation(
         shap_values=shap_values,
         rule_flags=rule_flags,
         features=features,
-        risk_score=composite_risk,
+        risk_score=calibrated_risk,
         decision=decision,
         model_version=settings.MODEL_VERSION
     )
 
-    # Compile signals
     signals = Signals(
         rule_flags=[f.rule_id for f in rule_flags],
         behavioral_deviation=round(deviation_score, 4),
         graph_risk=round(graph_risk, 4),
-        device_risk=round(features.get("device_is_rooted", 0.0) * 0.3 + features.get("device_is_emulator", 0.0) * 0.7, 4)
+        device_risk=round(dev_trust_res.device_risk_score, 4)
     )
 
-    # 7. Response Compilation
     latency_ms = int((time.time() - start_time) * 1000)
-    
+
     response = ScoringResponse(
         request_id=request_id,
         transaction_id=txn.transaction_id,
         scored_at=datetime.utcnow(),
         latency_ms=latency_ms,
-        risk_score=round(composite_risk, 4),
+        risk_score=round(calibrated_risk, 4),
         confidence=round(confidence, 4),
         decision=decision,
         explanation=explanation,
         signals=signals
     )
 
-    # 8. Async Audit Logging (fire-and-forget background task)
+    # Async background persistence & graph update
     asyncio.create_task(persist_score_and_audit(txn, response, features))
-    
-    # 9. Real-time Graph Feeding (add transaction edge)
+
     graph_engine.add_transaction_edge(
         txn.sender_vpa,
         txn.receiver_vpa,
@@ -179,15 +165,15 @@ async def score_transaction(txn: TransactionRequest) -> ScoringResponse:
 
     return response
 
+
 async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResponse, features: dict):
     """Asynchronously writes the scored transaction and score to Postgres."""
     from sqlalchemy import text
     from app.db.database import async_session_factory
     import json
-    
+
     try:
         async with async_session_factory() as session:
-            # 1. Insert into transactions
             insert_txn_query = text("""
                 INSERT INTO transactions (
                     transaction_id, sender_vpa, receiver_vpa, amount, currency, 
@@ -204,7 +190,7 @@ async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResp
                     decision = EXCLUDED.decision,
                     status = 'SCORED'
             """)
-            
+
             await session.execute(
                 insert_txn_query,
                 {
@@ -225,13 +211,11 @@ async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResp
                     "latency": response.latency_ms
                 }
             )
-            
-            # 2. Insert into risk_scores
-            # Serialize fields to JSON
+
             rule_flags_json = json.dumps(response.signals.rule_flags)
             shap_json = json.dumps({f.feature: f.contribution for f in response.explanation.top_features[:5]} if response.explanation.top_features else {})
             reasons_json = json.dumps([r.model_dump() for r in response.explanation.reasons])
-            
+
             insert_risk_query = text("""
                 INSERT INTO risk_scores (
                     transaction_id, ml_score, iso_score, rule_risk, 
@@ -243,12 +227,12 @@ async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResp
                     :rule_flags, :shap_values, :reasons, :nl_summary, :model_ver
                 )
             """)
-            
+
             await session.execute(
                 insert_risk_query,
                 {
                     "txn_id": txn.transaction_id,
-                    "ml_score": response.risk_score * 0.7,  # rough split for logging
+                    "ml_score": response.risk_score * 0.7,
                     "iso_score": response.risk_score * 0.5,
                     "rule_risk": response.risk_score * 0.8,
                     "behavior_score": response.signals.behavioral_deviation,
@@ -262,8 +246,7 @@ async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResp
                     "model_ver": settings.MODEL_VERSION
                 }
             )
-            
-            # 3. Write to Audit Logs table
+
             insert_audit_query = text("""
                 INSERT INTO audit_logs (
                     event_type, transaction_id, user_id, org_id, model_version,
@@ -273,7 +256,7 @@ async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResp
                     :risk, :decision, :latency, :features, :meta
                 )
             """)
-            
+
             await session.execute(
                 insert_audit_query,
                 {
@@ -288,7 +271,7 @@ async def persist_score_and_audit(txn: TransactionRequest, response: ScoringResp
                     "meta": json.dumps(txn.metadata.model_dump())
                 }
             )
-            
+
             await session.commit()
     except Exception as e:
         logger.error(f"Error persisting score audit log to PostgreSQL: {str(e)}")

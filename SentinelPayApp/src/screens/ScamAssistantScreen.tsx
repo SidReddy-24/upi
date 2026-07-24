@@ -3,12 +3,13 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import fraudShieldApi from '../services/fraudShieldApi';
+import AppIcon from '../components/AppIcon';
 
 const PRESETS = [
-  "Someone from RBI called asking to verify account",
-  "Part-time job: Like YouTube videos to earn ₹5000/day",
-  "FedEx courier parcel stuck containing illegal items",
-  "Urgent: Your HDFC electricity connection will be disconnected",
+  "Someone from RBI called asking to verify account details immediately",
+  "Part-time job offer: Like YouTube videos to earn ₹5,000/day",
+  "FedEx courier parcel stuck containing illegal narcotics",
+  "Urgent: Electricity connection will be disconnected tonight",
 ];
 
 export default function ScamAssistantScreen() {
@@ -34,15 +35,20 @@ export default function ScamAssistantScreen() {
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
-        <Text style={styles.title}>🤖 AI Scam Assistant</Text>
+        <View style={styles.headerTitleRow}>
+          <View style={styles.iconCircle}>
+            <AppIcon name="assistant" size={22} color="#2D6A4F" />
+          </View>
+          <Text style={styles.title}>AI Scam Assistant</Text>
+        </View>
         <Text style={styles.subtitle}>Ask "Is this safe?" — paste suspicious SMS, calls, or investment offers.</Text>
       </View>
 
       <View style={styles.card}>
         <TextInput
           style={styles.input}
-          placeholder="Paste SMS, message, or describe what happened..."
-          placeholderTextColor="#9ca3af"
+          placeholder="Paste SMS, message, or describe suspicious activity..."
+          placeholderTextColor="#94a3b8"
           multiline
           numberOfLines={3}
           value={input}
@@ -50,14 +56,18 @@ export default function ScamAssistantScreen() {
         />
 
         <TouchableOpacity
-          style={styles.analyzeBtn}
+          style={[styles.analyzeBtn, (!input.trim() || loading) && styles.btnDisabled]}
           onPress={() => handleAnalyze()}
-          disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.analyzeBtnText}>Analyze with AI Scam Engine →</Text>}
+          disabled={!input.trim() || loading}>
+          {loading ? (
+            <ActivityIndicator color="#FAF7F0" />
+          ) : (
+            <Text style={styles.analyzeBtnText}>Analyze with FraudShield AI →</Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.presetLabel}>Quick Presets to Test:</Text>
+      <Text style={styles.presetLabel}>Quick Test Presets:</Text>
       <View style={styles.presetContainer}>
         {PRESETS.map((p, idx) => (
           <TouchableOpacity
@@ -67,7 +77,7 @@ export default function ScamAssistantScreen() {
               setInput(p);
               handleAnalyze(p);
             }}>
-            <Text style={styles.presetText}>💡 "{p}"</Text>
+            <Text style={styles.presetText}>"{p}"</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -83,35 +93,45 @@ export default function ScamAssistantScreen() {
 
           <Text style={styles.explanationText}>{result.nl_explanation}</Text>
 
-          {result.recommended_actions.map((act: string, idx: number) => (
-            <Text key={idx} style={styles.actionText}>{act}</Text>
+          {result.recommended_actions?.map((act: string, idx: number) => (
+            <View key={idx} style={styles.actionRow}>
+              <Text style={styles.actionDot}>•</Text>
+              <Text style={styles.actionText}>{act}</Text>
+            </View>
           ))}
         </View>
       )}
+
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a', padding: 16 },
+  container: { flex: 1, backgroundColor: '#FAF7F0', padding: 16 },
   header: { marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  subtitle: { fontSize: 13, color: '#94a3b8', lineHeight: 18 },
-  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#334155' },
-  input: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, fontSize: 14, color: '#f8fafc', height: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: '#334155' },
-  analyzeBtn: { backgroundColor: '#6366f1', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  analyzeBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  presetLabel: { fontSize: 13, fontWeight: '700', color: '#cbd5e1', marginBottom: 8 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  iconCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E8C4B8' },
+  title: { fontSize: 22, fontWeight: '900', color: '#1A1A2E' },
+  subtitle: { fontSize: 13, color: '#64748b', lineHeight: 18 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#E8C4B8', elevation: 2, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 },
+  input: { backgroundColor: '#FAF7F0', borderRadius: 14, padding: 14, fontSize: 14, color: '#1A1A2E', height: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#E8C4B8' },
+  analyzeBtn: { backgroundColor: '#2D6A4F', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+  btnDisabled: { opacity: 0.6 },
+  analyzeBtnText: { color: '#FAF7F0', fontSize: 15, fontWeight: '800' },
+  presetLabel: { fontSize: 13, fontWeight: '700', color: '#1A1A2E', marginBottom: 8 },
   presetContainer: { gap: 8, marginBottom: 20 },
-  presetChip: { backgroundColor: '#1e293b', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
-  presetText: { fontSize: 13, color: '#818cf8' },
-  resultCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#475569', marginBottom: 30 },
+  presetChip: { backgroundColor: '#FFFFFF', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#E8C4B8' },
+  presetText: { fontSize: 13, color: '#2D6A4F', fontWeight: '600' },
+  resultCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#E8C4B8', marginBottom: 30, elevation: 2 },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  catTitle: { fontSize: 17, fontWeight: '800', color: '#f8fafc' },
-  levelBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  levelDanger: { backgroundColor: '#ef4444' },
-  levelSafe: { backgroundColor: '#22c55e' },
-  levelBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  explanationText: { fontSize: 14, color: '#e2e8f0', lineHeight: 20, marginBottom: 14 },
-  actionText: { fontSize: 13, color: '#cbd5e1', marginBottom: 6, fontWeight: '600' },
+  catTitle: { fontSize: 17, fontWeight: '800', color: '#1A1A2E' },
+  levelBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  levelDanger: { backgroundColor: '#E63946' },
+  levelSafe: { backgroundColor: '#2D6A4F' },
+  levelBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  explanationText: { fontSize: 14, color: '#1A1A2E', lineHeight: 20, marginBottom: 14 },
+  actionRow: { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  actionDot: { color: '#2D6A4F', fontWeight: '800' },
+  actionText: { fontSize: 13, color: '#64748b', fontWeight: '600', flex: 1 },
 });

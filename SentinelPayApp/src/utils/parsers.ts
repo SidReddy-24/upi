@@ -11,7 +11,31 @@
  * - Risk signal extraction
  */
 
-// ─── Date/Time Helpers ────────────────────────────────────────────────────────
+/**
+ * Safely parses any date input (ISO string, space-separated date, timestamp number, or Date object)
+ * into a valid JavaScript Date object without timezone shift bugs.
+ */
+export function parseSafeDate(raw: any): Date {
+  if (!raw) return new Date();
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? new Date() : raw;
+  
+  if (typeof raw === 'number') {
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }
+
+  let str = String(raw).trim();
+  
+  // Convert "YYYY-MM-DD HH:MM:SS" space format to ISO 8601 UTC ("YYYY-MM-DDTHH:MM:SSZ")
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(str)) {
+    str = str.replace(' ', 'T') + 'Z';
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(str)) {
+    str = str + 'Z';
+  }
+
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
 
 /**
  * Formats a Date object to "DD MMM, HH:MM" format (e.g., "21 Jul, 14:30").

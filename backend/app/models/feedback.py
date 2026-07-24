@@ -4,11 +4,11 @@ from typing import List, Optional
 
 
 class FeedbackRequest(BaseModel):
-    transaction_id: str = Field(..., description="Unique transaction ID being labeled")
-    feedback_type: str = Field(..., description="CONFIRM_FRAUD, CLEAR_FRAUD, ESCALATE")
-    analyst_decision: str = Field(..., description="FRAUD, LEGITIMATE, INCONCLUSIVE")
-    fraud_type: Optional[str] = Field(None, description="e.g. ACCOUNT_TAKEOVER, SYNTHETIC_ID, MONEY_MULE")
-    notes: Optional[str] = Field(None, description="Detailed notes on analyst's investigation")
+    transaction_id: str = Field(..., max_length=255, pattern=r"^[a-zA-Z0-9_\-]+$", description="Unique transaction ID being labeled")
+    feedback_type: str = Field(..., pattern=r"^(CONFIRM_FRAUD|CLEAR_FRAUD|ESCALATE)$", description="CONFIRM_FRAUD, CLEAR_FRAUD, ESCALATE")
+    analyst_decision: str = Field(..., pattern=r"^(FRAUD|LEGITIMATE|INCONCLUSIVE)$", description="FRAUD, LEGITIMATE, INCONCLUSIVE")
+    fraud_type: Optional[str] = Field(None, max_length=100, description="e.g. ACCOUNT_TAKEOVER, SYNTHETIC_ID, MONEY_MULE")
+    notes: Optional[str] = Field(None, max_length=1000, description="Detailed notes on analyst's investigation")
     escalate_to_case: Optional[bool] = Field(False, description="Whether to open a fraud case")
 
 

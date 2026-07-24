@@ -49,7 +49,7 @@ class NotificationService {
       return;
     }
 
-    // Create notification channel for Android API 26+
+    // Create notification channel for Android API 26+ (Transactions)
     PushNotification.createChannel(
       {
         channelId: CHANNEL_ID,
@@ -64,6 +64,23 @@ class NotificationService {
           console.log(`[NotificationService] Channel "${CHANNEL_ID}" created`);
         } else {
           console.log(`[NotificationService] Channel "${CHANNEL_ID}" already exists`);
+        }
+      },
+    );
+
+    // Create high-priority SMS channel for Realtime Truecaller-style popups
+    PushNotification.createChannel(
+      {
+        channelId: 'sentinelpay-sms-alerts',
+        channelName: 'Realtime SMS Fraud Detection (Truecaller AI)',
+        channelDescription: 'Realtime AI pop-up notifications for all incoming SMS messages',
+        importance: 4, // Importance.HIGH - Pop-up banner at top of screen
+        vibrate: true,
+        soundName: 'default',
+      },
+      (created) => {
+        if (created) {
+          console.log('[NotificationService] SMS Channel "sentinelpay-sms-alerts" created');
         }
       },
     );

@@ -35,7 +35,6 @@ export default function GuardianApprovalScreen() {
     const unsubscribe = guardianService.subscribe((event) => {
       console.log('[GuardianApprovalScreen] WebSocket update received:', event);
       if (event.type === 'APPROVAL_REQUEST') {
-        // Automatically inject or reload
         fetchRequests();
         Alert.alert('🚨 SECURITY NOTICE', `New high-risk transaction request received from ward: ${event.data.requester_name || 'Sentinel User'}`);
       } else if (event.type === 'APPROVAL_RESPONSE') {
@@ -52,7 +51,7 @@ export default function GuardianApprovalScreen() {
     setLoading(true);
     try {
       const data = await guardianService.getPendingRequests();
-      setRequests(data.incoming);
+      setRequests(data.incoming || []);
     } catch (e) {
       console.warn('Failed to load pending requests:', e);
     } finally {
@@ -86,25 +85,32 @@ export default function GuardianApprovalScreen() {
     const expiresDate = new Date(item.expires_at);
     const minsLeft = Math.max(0, Math.round((expiresDate.getTime() - Date.now()) / 60000));
     
-    const scoreColor = item.fraud_score > 0.8 ? '#f43f5e' : '#f59e0b';
+    const isHighRisk = item.fraud_score > 0.7;
+    const scoreColor = isHighRisk ? '#EF4444' : '#F59E0B';
 
     return (
       <View style={styles.reqCard}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.wardName}>{item.requester_name || 'Sentinel User'}</Text>
-            <Text style={styles.wardPhone}>+{item.requester_phone}</Text>
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarLetter}>{(item.requester_name || 'U')[0].toUpperCase()}</Text>
+            </View>
+            <View>
+              <Text style={styles.wardName}>{item.requester_name || 'Sentinel User'}</Text>
+              <Text style={styles.wardPhone}>+{item.requester_phone}</Text>
+            </View>
           </View>
-          <View style={styles.scoreContainer}>
-            <Text style={styles.scoreLabel}>AI Risk</Text>
+
+          <View style={[styles.scoreContainer, { backgroundColor: isHighRisk ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)' }]}>
+            <Text style={styles.scoreLabel}>AI RISK</Text>
             <Text style={[styles.scoreValue, { color: scoreColor }]}>{(item.fraud_score * 100).toFixed(0)}%</Text>
           </View>
         </View>
 
-        <View style={styles.detailsRow}>
+        <View style={styles.detailsGrid}>
           <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>AMOUNT</Text>
-            <Text style={styles.detailVal}>₹{item.amount.toLocaleString('en-IN')}</Text>
+            <Text style={styles.detailLabel}>PAYMENT AMOUNT</Text>
+            <Text style={styles.detailAmount}>₹{item.amount.toLocaleString('en-IN')}</Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>RECIPIENT VPA</Text>
@@ -114,10 +120,12 @@ export default function GuardianApprovalScreen() {
 
         {item.risk_signals && item.risk_signals.length > 0 && (
           <View style={styles.signalsContainer}>
-            <Text style={styles.signalsLabel}>CRITICAL RISK SIGNALS CHECKED:</Text>
+            <Text style={styles.signalsLabel}>DETECTED RISK SIGNALS:</Text>
             <View style={styles.signalsList}>
               {item.risk_signals.map((sig, idx) => (
-                <Text key={idx} style={styles.signalBadge}>⚠️ {sig.replace(/_/g, ' ')}</Text>
+                <View key={idx} style={styles.signalBadge}>
+                  <Text style={styles.signalBadgeText}>⚠️ {sig.replace(/_/g, ' ')}</Text>
+                </View>
               ))}
             </View>
           </View>
@@ -134,13 +142,13 @@ export default function GuardianApprovalScreen() {
             style={[styles.btn, styles.rejectBtn]}
             onPress={() => handleOpenRespond(item, 'REJECTED')}
           >
-            <Text style={styles.btnText}>Reject Payment</Text>
+            <Text style={styles.rejectBtnText}>Reject Payment</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.btn, styles.approveBtn]}
             onPress={() => handleOpenRespond(item, 'APPROVED')}
           >
-            <Text style={styles.btnText}>Approve & Sign</Text>
+            <Text style={styles.approveBtnText}>Approve & Sign</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -150,15 +158,15 @@ export default function GuardianApprovalScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Pending Ward Approvals</Text>
+        <Text style={styles.title}>Pending Approvals</Text>
         <Text style={styles.subtitle}>
-          Securely review and sign off on high-risk transactions requested by users protecting themselves under your coverage.
+          Review and authorize high-risk transaction requests submitted by your protected wards.
         </Text>
       </View>
 
       {loading && requests.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color="#10B981" />
         </View>
       ) : (
         <FlatList
@@ -169,7 +177,8 @@ export default function GuardianApprovalScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🛡️</Text>
-              <Text style={styles.emptyText}>All Clear! No pending approvals required.</Text>
+              <Text style={styles.emptyTitle}>All Clear!</Text>
+              <Text style={styles.emptyText}>No pending transactions require your guardian authorization.</Text>
             </View>
           }
           refreshing={loading}
@@ -196,11 +205,11 @@ export default function GuardianApprovalScreen() {
               {selectedRequest?.requester_name || 'Sentinel User'}?
             </Text>
 
-            <Text style={styles.inputLabel}>Add a Note / Explanation (Optional)</Text>
+            <Text style={styles.inputLabel}>OPTIONAL NOTE / EXPLANATION</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="e.g. Confirmed details over phone call."
-              placeholderTextColor="#64748b"
+              placeholder="e.g. Verified over phone call."
+              placeholderTextColor="#64748B"
               value={note}
               onChangeText={setNote}
               multiline
@@ -212,7 +221,7 @@ export default function GuardianApprovalScreen() {
                 onPress={() => setSelectedRequest(null)}
                 disabled={respondLoading}
               >
-                <Text style={styles.cancelBtnText}>Go Back</Text>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -223,7 +232,7 @@ export default function GuardianApprovalScreen() {
                 disabled={respondLoading}
               >
                 {respondLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Text style={styles.modalBtnText}>Submit Decision</Text>
                 )}
@@ -239,21 +248,22 @@ export default function GuardianApprovalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0B0F17',
   },
   header: {
     padding: 20,
+    backgroundColor: '#161F30',
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#1E293B',
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#F8FAFC',
   },
   subtitle: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#94A3B8',
     marginTop: 6,
     lineHeight: 18,
   },
@@ -263,219 +273,262 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    padding: 20,
+    padding: 18,
   },
   reqCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#161F30',
     borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
+    padding: 18,
+    marginBottom: 18,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#1E293B',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#1E293B',
     paddingBottom: 12,
-    marginBottom: 12,
+    marginBottom: 14,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarLetter: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
   wardName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#F8FAFC',
   },
   wardPhone: {
-    fontSize: 13,
-    color: '#64748b',
+    fontSize: 12,
+    color: '#94A3B8',
     marginTop: 2,
   },
   scoreContainer: {
-    alignItems: 'flex-end',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   scoreLabel: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
+    fontSize: 9,
+    color: '#94A3B8',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   scoreValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800',
+    marginTop: 1,
   },
-  detailsRow: {
+  detailsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   detailItem: {
     flex: 1,
   },
   detailLabel: {
-    fontSize: 11,
-    color: '#64748b',
+    fontSize: 10,
+    color: '#64748B',
     fontWeight: '700',
     letterSpacing: 0.5,
   },
+  detailAmount: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10B981',
+    marginTop: 3,
+  },
   detailVal: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#e2e8f0',
-    marginTop: 4,
+    color: '#CBD5E1',
+    marginTop: 3,
   },
   signalsContainer: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0B0F17',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#1E293B',
   },
   signalsLabel: {
-    fontSize: 11,
-    color: '#f43f5e',
+    fontSize: 10,
+    color: '#EF4444',
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   signalsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 6,
   },
   signalBadge: {
-    backgroundColor: '#f43f5e15',
-    color: '#f43f5e',
-    fontSize: 12,
-    fontWeight: '600',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginRight: 6,
-    marginBottom: 6,
+  },
+  signalBadgeText: {
+    color: '#EF4444',
+    fontSize: 11,
+    fontWeight: '700',
   },
   expiryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   expiryText: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#94A3B8',
   },
   expiryTime: {
     fontWeight: '700',
-    color: '#f59e0b',
+    color: '#F59E0B',
   },
   actionsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   btn: {
     flex: 1,
     borderRadius: 12,
-    padding: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rejectBtn: {
-    backgroundColor: '#ef444422',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: '#EF4444',
+  },
+  rejectBtnText: {
+    color: '#EF4444',
+    fontWeight: '700',
+    fontSize: 13,
   },
   approveBtn: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#10B981',
   },
-  btnText: {
-    color: '#fff',
+  approveBtnText: {
+    color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
   },
   emptyEmoji: {
-    fontSize: 54,
+    fontSize: 48,
     marginBottom: 12,
   },
+  emptyTitle: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   emptyText: {
-    color: '#64748b',
-    fontSize: 15,
-    fontWeight: '500',
+    color: '#64748B',
+    fontSize: 13,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
-    padding: 24,
+    padding: 22,
   },
   modalContent: {
-    backgroundColor: '#1e293b',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: '#161F30',
+    borderRadius: 20,
+    padding: 22,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#1E293B',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 12,
+    color: '#F8FAFC',
+    marginBottom: 8,
   },
   modalSubtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    lineHeight: 20,
-    marginBottom: 20,
+    fontSize: 13,
+    color: '#94A3B8',
+    lineHeight: 18,
+    marginBottom: 16,
   },
   bold: {
-    color: '#f8fafc',
+    color: '#F8FAFC',
     fontWeight: 'bold',
   },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginBottom: 8,
-    textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   modalInput: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 14,
-    color: '#f8fafc',
-    height: 80,
+    backgroundColor: '#0B0F17',
+    borderRadius: 10,
+    padding: 12,
+    color: '#F8FAFC',
+    height: 70,
     textAlignVertical: 'top',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#1E293B',
+    fontSize: 13,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   modalBtn: {
     flex: 1,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   cancelBtn: {
-    backgroundColor: '#334155',
+    backgroundColor: '#1E293B',
   },
   cancelBtnText: {
-    color: '#f8fafc',
-    fontWeight: '600',
+    color: '#94A3B8',
+    fontWeight: '700',
   },
   confirmApproveBtn: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#10B981',
   },
   confirmRejectBtn: {
-    backgroundColor: '#ef4444',
+    backgroundColor: '#EF4444',
   },
   modalBtnText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: '700',
   },
 });

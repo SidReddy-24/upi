@@ -2,8 +2,11 @@
 import time
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+import json
 
 from app.config import settings
 from app.db.database import engine
@@ -12,6 +15,7 @@ from app.db.database import engine
 from app.services.redis_service import redis_service
 from app.engines.rule_engine import rule_engine
 from app.engines.ml_engine import ml_engine
+from app.engines.graph_engine import graph_engine
 
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
@@ -24,14 +28,18 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}...")
     
-    # Initialize Redis
+    # 1. Initialize Redis
     await redis_service.connect()
     
-    # Initialize Rule Engine
+    # 2. Initialize Rule Engine
     await rule_engine.reload_rules()
     
-    # Load ML Models
+    # 3. Load ML Models via ModelRegistry
     ml_engine.load_models()
+    
+    # 4. Restore Graph Persistence
+    await graph_engine.restore_from_persistence()
+    
     yield
     
     # Shutdown
@@ -49,11 +57,27 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For hackathon/demo purposes
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi.encoders import jsonable_encoder
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": jsonable_encoder(exc.errors()), "body": jsonable_encoder(exc.body)},
+    )
+
+@app.exception_handler(json.decoder.JSONDecodeError)
+async def json_decode_exception_handler(request: Request, exc: json.decoder.JSONDecodeError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": "Malformed JSON payload"},
+    )
 
 # Timing and request logging middleware
 @app.middleware("http")
@@ -78,4 +102,5 @@ async def root():
     }
 
 from app.api.router import api_router
-app.include_router(api_router, prefix=settings.API_PREFIX)
+api_router_prefix = settings.API_PREFIX
+app.include_router(api_router, prefix=api_router_prefix)

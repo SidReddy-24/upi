@@ -550,7 +550,7 @@ describe('SmsReaderService', () => {
       expect(notificationCall.color).toBe('#fbbf24'); // Yellow for suspicious
     });
 
-    it('should NOT send notification for SAFE SMS from trusted sender', async () => {
+    it('should send notification for SAFE SMS from trusted sender with green color', async () => {
       service.startMonitoring();
 
       const smsReceivedHandler = mockAddListener.mock.calls[0][1];
@@ -565,8 +565,10 @@ describe('SmsReaderService', () => {
       await smsReceivedHandler(safeSms);
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // No notification should be sent for SAFE messages
-      expect(mockLocalNotification).not.toHaveBeenCalled();
+      expect(mockLocalNotification).toHaveBeenCalledTimes(1);
+      const notificationCall = mockLocalNotification.mock.calls[0][0];
+      expect(notificationCall.color).toBe('#10b981'); // Green for safe
+      expect(notificationCall.title).toContain('LEGIT SMS');
     });
 
     it('should truncate sender ID if longer than 30 chars (Requirement 6.9)', async () => {

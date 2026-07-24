@@ -14,6 +14,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Settings: undefined;
   GuardianManagement: undefined;
+  GuardianApproval: undefined;
   Login: undefined;
   Register: undefined;
   SmsTracker: undefined;
@@ -27,10 +28,13 @@ export type RootStackParamList = {
 
 // ─── Wallet / DB ──────────────────────────────────────────────────────────────
 export interface WalletUser {
-  id: number;
+  id: number | string;
+  phone?: string;
   name: string;
+  dob?: string;
   vpa: string;
   balance: number;
+  upiPin?: string;
   created_at: string;
 }
 

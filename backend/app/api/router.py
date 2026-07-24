@@ -1,6 +1,9 @@
 """API Router Registry aggregating all v1 sub-routers."""
 from fastapi import APIRouter
-from app.api.v1 import score, feedback, risk, analytics, model, health, qr_trust, community, assistant, heatmap, user, transfer, notifications, auth, guardian
+from app.api.v1 import (
+    score, feedback, risk, analytics, model, health, qr_trust, community,
+    assistant, heatmap, user, transfer, notifications, auth, guardian, monitoring
+)
 
 api_router = APIRouter()
 
@@ -19,5 +22,4 @@ api_router.include_router(transfer.router, tags=["Multi-User P2P Transfer"])
 api_router.include_router(notifications.router, tags=["Notifications"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(guardian.router, prefix="/guardian", tags=["Guardian Approval"])
-
-
+api_router.include_router(monitoring.router, prefix="/monitoring", tags=["Model Monitoring"])

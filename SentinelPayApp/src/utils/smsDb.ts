@@ -6,6 +6,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { containsScamKeyword, EXTENDED_BANK_WHITELIST_SENDERS } from '../config/smsKeywords';
 
 const SMS_STORAGE_KEY = 'sentinelpay_sms_messages';
 const SMS_STATS_KEY = 'sentinelpay_sms_stats';
@@ -54,17 +55,19 @@ export function classifyMessage(
   const text = (body || '').toLowerCase();
   const snd = (sender || '').toUpperCase();
 
-  // 1. Phishing / Scam explicit keywords -> High Fraud
+  // 1. Phishing / Scam explicit keywords (10 Indian languages + extended scam types)
   const isScamLinkOrPhish =
+    containsScamKeyword(text) ||
     text.includes('bit.ly') ||
     text.includes('tinyurl') ||
     text.includes('claim prize') ||
     text.includes('won lottery') ||
     text.includes('account suspended') ||
-    text.includes('update kyc now') ||
+    text.includes('update kyc') ||
     text.includes('part time job') ||
-    text.includes('telegram.me') ||
-    text.includes('earn daily') ||
+    text.includes('download apk') ||
+    text.includes('anydesk') ||
+    text.includes('teamviewer') ||
     text.includes('click here to verify');
 
   if (isScamLinkOrPhish) return 'fraud';
@@ -86,15 +89,15 @@ export function classifyMessage(
 
   const isBankSender =
     /^[A-Z]{2}-[A-Z0-9]{3,8}$/.test(snd) ||
-    ['HDFC', 'ICICI', 'AXIS', 'SBI', 'KOTAK', 'PAYTM', 'YESBNK', 'INDBNK', 'BOI', 'UNION', 'FED', 'RBL', 'CANARA', 'PNB', 'IDFC', 'BOB'].some((b) => snd.includes(b));
+    EXTENDED_BANK_WHITELIST_SENDERS.some((b) => snd.includes(b));
 
   if ((isBankKeywords || isBankSender) && !text.includes('share pin') && !text.includes('share password')) {
     return 'genuine';
   }
 
-  // 3. Fallback based on ML score
-  if (fraudScore >= 0.7) return 'fraud';
-  if (fraudScore >= 0.4) return 'suspicious';
+  // 3. Fallback based on unified ML score threshold
+  if (fraudScore >= 0.70) return 'fraud';
+  if (fraudScore >= 0.40) return 'suspicious';
   return 'genuine';
 }
 

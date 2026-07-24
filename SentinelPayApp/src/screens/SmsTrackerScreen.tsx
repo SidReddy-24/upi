@@ -26,6 +26,7 @@ import {
   resetScannerState,
 } from '../utils/smsDb';
 import { useSmsTracker } from '../hooks/useSmsTracker';
+import AppIcon from '../components/AppIcon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SmsTracker'>;
 
@@ -323,12 +324,14 @@ export default function SmsTrackerScreen({ navigation }: Props): React.JSX.Eleme
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity style={styles.actionButton} onPress={handleRescan}>
-          <Text style={styles.actionButtonText}>🔄 Re-scan</Text>
+          <AppIcon name="sms" size={16} color="#FAF7F0" />
+          <Text style={styles.actionButtonText}>Re-scan SMS</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.actionButtonDanger]}
           onPress={handleClearData}>
-          <Text style={styles.actionButtonText}>🗑️ Clear Data</Text>
+          <AppIcon name="report" size={16} color="#FAF7F0" />
+          <Text style={styles.actionButtonText}>Clear Data</Text>
         </TouchableOpacity>
       </View>
 
@@ -345,7 +348,7 @@ export default function SmsTrackerScreen({ navigation }: Props): React.JSX.Eleme
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FAF7F0',
   },
   centerContainer: {
     flex: 1,
@@ -354,61 +357,66 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   statsHeader: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#2D6A4F',
     padding: 16,
     alignItems: 'center',
   },
   statsTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '900',
+    color: '#FAF7F0',
   },
   statsSubtitle: {
-    fontSize: 14,
-    color: '#e0e7ff',
+    fontSize: 13,
+    color: '#E8C4B8',
     marginTop: 4,
   },
   filterContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#E8C4B8',
   },
   filterTab: {
     flex: 1,
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 10,
+    marginHorizontal: 3,
+    borderRadius: 12,
+    backgroundColor: '#FAF7F0',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
   },
   filterTabActive: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#2D6A4F',
+    borderColor: '#2D6A4F',
   },
   filterText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontWeight: '700',
+    color: '#64748b',
   },
   filterTextActive: {
-    color: '#fff',
+    color: '#FAF7F0',
   },
   listContent: {
-    padding: 12,
+    padding: 14,
   },
   messageCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+    elevation: 2,
+    shadowColor: '#1A1A2E',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
   },
   messageHeader: {
     flexDirection: 'row',

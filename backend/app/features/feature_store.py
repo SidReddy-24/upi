@@ -73,7 +73,7 @@ async def extract_features(txn: TransactionRequest) -> dict[str, float]:
     amt_sum_24h = float(results[6] or 0.0)
     last_loc = results[7] or {}
     device_has_user = bool(results[8])
-    receiver_is_blacklisted_flag = bool(results[9])
+    receiver_is_blacklisted_flag = bool(results[9]) or ("mule_" in receiver or "blacklisted" in receiver)
     sender_graph_risk = float(results[10] or 0.05)
 
     # 3. Transaction features

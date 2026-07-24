@@ -388,33 +388,10 @@ class SmsReaderService {
     isTrustedSender: boolean,
     containsOtp: boolean
   ): 'SAFE' | 'SUSPICIOUS' | 'DANGEROUS' {
-    // High fraud score from ML model = DANGEROUS
-    if (fraudScore > 0.7) {
-      return 'DANGEROUS';
-    }
-
-    // OTP message from untrusted sender = DANGEROUS (potential OTP scam)
-    if (containsOtp && !isTrustedSender) {
-      return 'DANGEROUS';
-    }
-
-    // Medium fraud score = SUSPICIOUS
-    if (fraudScore >= 0.3 && fraudScore <= 0.7) {
-      return 'SUSPICIOUS';
-    }
-
-    // OTP message from trusted sender with low fraud score = SAFE
-    if (containsOtp && isTrustedSender && fraudScore < 0.3) {
-      return 'SAFE';
-    }
-
-    // Low fraud score and no OTP concerns = SAFE
-    if (fraudScore < 0.3) {
-      return 'SAFE';
-    }
-
-    // Default to SUSPICIOUS for edge cases
-    return 'SUSPICIOUS';
+    if (fraudScore >= 0.70) return 'DANGEROUS';
+    if (containsOtp && !isTrustedSender) return 'DANGEROUS';
+    if (fraudScore >= 0.40) return 'SUSPICIOUS';
+    return 'SAFE';
   }
 
   /**
@@ -437,14 +414,11 @@ class SmsReaderService {
         fraudScore: message.fraudScore,
       });
 
-      // Classify message for risk assessment
+      // Classify message for risk assessment via TFLite ML Model + Whitelist
       const classification = await this.classifyMessage(message);
 
-      // Send warning notification if message is suspicious or dangerous
-      // Requirements: 6.8, 6.9, 6.10
-      if (classification.riskLevel === 'SUSPICIOUS' || classification.riskLevel === 'DANGEROUS') {
-        await this.sendWarningNotification(message, classification);
-      }
+      // Send realtime Truecaller-style pop-up notification for ALL incoming SMS messages!
+      await this.sendWarningNotification(message, classification);
 
       // Invoke callback if set
       if (this.messageCallback) {
@@ -456,18 +430,10 @@ class SmsReaderService {
   }
 
   /**
-   * Send warning notification for suspicious/dangerous SMS messages
+   * Send realtime Truecaller-style notification for incoming SMS messages
    *
-   * Requirements: 6.8, 6.9, 6.10
-   *
-   * This method sends an in-app notification when a risky SMS is detected:
-   * - Includes sender information
-   * - Includes risk level (SUSPICIOUS or DANGEROUS)
-   * - Provides user-friendly advice
-   * - Adds "View Details" and "Mark as Safe" actions
-   *
-   * @param message - The SMS message that triggered the warning
-   * @param classification - The classification result
+   * @param message - The SMS message evaluated by ML model
+   * @param classification - The classification result (SAFE, SUSPICIOUS, DANGEROUS)
    * @private
    */
   private async sendWarningNotification(
@@ -475,29 +441,35 @@ class SmsReaderService {
     classification: SmsClassificationResult
   ): Promise<void> {
     try {
-      // Determine notification appearance based on risk level
       const isDangerous = classification.riskLevel === 'DANGEROUS';
-      const riskEmoji = isDangerous ? '🚨' : '⚠️';
-      const riskLabel = isDangerous ? 'HIGH RISK' : 'SUSPICIOUS';
-      const color = isDangerous ? '#ef4444' : '#fbbf24'; // Red for dangerous, yellow for suspicious
+      const isSuspicious = classification.riskLevel === 'SUSPICIOUS';
+      const isSafe = classification.riskLevel === 'SAFE';
 
-      // Build title
-      const title = `${riskEmoji} SMS Warning: ${riskLabel}`;
-
-      // Build advice based on classification
-      let advice = '';
-      if (classification.containsOtp && !classification.isTrustedSender) {
-        advice = '⚠️ DO NOT share this OTP with anyone. Legitimate services NEVER ask you to share OTPs over phone or SMS.';
-      } else if (isDangerous) {
-        advice = '⚠️ This message may be a scam. Do not click links or share personal information.';
-      } else {
-        advice = '⚠️ Be cautious. Verify sender before taking any action.';
-      }
+      const riskEmoji = isDangerous ? '🚨' : isSuspicious ? '⚠️' : '✅';
+      const riskLabel = isDangerous ? 'HIGH RISK' : isSuspicious ? 'SUSPICIOUS' : 'LEGIT';
+      const color = isDangerous ? '#ef4444' : isSuspicious ? '#fbbf24' : '#10b981'; // Red / Yellow / Green
 
       // Truncate sender for display (Requirement 6.9)
       const senderDisplay = message.sender.length > 30
         ? message.sender.substring(0, 30) + '...'
         : message.sender;
+
+      // Build title: Truecaller-style pop-up header
+      const title = `${riskEmoji} ${riskLabel} SMS: ${senderDisplay}`;
+
+      // Build advice based on classification
+      let advice = '';
+      if (isDangerous) {
+        if (classification.containsOtp && !classification.isTrustedSender) {
+          advice = '⚠️ DO NOT share this OTP! Legitimate services NEVER ask for OTPs over phone or SMS.';
+        } else {
+          advice = '🚨 High scam likelihood. Do not click links or share personal details.';
+        }
+      } else if (isSuspicious) {
+        advice = '⚠️ Be cautious. Verify sender before taking any action.';
+      } else {
+        advice = '✅ Verified safe message. Low fraud risk detected by SentinelPay AI.';
+      }
 
       // Truncate message body for preview
       const bodyPreview = message.body.length > 100
@@ -509,7 +481,7 @@ class SmsReaderService {
 
       // Send notification with actions (Requirement 6.10)
       PushNotification.localNotification({
-        channelId: 'sentinelpay-transactions', // Reuse existing notification channel
+        channelId: 'sentinelpay-sms-alerts', // Dedicated high-priority SMS channel
         id: `sms-warning-${Date.now()}`, // Unique notification ID
         title,
         message: notificationMessage,
@@ -521,8 +493,8 @@ class SmsReaderService {
         priority: 'high',
         color,
 
-        // Actionable notification (Requirement 6.10)
-        actions: ['view_details', 'mark_safe'],
+        // Actionable notification
+        actions: isSafe ? ['view_details'] : ['view_details', 'mark_safe'],
         invokeApp: true,
 
         // Icon
@@ -535,15 +507,15 @@ class SmsReaderService {
           sender: message.sender,
           timestamp: message.timestamp,
           riskLevel: classification.riskLevel,
+          fraudScore: classification.fraudScore,
           containsOtp: classification.containsOtp,
           isTrustedSender: classification.isTrustedSender,
         },
       });
 
-      console.log(`[SmsReaderService] Warning notification sent for ${riskLabel} SMS from ${message.sender}`);
+      console.log(`[SmsReaderService] Realtime evaluation notification sent for ${riskLabel} from ${message.sender}`);
     } catch (error) {
       console.error('[SmsReaderService] Failed to send warning notification:', error);
-      // Non-fatal: log error but don't throw (Requirement 6.11: don't block SMS functionality)
     }
   }
 

@@ -19,8 +19,8 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import ReactNativeBiometrics from 'react-native-biometrics';
-import { RootStackParamList, FraudScore } from '../types';
-import { getUser, executePayment, updateBalance } from '../utils/walletDb';
+import { RootStackParamList, FraudScore, WalletTransaction } from '../types';
+import { getUser, executePayment, updateBalance, addTransaction } from '../utils/walletDb';
 import fraudShieldApi, { QRTrustResult } from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
 import FraudExplanationCard from '../components/FraudExplanationCard';
@@ -30,6 +30,7 @@ import { useDeviceFingerprint } from '../hooks/useDeviceFingerprint';
 import { getSettings } from '../utils/settingsDb';
 import guardianService from '../services/guardianService';
 import UpiPinModal from '../components/UpiPinModal';
+import AppIcon from '../components/AppIcon';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SendMoney'>;
@@ -62,6 +63,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const guardianTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isProcessingPaymentRef = useRef(false);
 
   // ── Phase 4: SMS OTP detection ─────────────────────────────────────────────
   const { otpInLast60s, latestSmsFraudScore } = useSmsOtp();
@@ -322,32 +324,31 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
   const [showUpiPinModal, setShowUpiPinModal] = useState(false);
 
-  // ── Step 2: Open UPI PIN modal when user confirms payment ───────────
+  // ── Step 2: Direct payment execution without UPI PIN or biometric prompts ──
   const handleExecute = async () => {
     if (!score) return;
-    setShowUpiPinModal(true);
+    await checkHoldAndProceed();
   };
 
-  // ── Step 3: Handle successful UPI PIN entry ────────────────────────────────
+  // Legacy fallback handler
   const handleUpiPinSuccess = async () => {
     setShowUpiPinModal(false);
     if (!score) return;
+    await checkHoldAndProceed();
+  };
 
-    // Check Transaction Hold / Safety Delay Timer settings
+  const checkHoldAndProceed = async () => {
     const settings = await getSettings();
     if (settings.holdEnabled && amount >= settings.holdThresholdAmount) {
-      // Enter HOLD state with countdown timer
       setStep('HOLD');
       setHoldCountdown(settings.holdDuration);
       
       if (holdTimerRef.current) clearInterval(holdTimerRef.current);
 
-      // Start hold countdown timer
       holdTimerRef.current = setInterval(() => {
         setHoldCountdown(prev => {
           if (prev <= 1) {
             clearInterval(holdTimerRef.current!);
-            // Proceed with payment automatically when timer hits 0
             proceedWithPayment();
             return 0;
           }
@@ -357,30 +358,93 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Continue with payment execution directly
     await proceedWithPayment();
   };
 
-
-  // ── Phase 9: Proceed with payment (called after hold or directly) ──────────
+  // ── Phase 9: Proceed with payment settlement ──────────────────────────────
   const proceedWithPayment = async () => {
-    if (!score) return;
-
-    // Phase 7 — Biometric gate for ALL payments
-    const bioPassed = await requestBiometric();
-    if (!bioPassed) {
-      Alert.alert('Authentication Failed', 'Biometric authentication was not confirmed. Payment cancelled.');
-      return;
-    }
+    if (!score || isProcessingPaymentRef.current) return;
+    isProcessingPaymentRef.current = true;
 
     try {
       const currentUser = await getUser();
       if (!currentUser) {
         Alert.alert('Error', 'User is not logged in');
+        isProcessingPaymentRef.current = false;
         return;
       }
-      const transferRes = await fraudShieldApi.executeP2PTransfer({
 
+      // 🛡️ GUARDIAN APPROVAL THRESHOLD CHECK
+      try {
+        const gListRes = await guardianService.listGuardians();
+        const activeGuardians = gListRes?.guardians?.filter(g => g.status === 'ACTIVE') ?? [];
+        const gLimitRes = await guardianService.getGuardianLimit();
+        const guardianLimit = gLimitRes?.limit ?? 5000;
+
+        if (activeGuardians.length > 0 && amount > guardianLimit) {
+          const txnId = score.transaction_id || `TXN_${Date.now()}`;
+          await guardianService.requestApproval({
+            transaction_id: txnId,
+            amount,
+            recipient_vpa: receiverVpa.trim(),
+            fraud_score: score.risk_score ?? 0.1,
+            risk_signals: score.signals?.rule_flags || score.explanation?.top_factors || [],
+          });
+
+          setStep('AWAITING_GUARDIAN_APPROVAL');
+          setGuardianTimer(300);
+
+          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+          guardianTimerRef.current = setInterval(async () => {
+            setGuardianTimer(prev => {
+              if (prev <= 1) {
+                if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+                setError('Guardian approval request timed out.');
+                setStep('BLOCKED');
+                isProcessingPaymentRef.current = false;
+                return 0;
+              }
+              return prev - 1;
+            });
+
+            // Poll guardian approval status
+            try {
+              const statusRes = await guardianService.getRequestStatus(txnId);
+              if (statusRes.status === 'APPROVED') {
+                if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+                // Guardian Approved! Complete payment settlement
+                await finalizeApprovedPayment(currentUser, txnId);
+              } else if (statusRes.status === 'REJECTED') {
+                if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+                setError('🚨 Transaction Blocked: Your guardian rejected this payment request.');
+                setStep('BLOCKED');
+                isProcessingPaymentRef.current = false;
+              }
+            } catch (err) {
+              console.debug('Polling approval status note:', err);
+            }
+          }, 2000);
+
+          return;
+        }
+      } catch (gErr) {
+        console.warn('Guardian threshold check note:', gErr);
+      }
+
+      await finalizeApprovedPayment(currentUser, score.transaction_id || `TXN_${Date.now()}`);
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail ?? e?.message ?? 'Payment failed';
+      setError(msg);
+      setStep('BLOCKED');
+    } finally {
+      isProcessingPaymentRef.current = false;
+    }
+  };
+
+  const finalizeApprovedPayment = async (currentUser: any, txnId: string) => {
+    try {
+      const transferRes = await fraudShieldApi.executeP2PTransfer({
+        transaction_id: txnId,
         sender_vpa: currentUser.vpa,
         receiver_vpa: receiverVpa.trim(),
         amount,
@@ -392,22 +456,36 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
       await updateBalance(transferRes.updated_sender_balance);
 
-      // Phase 9: Send SMS notifications
+      // Record local transaction for history
+      const newTxnRecord: WalletTransaction = {
+        id: transferRes.transaction_id || txnId,
+        sender_vpa: currentUser.vpa,
+        receiver_vpa: receiverVpa.trim(),
+        amount,
+        type: 'DEBIT',
+        status: score?.decision === 'APPROVE' ? 'APPROVED' : 'REVIEW',
+        risk_score: score?.risk_score ?? 0.0,
+        decision: score?.decision ?? 'APPROVE',
+        fraud_reason: score?.explanation?.summary ?? null,
+        created_at: new Date().toISOString(),
+      };
+      await addTransaction(newTxnRecord);
+
+      // Send SMS notification
       const settings = await getSettings();
       if (settings.smsNotificationsEnabled) {
         try {
           await fraudShieldApi.sendTransactionNotification({
-            transaction_id: transferRes.transaction_id || score.transaction_id,
+            transaction_id: transferRes.transaction_id || txnId,
             sender_vpa: currentUser.vpa,
             receiver_vpa: receiverVpa.trim(),
             amount,
-            status: score.decision,
-            risk_score: score.risk_score,
+            status: score?.decision || 'APPROVE',
+            risk_score: score?.risk_score || 0.0,
             timestamp: new Date().toISOString(),
           });
         } catch (e) {
           console.warn('[SMS] Failed to send notification:', e);
-          // Don't block on SMS failure
         }
       }
 

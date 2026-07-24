@@ -83,8 +83,8 @@ describe('NotificationService', () => {
       service.configure();
       service.configure();
 
-      // Should only be called once
-      expect(PushNotification.createChannel).toHaveBeenCalledTimes(1);
+      // Should only be called once (2 channels created in total)
+      expect(PushNotification.createChannel).toHaveBeenCalledTimes(2);
       expect(PushNotification.configure).toHaveBeenCalledTimes(1);
     });
   });

@@ -234,14 +234,20 @@ export function useSmsTracker() {
   /**
    * Start real-time SMS monitoring
    */
-  const startMonitoring = useCallback((): (() => void) | void => {
-    if (!state.hasReceivePermission) {
-      setState((prev) => ({ ...prev, error: 'RECEIVE_SMS permission not granted' }));
-      return;
+  const startMonitoring = useCallback(async (): Promise<(() => void) | void> => {
+    if (Platform.OS === 'android') {
+      const hasPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS);
+      if (!hasPermission) {
+        const granted = await requestReceivePermission();
+        if (!granted) {
+          setState((prev) => ({ ...prev, error: 'RECEIVE_SMS permission not granted' }));
+          return;
+        }
+      }
     }
 
     if (!SmsReceiverModule) {
-      setState((prev) => ({ ...prev, error: 'SmsReceiverModule not available' }));
+      console.warn('[useSmsTracker] SmsReceiverModule not available');
       return;
     }
 

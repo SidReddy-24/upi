@@ -68,7 +68,15 @@ class RuleEngine:
             return feat_val <= val
         if op == "ne":
             return feat_val != val
-            
+        if op == "in_range" and isinstance(val, (list, tuple)) and len(val) == 2:
+            return val[0] <= feat_val <= val[1]
+        if op == "in_list" and isinstance(val, list):
+            return feat_val in val
+        if op == "not_in" and isinstance(val, list):
+            return feat_val not in val
+        if op == "is_null":
+            return feat_val is None or feat_val == 0.0
+
         return False
 
     def evaluate(self, features: dict[str, float]) -> tuple[list[RuleFlag], bool]:

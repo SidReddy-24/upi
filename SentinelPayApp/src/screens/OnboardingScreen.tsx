@@ -33,37 +33,43 @@ const SLIDES = [
     title: 'Welcome to SentinelPay',
     subtitle: 'SentinelPay Credits (SPC)',
     body: 'This is a simulation app. All transactions use SentinelPay Credits (SPC) — not real Indian Rupees. No real money is transferred at any point.',
-    accent: '#6366f1',
-    bg: '#eef2ff',
+    accent: '#2D6A4F',
+    bg: '#FAF7F0',
   },
   {
     emoji: '🛡️',
     title: 'AI Fraud Shield',
     subtitle: 'Real-time, 6ms decisions',
     body: 'Every payment is scored by FraudShield AI before it executes.\n\n✅ Machine Learning model\n✅ 10 rule engine checks\n✅ Behavioural anomaly detection\n✅ Transaction graph analysis\n✅ Device & call-state signals',
-    accent: '#0284c7',
-    bg: '#e0f2fe',
+    accent: '#E8C4B8',
+    bg: '#FAF7F0',
   },
   {
     emoji: '🔒',
     title: 'Your Privacy is Protected',
     subtitle: '100% on-device processing',
     body: 'SMS messages are read locally for OTP detection only — no message content is ever uploaded to any server.\n\nCall state detection is used solely to flag potential social engineering attacks.',
-    accent: '#16a34a',
-    bg: '#dcfce7',
+    accent: '#2D6A4F',
+    bg: '#FAF7F0',
   },
 ];
 
 export default function OnboardingScreen({ navigation }: Props) {
   const [current, setCurrent] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const goToSlide = (next: number) => {
-    Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-    ]).start();
-    setTimeout(() => setCurrent(next), 150);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0.3, duration: 120, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 0.95, friction: 8, useNativeDriver: true }),
+    ]).start(() => {
+      setCurrent(next);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+      ]).start();
+    });
   };
 
   const handleNext = () => {
@@ -76,27 +82,12 @@ export default function OnboardingScreen({ navigation }: Props) {
 
   const handleComplete = async () => {
     try {
-      const deviceIdKey = 'sentinelpay_device_id';
-      let deviceId = await AsyncStorage.getItem(deviceIdKey);
-      if (!deviceId) {
-        deviceId = `SP_DEV_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-        await AsyncStorage.setItem(deviceIdKey, deviceId);
-      }
-
-      // Register unique user profile in central database
-      const profile = await fraudShieldApi.registerUser(deviceId, 'Sentinel User');
-      await AsyncStorage.setItem('sentinelpay_user', JSON.stringify({
-        id: 1,
-        name: profile.name,
-        vpa: profile.vpa,
-        balance: profile.balance,
-        created_at: new Date().toISOString(),
-      }));
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     } catch (e) {
-      console.warn('Backend user registration fallback to local:', e);
+      console.warn('Failed setting onboarding key:', e);
+    } finally {
+      navigation.replace('PhoneAuth', { useMock: true });
     }
-    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    navigation.replace('AuthModeSelector');
   };
 
 
@@ -171,6 +162,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 40,
+    backgroundColor: '#FAF7F0',
   },
   dotsRow: {
     flexDirection: 'row',
@@ -183,49 +175,54 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
+    backgroundColor: '#2D6A4F',
   },
   dotInactive: {
     width: 8,
-    backgroundColor: '#d1d5db',
+    backgroundColor: '#E8C4B8',
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
     padding: 28,
     width: '100%',
     maxWidth: 420,
-    shadowColor: '#000',
+    shadowColor: '#1A1A2E',
     shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 20,
+    elevation: 6,
     marginBottom: 32,
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
   },
   emoji: {
-    fontSize: 56,
+    fontSize: 60,
     textAlign: 'center',
     marginBottom: 16,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '900',
     textAlign: 'center',
     marginBottom: 4,
+    color: '#1A1A2E',
   },
   subtitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6b7280',
+    color: '#2D6A4F',
     textAlign: 'center',
     marginBottom: 16,
   },
   divider: {
     height: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#E8C4B8',
     marginBottom: 16,
   },
   body: {
     fontSize: 14,
-    color: '#374151',
+    color: '#1A1A2E',
     lineHeight: 22,
     textAlign: 'left',
   },
@@ -244,27 +241,37 @@ const styles = StyleSheet.create({
   },
   backBtnText: {
     fontSize: 15,
-    color: '#6b7280',
+    color: '#64748b',
     fontWeight: '600',
   },
   nextBtn: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 32,
+    backgroundColor: '#2D6A4F',
+    shadowColor: '#2D6A4F',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   nextBtnText: {
-    color: '#fff',
+    color: '#FAF7F0',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   skipBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
     marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
   },
   skipBtnText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#64748b',
+    fontWeight: '600',
   },
   disclaimer: {
     position: 'absolute',
@@ -277,3 +284,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+

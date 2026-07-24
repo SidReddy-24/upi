@@ -8,6 +8,8 @@ import unifiedAuthService from '../services/unifiedAuthService';
 import { getSettings, updateSettings, UserSettings } from '../utils/settingsDb';
 
 
+import AppIcon from '../components/AppIcon';
+
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 };
@@ -60,10 +62,9 @@ export default function ProfileScreen({ navigation }: Props) {
             await authService.logout();
             navigation.reset({
               index: 0,
-              routes: [{ name: 'AuthModeSelector' }],
+              routes: [{ name: 'PhoneAuth' }],
             });
           },
-
         },
       ]
     );
@@ -96,23 +97,29 @@ export default function ProfileScreen({ navigation }: Props) {
       {/* 1. USER PROFILE HEADER */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarBox}>
-          <Text style={styles.avatarText}>👤</Text>
+          <AppIcon name="profile" size={36} color="#FAF7F0" />
         </View>
         <Text style={styles.userName}>{user.name}</Text>
 
         <View style={styles.idPillContainer}>
           <View style={styles.idPill}>
-            <Text style={styles.idPillTag}>🆔 UNIQUE USER ID</Text>
-            <Text style={styles.idPillValue}>USR_{user.vpa.split('@')[0].toUpperCase()}</Text>
+            <Text style={styles.idPillTag}>PRIMARY KEY (PHONE)</Text>
+            <Text style={styles.idPillValue}>{user.phone || user.id}</Text>
           </View>
+          {user.dob ? (
+            <View style={styles.idPill}>
+              <Text style={styles.idPillTag}>DATE OF BIRTH</Text>
+              <Text style={styles.idPillValue}>{user.dob}</Text>
+            </View>
+          ) : null}
           <View style={styles.idPill}>
-            <Text style={styles.idPillTag}>💳 UNIQUE UPI ID</Text>
+            <Text style={styles.idPillTag}>UPI VPA ID</Text>
             <Text style={styles.idPillValue}>{user.vpa}</Text>
           </View>
         </View>
 
         <View style={styles.simulatedPill}>
-          <Text style={styles.simulatedText}>🧪 SIMULATED SPC ACCOUNT</Text>
+          <Text style={styles.simulatedText}>SIMULATED SPC ACCOUNT</Text>
         </View>
       </View>
 

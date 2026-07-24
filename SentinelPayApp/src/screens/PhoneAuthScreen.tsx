@@ -1,5 +1,5 @@
 /**
- * PhoneAuthScreen.tsx - Phone number + OTP authentication
+ * PhoneAuthScreen.tsx - Mandatory Registration & Persistent Login
  */
 
 import React, { useState } from 'react';
@@ -18,32 +18,48 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import unifiedAuthService from '../services/unifiedAuthService';
+import AppIcon from '../components/AppIcon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PhoneAuth'>;
 
 export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX.Element {
   const useMock = route.params?.useMock ?? true;
   
-  const [phone, setPhone] = useState('9876543210');
+  // Auth Mode: Signup vs Login
+  const [authMode, setAuthMode] = useState<'signup' | 'login'>('login');
 
-  const [otp, setOtp] = useState('');
+  // Mandatory Registration Fields
+  const [name, setName] = useState('Pranay Kadam');
+  const [dob, setDob] = useState('1998-08-15');
+  const [phone, setPhone] = useState('9876543210'); // Primary Key
+
+  // Security & Auth Fields
+  const [otp, setOtp] = useState('123456');
+
   const [sessionId, setSessionId] = useState('');
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [step, setStep] = useState<'details' | 'otp'>('details');
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Validate phone number
-   */
   const validatePhone = (phoneNumber: string): boolean => {
-    // Indian phone number: 10 digits
     const phoneRegex = /^[6-9]\d{9}$/;
-    return phoneRegex.test(phoneNumber);
+    return phoneRegex.test(phoneNumber.trim());
   };
 
   /**
-   * Send OTP to phone number
+   * Step 1: Send OTP to Phone Number
    */
-  const handleSendOtp = async () => {
+  const handleProceedToOtp = async () => {
+    if (authMode === 'signup') {
+      if (!name.trim()) {
+        Alert.alert('Missing Name', 'Please enter your full name');
+        return;
+      }
+      if (!dob.trim()) {
+        Alert.alert('Missing Date of Birth', 'Please enter your Date of Birth (YYYY-MM-DD)');
+        return;
+      }
+    }
+
     if (!validatePhone(phone)) {
       Alert.alert('Invalid Phone Number', 'Please enter a valid 10-digit Indian mobile number');
       return;
@@ -68,25 +84,28 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
   };
 
   /**
-   * Verify OTP and login
+   * Step 2: Verify OTP and Login/Register
    */
   const handleVerifyOtp = async () => {
     if (!otp || otp.length !== 6) {
-      Alert.alert('Invalid OTP', 'Please enter a 6-digit OTP');
+      Alert.alert('Invalid OTP', 'Please enter a 6-digit OTP code (e.g. 123456)');
       return;
     }
 
     setLoading(true);
     try {
-      const result = await unifiedAuthService.verifyOtp(phone, otp, sessionId, useMock);
+      const result = await unifiedAuthService.verifyOtp(phone, otp, sessionId, useMock, authMode, name, dob);
       
       if (result.success) {
+        // Complete authentication and navigate directly to Home
         navigation.replace('Home');
       } else {
-        Alert.alert('Verification Failed', result.error || 'Invalid OTP. Please try again.');
+        Alert.alert(
+          authMode === 'signup' ? 'Sign Up Failed' : 'Login Failed',
+          result.error || 'Authentication failed. Please try again.'
+        );
         setOtp('');
       }
-
     } catch (error) {
       console.error('[PhoneAuth] Verify OTP error:', error);
       Alert.alert('Error', 'Failed to verify OTP. Please try again.');
@@ -95,40 +114,71 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
     }
   };
 
-  /**
-   * Change phone number (go back to phone step)
-   */
-  const handleChangePhone = () => {
-    setStep('phone');
-    setOtp('');
-    setSessionId('');
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.logo}>📱</Text>
-          <Text style={styles.title}>
-            {step === 'phone' ? 'Enter Your Phone Number' : 'Verify OTP'}
-          </Text>
+          <View style={styles.iconCircle}>
+            <AppIcon name="shield" size={32} color="#2D6A4F" />
+          </View>
+          <Text style={styles.title}>SentinelPay Wallet</Text>
           <Text style={styles.subtitle}>
-            {step === 'phone'
-              ? 'We will send you a one-time password'
-              : `Enter the 6-digit code sent to ${phone}`}
+            {authMode === 'login' ? 'Sign in to access your persistent wallet' : 'Create a new persistent SentinelPay account'}
           </Text>
+
+          {/* ── Mode Switcher (Log In vs Sign Up) ── */}
+          {step === 'details' && (
+            <View style={styles.modeToggleContainer}>
+              <TouchableOpacity
+                style={[styles.modeTab, authMode === 'login' && styles.modeTabActive]}
+                onPress={() => setAuthMode('login')}>
+                <Text style={[styles.modeTabText, authMode === 'login' && styles.modeTabTextActive]}>Log In</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modeTab, authMode === 'signup' && styles.modeTabActive]}
+                onPress={() => setAuthMode('signup')}>
+                <Text style={[styles.modeTabText, authMode === 'signup' && styles.modeTabTextActive]}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Phone Number Entry */}
-        {step === 'phone' && (
+        {/* STEP 1: Phone Details Form */}
+        {step === 'details' && (
           <View style={styles.form}>
+            {authMode === 'signup' && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Full Name</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Pranay Kadam"
+                    placeholderTextColor="#94a3b8"
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Date of Birth (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="1998-08-15"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="numbers-and-punctuation"
+                    value={dob}
+                    onChangeText={setDob}
+                  />
+                </View>
+              </>
+            )}
+
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Mobile Number</Text>
+              <Text style={styles.inputLabel}>Mobile Phone Number (Primary Key)</Text>
               <View style={styles.phoneInputWrapper}>
                 <Text style={styles.countryCode}>+91</Text>
                 <TextInput
@@ -139,38 +189,30 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
                   value={phone}
                   onChangeText={setPhone}
                   maxLength={10}
-                  autoFocus
                 />
               </View>
             </View>
 
             <TouchableOpacity
               style={[styles.button, (!phone || loading) && styles.buttonDisabled]}
-              onPress={handleSendOtp}
+              onPress={handleProceedToOtp}
               disabled={!phone || loading}>
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="#FAF7F0" />
               ) : (
-                <Text style={styles.buttonText}>Send OTP</Text>
+                <Text style={styles.buttonText}>
+                  {authMode === 'login' ? 'Send Login OTP →' : 'Proceed to Verify OTP →'}
+                </Text>
               )}
             </TouchableOpacity>
-
-            {useMock && (
-              <View style={styles.mockInfo}>
-                <Text style={styles.mockInfoIcon}>🧪</Text>
-                <Text style={styles.mockInfoText}>
-                  Mock Mode Active - Use OTP: 123456
-                </Text>
-              </View>
-            )}
           </View>
         )}
 
-        {/* OTP Entry */}
+        {/* STEP 2: OTP Entry */}
         {step === 'otp' && (
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Enter OTP</Text>
+              <Text style={styles.inputLabel}>Enter 6-Digit OTP Sent to +91 {phone}</Text>
               <TextInput
                 style={styles.otpInput}
                 placeholder="123456"
@@ -188,43 +230,26 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
               onPress={handleVerifyOtp}
               disabled={!otp || loading}>
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="#FAF7F0" />
               ) : (
-                <Text style={styles.buttonText}>Verify & Login</Text>
+                <Text style={styles.buttonText}>Verify OTP & Log In →</Text>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleChangePhone}
-              disabled={loading}>
-              <Text style={styles.secondaryButtonText}>← Change Phone Number</Text>
+            <TouchableOpacity style={styles.backLink} onPress={() => setStep('details')}>
+              <Text style={styles.backLinkText}>← Change Phone Number</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.resendButton}
-              onPress={handleSendOtp}
-              disabled={loading}>
-              <Text style={styles.resendButtonText}>Resend OTP</Text>
-            </TouchableOpacity>
+            {useMock && (
+              <View style={styles.mockInfo}>
+                <AppIcon name="coin" size={16} color="#2D6A4F" />
+                <Text style={styles.mockInfoText}>
+                  Mock Mode Active - Use OTP: 123456
+                </Text>
+              </View>
+            )}
           </View>
         )}
-
-        {/* Security Info */}
-        <View style={styles.securityInfo}>
-          <Text style={styles.securityIcon}>🔒</Text>
-          <Text style={styles.securityText}>
-            Your phone number is encrypted and stored securely
-          </Text>
-        </View>
-
-        {/* Back to Mode Selector */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('AuthModeSelector')}
-          disabled={loading}>
-          <Text style={styles.backButtonText}>← Back to Login Options</Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -233,162 +258,168 @@ export default function PhoneAuthScreen({ navigation, route }: Props): React.JSX
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a', // Slate 900
+    backgroundColor: '#FAF7F0',
   },
   scrollContent: {
-    flexGrow: 1,
-    padding: 20,
-    paddingTop: 40,
+    padding: 24,
+    paddingTop: 48,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 24,
   },
-  logo: {
-    fontSize: 64,
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 8,
-    textAlign: 'center',
+    fontWeight: '900',
+    color: '#1A1A2E',
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
+    fontSize: 13,
+    color: '#64748b',
     textAlign: 'center',
-    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  modeToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+    width: '100%',
+    maxWidth: 320,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  modeTabActive: {
+    backgroundColor: '#2D6A4F',
+  },
+  modeTabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  modeTabTextActive: {
+    color: '#FAF7F0',
   },
   form: {
-    width: '100%',
-    marginBottom: 32,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+    elevation: 2,
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    color: '#1A1A2E',
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: '#FAF7F0',
+    borderWidth: 1,
+    borderColor: '#E8C4B8',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1A1A2E',
   },
   phoneInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
+    backgroundColor: '#FAF7F0',
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 16,
+    borderColor: '#E8C4B8',
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   countryCode: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#f8fafc',
-    marginRight: 8,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2D6A4F',
   },
   phoneInput: {
     flex: 1,
-    padding: 16,
-    fontSize: 16,
-    color: '#f8fafc',
-  },
-  otpInput: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 20,
-    fontSize: 24,
-    color: '#f8fafc',
-    letterSpacing: 8,
-    textAlign: 'center',
-    fontWeight: 'bold',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  button: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
+    paddingVertical: 12,
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: '#1A1A2E',
   },
-  secondaryButton: {
-    paddingVertical: 12,
+  otpInput: {
+    backgroundColor: '#FAF7F0',
+    borderWidth: 2,
+    borderColor: '#2D6A4F',
+    borderRadius: 16,
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 8,
+    textAlign: 'center',
+    paddingVertical: 14,
+    color: '#1A1A2E',
+  },
+  button: {
+    backgroundColor: '#2D6A4F',
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#818cf8',
+  buttonDisabled: {
+    opacity: 0.5,
   },
-  resendButton: {
-    paddingVertical: 12,
+  buttonText: {
+    color: '#FAF7F0',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  backLink: {
     alignItems: 'center',
     marginTop: 16,
   },
-  resendButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94a3b8',
-    textDecorationLine: 'underline',
+  backLinkText: {
+    color: '#2D6A4F',
+    fontSize: 13,
+    fontWeight: '700',
   },
   mockInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef3c7',
-    padding: 12,
-    borderRadius: 8,
+    justifyContent: 'center',
+    gap: 6,
     marginTop: 16,
-  },
-  mockInfoIcon: {
-    fontSize: 18,
-    marginRight: 8,
+    backgroundColor: '#D1FAE5',
+    padding: 10,
+    borderRadius: 12,
   },
   mockInfoText: {
-    flex: 1,
     fontSize: 12,
-    color: '#92400e',
-    fontWeight: '600',
-  },
-  securityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  securityIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  securityText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#94a3b8',
-    lineHeight: 18,
-  },
-  backButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#94a3b8',
+    fontWeight: '700',
+    color: '#2D6A4F',
   },
 });

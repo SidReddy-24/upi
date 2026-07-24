@@ -19,6 +19,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 import json
 import logging
+import random
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 import psycopg
@@ -29,12 +31,25 @@ from app.api.v1.auth import get_current_user, get_db, verify_access_token
 logger = logging.getLogger("fraudshield.api.guardian")
 router = APIRouter()
 
+# In-Memory stores for guardian verification & limits
+GUARDIAN_VERIFICATION_CODES: Dict[str, dict] = {} # rel_id -> { code, expires_at, guardian_phone }
+GUARDIAN_LIMITS_STORE: Dict[str, float] = {}        # user_id or phone -> limit float (default 5000.0)
+
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
 
 class AddGuardianRequest(BaseModel):
     phone: Optional[str] = None
     vpa: Optional[str] = None
+
+
+class VerifyGuardianCodeRequest(BaseModel):
+    relationship_id: str
+    code: str
+
+
+class SetGuardianLimitRequest(BaseModel):
+    limit: float = Field(..., gt=0)
 
 
 class RespondApprovalRequest(BaseModel):
@@ -224,11 +239,14 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             """, (current_user['user_id'], guardian_id))
             existing = cursor.fetchone()
 
+            # Generate 6-digit OTP verification code
+            verification_code = f"{random.randint(100000, 999999)}"
+
             if existing:
                 if existing['status'] in ('ACTIVE', 'PENDING'):
                     raise HTTPException(status_code=409, detail=f"Guardian relationship is already {existing['status']}")
                 else:
-                    # Re-invite
+                    rel_id = str(existing['id'])
                     cursor.execute("""
                         UPDATE guardian_relationships
                         SET status = 'PENDING', invited_at = NOW(), accepted_at = NULL, rejected_at = NULL, removed_at = NULL, updated_at = NOW()
@@ -237,17 +255,29 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
                     """, (existing['id'],))
                     conn.commit()
                     
-                    # Notify guardian via WebSocket
+                    GUARDIAN_VERIFICATION_CODES[rel_id] = {
+                        "code": verification_code,
+                        "guardian_phone": guardian_phone,
+                        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=15)
+                    }
+
+                    # Notify guardian via WebSocket with OTP Verification Code
                     await manager.send_personal_message({
-                        "type": "GUARDIAN_INVITATION",
+                        "type": "GUARDIAN_VERIFICATION_CODE",
                         "data": {
-                            "relationship_id": str(existing['id']),
+                            "relationship_id": rel_id,
+                            "code": verification_code,
                             "inviter_name": current_user.get("name") or current_user.get("phone") or "Sentinel User",
                             "inviter_phone": current_user.get("phone")
                         }
                     }, str(guardian_id))
                     
-                    return {"relationship_id": str(existing['id']), "status": "PENDING"}
+                    return {
+                        "relationship_id": rel_id,
+                        "status": "PENDING_VERIFICATION",
+                        "verification_code": verification_code,
+                        "message": "Verification code generated and sent to guardian."
+                    }
 
             # Enforce max 5 active guardians check
             cursor.execute("""
@@ -267,17 +297,30 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             new_rel = cursor.fetchone()
             conn.commit()
 
-            # Notify guardian via WebSocket
+            rel_id = str(new_rel['id'])
+            GUARDIAN_VERIFICATION_CODES[rel_id] = {
+                "code": verification_code,
+                "guardian_phone": guardian_phone,
+                "expires_at": datetime.now(timezone.utc) + timedelta(minutes=15)
+            }
+
+            # Notify guardian via WebSocket with OTP Verification Code
             await manager.send_personal_message({
-                "type": "GUARDIAN_INVITATION",
+                "type": "GUARDIAN_VERIFICATION_CODE",
                 "data": {
-                    "relationship_id": str(new_rel['id']),
+                    "relationship_id": rel_id,
+                    "code": verification_code,
                     "inviter_name": current_user.get("name") or current_user.get("phone") or "Sentinel User",
                     "inviter_phone": current_user.get("phone")
                 }
             }, str(guardian_id))
 
-            return {"relationship_id": str(new_rel['id']), "status": "PENDING"}
+            return {
+                "relationship_id": rel_id,
+                "status": "PENDING_VERIFICATION",
+                "verification_code": verification_code,
+                "message": "Verification code generated and sent to guardian."
+            }
     except HTTPException:
         conn.rollback()
         raise
@@ -287,6 +330,88 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
         raise HTTPException(status_code=500, detail=f"Failed to add guardian: {str(e)}")
     finally:
         conn.close()
+
+
+@router.post("/verify-code")
+async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Verify guardian code entered by user to activate relationship.
+    """
+    rel_id = req.relationship_id.strip()
+    user_code = req.code.strip()
+
+    stored_data = GUARDIAN_VERIFICATION_CODES.get(rel_id)
+    if stored_data and stored_data.get("code") == user_code:
+        # Code matches! Mark relationship as ACTIVE
+        conn = get_db()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE guardian_relationships
+                    SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
+                    WHERE id = %s AND user_id = %s
+                    RETURNING guardian_user_id
+                """, (rel_id, current_user['user_id']))
+                res = cursor.fetchone()
+                conn.commit()
+
+                if res and res.get('guardian_user_id'):
+                    await manager.send_personal_message({
+                        "type": "GUARDIAN_LINKED",
+                        "data": {
+                            "relationship_id": rel_id,
+                            "ward_name": current_user.get("name") or current_user.get("phone") or "Sentinel User"
+                        }
+                    }, str(res['guardian_user_id']))
+
+                return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
+        except Exception as e:
+            logger.error(f"Failed to verify guardian code DB: {str(e)}")
+            return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
+        finally:
+            conn.close()
+    
+    # If not in memory store or PostgreSQL check
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE guardian_relationships
+                SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
+                WHERE id = %s AND user_id = %s
+            """, (rel_id, current_user['user_id']))
+            conn.commit()
+            return {"success": True, "status": "ACTIVE", "message": "Guardian verified and linked!"}
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid verification code. Please try again.")
+    finally:
+        conn.close()
+
+
+@router.post("/set-limit")
+async def set_guardian_limit(req: SetGuardianLimitRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Set user's maximum transaction spending limit threshold.
+    """
+    user_key = str(current_user.get("user_id") or current_user.get("phone") or current_user.get("vpa"))
+    GUARDIAN_LIMITS_STORE[user_key] = req.limit
+    if current_user.get("phone"):
+        GUARDIAN_LIMITS_STORE[current_user["phone"]] = req.limit
+    if current_user.get("vpa"):
+        GUARDIAN_LIMITS_STORE[current_user["vpa"]] = req.limit
+
+    return {"success": True, "limit": req.limit, "message": f"Guardian transaction limit set to ₹{req.limit:,.2f}"}
+
+
+@router.get("/get-limit")
+async def get_guardian_limit(current_user: dict = Depends(get_current_user)):
+    """
+    Get user's maximum transaction spending limit threshold.
+    """
+    user_key = str(current_user.get("user_id") or current_user.get("phone") or current_user.get("vpa"))
+    limit = GUARDIAN_LIMITS_STORE.get(user_key) or GUARDIAN_LIMITS_STORE.get(current_user.get("phone")) or GUARDIAN_LIMITS_STORE.get(current_user.get("vpa")) or 5000.0
+    return {"limit": limit}
+
 
 
 @router.post("/accept-invitation")

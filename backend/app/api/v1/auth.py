@@ -62,12 +62,40 @@ def init_db_tables(conn):
                     password_hash VARCHAR(255) NOT NULL,
                     vpa VARCHAR(100) UNIQUE NOT NULL,
                     name VARCHAR(100),
+                    dob VARCHAR(20),
+                    upi_pin VARCHAR(10),
+                    balance NUMERIC(12, 2) DEFAULT 100000.0,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     last_login TIMESTAMP WITH TIME ZONE,
                     is_active BOOLEAN DEFAULT TRUE
                 );
+            """)
 
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='auth_users' AND column_name='balance') THEN
+                        ALTER TABLE auth_users ADD COLUMN balance NUMERIC(12, 2) DEFAULT 100000.0;
+                    END IF;
+                END
+                $$;
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS transactions (
+                    id VARCHAR(100) PRIMARY KEY,
+                    sender_phone VARCHAR(15) REFERENCES auth_users(phone),
+                    receiver_phone VARCHAR(15) REFERENCES auth_users(phone),
+                    sender_vpa VARCHAR(100),
+                    receiver_vpa VARCHAR(100),
+                    amount NUMERIC(12, 2) NOT NULL,
+                    status VARCHAR(20) NOT NULL,
+                    decision VARCHAR(20),
+                    risk_score NUMERIC(5, 4),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                
                 CREATE TABLE IF NOT EXISTS otp_verifications (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     phone VARCHAR(15) NOT NULL,
@@ -111,33 +139,35 @@ PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$')
 # ─── Request/Response Models ──────────────────────────────────────────────────
 
 class SendOTPRequest(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=15)
+    phone: str = Field(..., min_length=10, max_length=15, pattern=r'^\+?[1-9]\d{1,14}$')
     purpose: str = Field(..., pattern='^(REGISTRATION|PASSWORD_RESET|LOGIN)$')
 
 
 class VerifyOTPRequest(BaseModel):
-    phone: str
+    phone: str = Field(..., min_length=10, max_length=15, pattern=r'^\+?[1-9]\d{1,14}$')
     otp_code: str = Field(..., min_length=6, max_length=6)
 
 
 class RegisterRequest(BaseModel):
-    phone: str
-    password: str = Field(..., min_length=8)
-    email: Optional[str] = None
-    name: Optional[str] = None
+    phone: str = Field(..., min_length=10, max_length=15, pattern=r'^\+?[1-9]\d{1,14}$')
+    password: Optional[str] = "Sentinel@123"
+    email: Optional[str] = Field(None, max_length=255)
+    name: Optional[str] = Field(None, max_length=255)
+    dob: Optional[str] = Field(None, max_length=20)
+    upi_pin: Optional[str] = Field(None, max_length=10)
     
     @field_validator('password')
     @classmethod
     def validate_password(cls, v):
-        if not PASSWORD_REGEX.match(v):
+        if v and not PASSWORD_REGEX.match(v) and v != "Sentinel@123":
             raise ValueError(
                 'Password must be at least 8 characters with uppercase, lowercase, and digit'
             )
-        return v
+        return v or "Sentinel@123"
 
 
 class LoginRequest(BaseModel):
-    identifier: str  # phone or email
+    identifier: str = Field(..., max_length=255)
     password: str
 
 
@@ -146,7 +176,7 @@ class RefreshTokenRequest(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    phone: str
+    phone: str = Field(..., min_length=10, max_length=15, pattern=r'^\+?[1-9]\d{1,14}$')
     otp_code: str
     new_password: str
     
@@ -390,7 +420,10 @@ async def register(request: RegisterRequest):
     """
     Register a new user.
     """
-    from app.api.v1.user import USERS_STORE
+    try:
+        from app.api.v1.user import USERS_STORE
+    except ImportError:
+        USERS_STORE = {}
 
     conn = get_db()
     
@@ -416,16 +449,15 @@ async def register(request: RegisterRequest):
             
             # Check if user already exists
             cursor.execute("""
-                SELECT id, phone, email, vpa, name FROM auth_users WHERE phone = %s
+                SELECT id, phone, email, vpa, name, dob, upi_pin FROM auth_users WHERE phone = %s
             """, (request.phone,))
             
             existing = cursor.fetchone()
             if existing:
-                # If already registered, return token & user profile
-                access_token = generate_access_token(str(existing['id']), existing['phone'], existing['email'])
-                refresh_token = generate_refresh_token()
-                
-                # Sync USERS_STORE
+                raise HTTPException(
+                    status_code=400,
+                    detail="Mobile number is already registered. Please log in instead."
+                )
                 USERS_STORE[existing['vpa'].lower()] = {
                     "user_id": f"USR_{str(existing['id'])[:6].upper()}",
                     "vpa": existing['vpa'].lower(),
@@ -444,12 +476,14 @@ async def register(request: RegisterRequest):
                         'phone': existing['phone'],
                         'email': existing['email'],
                         'vpa': existing['vpa'],
-                        'name': existing['name']
+                        'name': existing['name'],
+                        'dob': existing['dob'],
+                        'upi_pin': existing['upi_pin']
                     }
                 )
             
             # Hash password
-            password_hash = hash_password(request.password)
+            password_hash = hash_password(request.password or "Sentinel@123")
             
             # Generate VPA
             vpa = generate_vpa(request.phone)
@@ -457,10 +491,10 @@ async def register(request: RegisterRequest):
             
             # Create user
             cursor.execute("""
-                INSERT INTO auth_users (phone, email, password_hash, vpa, name)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id, phone, email, vpa, name, created_at
-            """, (request.phone, request.email, password_hash, vpa, user_name))
+                INSERT INTO auth_users (phone, email, password_hash, vpa, name, dob, upi_pin)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, phone, email, vpa, name, dob, upi_pin, created_at
+            """, (request.phone, request.email, password_hash, vpa, user_name, request.dob, request.upi_pin))
             
             user = cursor.fetchone()
             conn.commit()
@@ -498,7 +532,9 @@ async def register(request: RegisterRequest):
                     'phone': user['phone'],
                     'email': user['email'],
                     'vpa': user['vpa'],
-                    'name': user['name']
+                    'name': user['name'],
+                    'dob': user['dob'],
+                    'upi_pin': user['upi_pin']
                 }
             )
     
@@ -549,7 +585,10 @@ async def login(request: LoginRequest):
             conn.commit()
 
             # Sync to in-memory store for P2P settlement engine
-            from app.api.v1.user import USERS_STORE
+            try:
+                from app.api.v1.user import USERS_STORE
+            except ImportError:
+                USERS_STORE = {}
             vpa_clean = user['vpa'].lower()
             if vpa_clean not in USERS_STORE:
                 USERS_STORE[vpa_clean] = {
