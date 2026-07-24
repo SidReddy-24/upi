@@ -44,7 +44,9 @@ export default function UpiPinModal({
   const handleSubmit = () => {
     if (pin.length !== PIN_LENGTH) {
       setErrorMsg(`Please enter a ${PIN_LENGTH}-digit UPI PIN`);
-      Vibration.vibrate(100);
+      try {
+        Vibration.vibrate(100);
+      } catch {}
       return;
     }
 

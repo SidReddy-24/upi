@@ -344,7 +344,7 @@ export default function RegisterScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#FAF7F0',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
   logoEmoji: {
     fontSize: 54,
@@ -362,50 +362,50 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#1A1A2E',
     letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748B',
     marginTop: 6,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   cardTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1A1A2E',
     marginBottom: 20,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#f8fafc',
+    color: '#1A1A2E',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
   },
   passwordContainer: {
     position: 'relative',
@@ -424,12 +424,12 @@ const styles = StyleSheet.create({
   },
   tipText: {
     fontSize: 12,
-    color: '#e2e8f0',
+    color: '#64748B',
     marginTop: -10,
     marginBottom: 14,
   },
   actionButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#2E8B57',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -440,18 +440,18 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#ffffff',
   },
   instructions: {
     fontSize: 15,
-    color: '#cbd5e1',
+    color: '#475569',
     lineHeight: 22,
     marginBottom: 20,
   },
   bold: {
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: '#1A1A2E',
   },
   otpInput: {
     fontSize: 24,
@@ -466,15 +466,15 @@ const styles = StyleSheet.create({
   },
   timerText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748B',
   },
   timerValue: {
     fontWeight: '700',
-    color: '#f43f5e',
+    color: '#DC2626',
   },
   resendLink: {
-    color: '#6366f1',
-    fontWeight: '700',
+    color: '#2E8B57',
+    fontWeight: '800',
   },
   backButton: {
     padding: 12,
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   backButtonText: {
-    color: '#94a3b8',
+    color: '#64748B',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -492,16 +492,16 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748B',
   },
   footerLink: {
-    color: '#6366f1',
-    fontWeight: '700',
+    color: '#2E8B57',
+    fontWeight: '800',
   },
   demoOtpBox: {
-    backgroundColor: '#1e1b4b',
+    backgroundColor: 'rgba(46, 139, 87, 0.1)',
     borderWidth: 1,
-    borderColor: '#4338ca',
+    borderColor: '#2E8B57',
     borderRadius: 10,
     padding: 12,
     alignItems: 'center',
@@ -510,14 +510,14 @@ const styles = StyleSheet.create({
   demoOtpLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#818cf8',
+    color: '#2E8B57',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   demoOtpValue: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#f43f5e',
+    color: '#1A1A2E',
     letterSpacing: 4,
   },
 });

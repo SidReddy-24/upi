@@ -32,39 +32,49 @@ export default function AiRiskHistoryScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Light Enterprise Header */}
       <View style={styles.headerContainer}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <AppIcon name="chevronLeft" size={24} color="#F8FAFC" />
+          <AppIcon name="chevronLeft" size={24} color="#1A1A2E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>FraudShield AI Risk History</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerTitleGroup}>
+          <Text style={styles.headerSubtitle}>ENTERPRISE INTELLIGENCE</Text>
+          <Text style={styles.headerTitle}>FraudShield AI Risk History</Text>
+        </View>
+        <View style={styles.livePulseBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>LIVE</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Top Summary Banner */}
         <View style={styles.summaryCard}>
           <View style={styles.cardHeaderRow}>
-            <AppIcon name="cpu" size={20} color="#10B981" />
-            <Text style={styles.cardTitle}>30-Day Model Performance</Text>
+            <View style={styles.iconCircle}>
+              <AppIcon name="cpu" size={20} color="#2E8B57" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>30-Day Model Performance</Text>
+              <Text style={styles.cardSub}>FraudShield ML Model continuous learning stats</Text>
+            </View>
           </View>
-          <Text style={styles.cardSub}>FraudShield ML Model continuous learning stats</Text>
 
           <View style={styles.kpiRow}>
             <View style={styles.kpiBox}>
-              <Text style={[styles.kpiVal, { color: '#10B981' }]}>142</Text>
+              <Text style={[styles.kpiVal, { color: '#2E8B57' }]}>142</Text>
               <Text style={styles.kpiLabel}>Low Risk</Text>
             </View>
             <View style={styles.kpiBox}>
-              <Text style={[styles.kpiVal, { color: '#F59E0B' }]}>12</Text>
+              <Text style={[styles.kpiVal, { color: '#D97706' }]}>12</Text>
               <Text style={styles.kpiLabel}>Med Risk</Text>
             </View>
             <View style={styles.kpiBox}>
-              <Text style={[styles.kpiVal, { color: '#EF4444' }]}>4</Text>
+              <Text style={[styles.kpiVal, { color: '#DC2626' }]}>4</Text>
               <Text style={styles.kpiLabel}>Blocked</Text>
             </View>
             <View style={styles.kpiBox}>
-              <Text style={[styles.kpiVal, { color: '#3B82F6' }]}>8</Text>
+              <Text style={[styles.kpiVal, { color: '#2563EB' }]}>8</Text>
               <Text style={styles.kpiLabel}>Guardian</Text>
             </View>
           </View>
@@ -86,12 +96,12 @@ export default function AiRiskHistoryScreen({ navigation }: Props) {
           <Text style={styles.sectionTitle}>Learned Behaviour & Top Triggers</Text>
 
           <View style={styles.infoRow}>
-            <AppIcon name="shieldCheck" size={16} color="#10B981" />
-            <Text style={styles.infoText}>Learned Trusted Merchants: <Text style={{ color: '#F8FAFC', fontWeight: '700' }}>Amazon India, Swiggy, Zomato</Text></Text>
+            <AppIcon name="shieldCheck" size={16} color="#2E8B57" />
+            <Text style={styles.infoText}>Learned Trusted Merchants: <Text style={{ color: '#1A1A2E', fontWeight: '700' }}>Amazon India, Swiggy, Zomato</Text></Text>
           </View>
           <View style={styles.infoRow}>
-            <AppIcon name="alertTriangle" size={16} color="#F59E0B" />
-            <Text style={styles.infoText}>Top Fraud Rule Trigger: <Text style={{ color: '#F8FAFC', fontWeight: '700' }}>NEW_MERCHANT_HIGH_AMOUNT (+31)</Text></Text>
+            <AppIcon name="alertTriangle" size={16} color="#D97706" />
+            <Text style={styles.infoText}>Top Fraud Rule Trigger: <Text style={{ color: '#1A1A2E', fontWeight: '700' }}>NEW_MERCHANT_HIGH_AMOUNT (+31)</Text></Text>
           </View>
         </View>
 
@@ -126,7 +136,7 @@ export default function AiRiskHistoryScreen({ navigation }: Props) {
                 <Text style={styles.dateText}>{item.date} • Ref: {item.id}</Text>
               </View>
               <View style={[styles.badge, item.decision === 'REJECT' ? styles.badgeReject : styles.badgeApprove]}>
-                <Text style={[styles.badgeText, item.decision === 'REJECT' ? { color: '#EF4444' } : { color: '#10B981' }]}>
+                <Text style={[styles.badgeText, item.decision === 'REJECT' ? { color: '#DC2626' } : { color: '#2E8B57' }]}>
                   {item.decision === 'REJECT' ? 'BLOCKED' : item.decision}
                 </Text>
               </View>
@@ -138,8 +148,8 @@ export default function AiRiskHistoryScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.ruleBox}>
-              <Text style={styles.ruleLabel}>Trigger / Factor: <Text style={{ color: '#CBD5E1' }}>{item.rule}</Text></Text>
-              <Text style={styles.scoreLabel}>Risk Score: <Text style={{ color: item.score > 0.7 ? '#EF4444' : '#10B981', fontWeight: '700' }}>{(item.score * 100).toFixed(0)}/100</Text></Text>
+              <Text style={styles.ruleLabel}>Trigger: <Text style={{ color: '#1A1A2E', fontWeight: '600' }}>{item.rule}</Text></Text>
+              <Text style={styles.scoreLabel}>Risk Score: <Text style={{ color: item.score > 0.7 ? '#DC2626' : '#2E8B57', fontWeight: '700' }}>{(item.score * 100).toFixed(0)}/100</Text></Text>
             </View>
           </View>
         ))}
@@ -151,7 +161,7 @@ export default function AiRiskHistoryScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FAF7F0',
   },
   headerContainer: {
     flexDirection: 'row',
@@ -160,56 +170,101 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FAF7F0',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#E2E8F0',
   },
   backBtn: {
     padding: 6,
   },
+  headerTitleGroup: {
+    alignItems: 'center',
+  },
+  headerSubtitle: {
+    color: '#2E8B57',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
   headerTitle: {
-    color: '#F8FAFC',
-    fontSize: 17,
+    color: '#1A1A2E',
+    fontSize: 16,
     fontWeight: '700',
+    marginTop: 2,
+  },
+  livePulseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2E8B57',
+  },
+  liveText: {
+    color: '#2E8B57',
+    fontSize: 10,
+    fontWeight: '800',
   },
   scrollContainer: {
     padding: 16,
   },
   summaryCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
     marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardTitle: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 15,
     fontWeight: '700',
   },
   cardSub: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 12,
     marginTop: 2,
-    marginBottom: 14,
   },
   kpiRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 14,
     marginBottom: 16,
   },
   kpiBox: {
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     width: '23%',
   },
   kpiVal: {
@@ -217,14 +272,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   kpiLabel: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 10,
+    fontWeight: '600',
     marginTop: 2,
   },
   meterContainer: {
-    backgroundColor: '#0F172A',
-    padding: 12,
-    borderRadius: 10,
+    marginTop: 4,
   },
   meterHeader: {
     flexDirection: 'row',
@@ -232,47 +286,52 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   meterTitle: {
-    color: '#94A3B8',
-    fontSize: 11,
+    color: '#64748B',
+    fontSize: 12,
   },
   meterVal: {
-    color: '#10B981',
-    fontSize: 11,
+    color: '#2E8B57',
+    fontSize: 12,
     fontWeight: '700',
   },
   progressBg: {
     height: 8,
-    backgroundColor: '#334155',
+    backgroundColor: '#E2E8F0',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: '#2E8B57',
     borderRadius: 4,
   },
   sectionCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 14,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   sectionTitle: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   infoText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 12,
   },
   filterRow: {
@@ -281,19 +340,19 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   filterChip: {
-    paddingVertical: 6,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#CBD5E1',
   },
   filterChipActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#2E8B57',
+    borderColor: '#2E8B57',
   },
   filterText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -301,12 +360,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   historyCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 14,
-    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -315,25 +379,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   receiverText: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 14,
     fontWeight: '700',
   },
   dateText: {
-    color: '#64748B',
+    color: '#94A3B8',
     fontSize: 11,
     marginTop: 2,
   },
   badge: {
-    paddingVertical: 3,
     paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   badgeApprove: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
   },
   badgeReject: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    backgroundColor: 'rgba(220, 38, 38, 0.12)',
   },
   badgeText: {
     fontSize: 10,
@@ -346,21 +410,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   amountText: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 16,
     fontWeight: '800',
   },
   confidenceText: {
-    color: '#60A5FA',
+    color: '#2563EB',
     fontSize: 12,
     fontWeight: '600',
   },
   ruleBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     padding: 8,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   ruleLabel: {
     color: '#64748B',

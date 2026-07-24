@@ -164,14 +164,21 @@ class UnifiedAuthService {
           return { success: false, error: detailMsg || 'Mobile number is already registered. Please log in instead.' };
         }
       } else {
-        // Login mode
+        // Login mode: Try login first, auto-register if user doesn't exist yet
         try {
           const loginRes = await authService.login(phone, defaultPassword);
           backendUser = loginRes.user;
           token = loginRes.access_token;
         } catch (loginErr: any) {
-          const detailMsg = loginErr?.response?.data?.detail || loginErr?.message;
-          return { success: false, error: detailMsg || 'No account registered with this mobile number. Please sign up.' };
+          try {
+            // Auto-register seamless fallback for new phone number
+            const regRes = await authService.register(phone, defaultPassword, undefined, name || `User ${phone.slice(-4)}`);
+            backendUser = regRes.user;
+            token = regRes.access_token;
+          } catch (regErr: any) {
+            const detailMsg = loginErr?.response?.data?.detail || loginErr?.message || regErr?.message;
+            return { success: false, error: typeof detailMsg === 'string' ? detailMsg : 'Authentication failed. Please try again.' };
+          }
         }
       }
 
@@ -203,8 +210,15 @@ class UnifiedAuthService {
         expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
       };
 
-      // Save session and auth mode
+      // Save session, userProfile, and auth mode
       await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      await AsyncStorage.setItem('userProfile', JSON.stringify({
+        id: realId,
+        phone,
+        vpa: realVpa,
+        name: realName,
+        balance: realBalance,
+      }));
       await AsyncStorage.setItem(AUTH_MODE_KEY, AuthMode.PHONE_OTP);
 
       return { success: true, session };
@@ -297,6 +311,12 @@ class UnifiedAuthService {
       };
 
       await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      await AsyncStorage.setItem('userProfile', JSON.stringify({
+        id: realId,
+        phone: cleanPhone,
+        vpa: realVpa,
+        name: realName,
+      }));
       await AsyncStorage.setItem(AUTH_MODE_KEY, AuthMode.PHONE_OTP);
 
       return { success: true, session };
@@ -503,6 +523,7 @@ class UnifiedAuthService {
       await AsyncStorage.removeItem(AUTH_SESSION_KEY);
       await AsyncStorage.removeItem(AUTH_MODE_KEY);
       await AsyncStorage.removeItem('sentinelpay_user');
+      await AsyncStorage.removeItem('userProfile');
       try {
         await authService.logout();
       } catch (e) {

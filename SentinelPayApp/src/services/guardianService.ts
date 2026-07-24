@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authClient, API_BASE_URL } from './authService';
 
-// Use secure WSS for the cloud production endpoint
-const WS_BASE_URL = API_BASE_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+const getWsBaseUrl = () => API_BASE_URL.replace('https://', 'wss://').replace('http://', 'ws://');
 
 
 export interface GuardianRelationship {
@@ -113,7 +112,7 @@ class GuardianService {
     if (!token) return;
 
     this.isConnecting = true;
-    const wsUrl = `${WS_BASE_URL}/guardian/ws?token=${token}`;
+    const wsUrl = `${getWsBaseUrl()}/guardian/ws?token=${token}`;
     console.log(`[GuardianService] Connecting WebSocket to ${wsUrl}`);
 
     try {

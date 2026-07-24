@@ -29,6 +29,7 @@ import { useCallState } from '../hooks/useCallState';
 import { useDeviceFingerprint } from '../hooks/useDeviceFingerprint';
 import { getSettings } from '../utils/settingsDb';
 import guardianService from '../services/guardianService';
+import { notificationService } from '../services/notificationService';
 import UpiPinModal from '../components/UpiPinModal';
 import AppIcon from '../components/AppIcon';
 
@@ -64,6 +65,18 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const guardianTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isProcessingPaymentRef = useRef(false);
+
+  // ── Sync route params on navigation ──────────────────────────────────────────
+  useEffect(() => {
+    if (route.params?.prefillVpa) {
+      setReceiverVpa(route.params.prefillVpa);
+    }
+    if (route.params?.prefillAmount) {
+      setAmountStr(String(route.params.prefillAmount));
+    }
+  }, [route.params?.prefillVpa, route.params?.prefillAmount]);
+
+
 
   // ── Phase 4: SMS OTP detection ─────────────────────────────────────────────
   const { otpInLast60s, latestSmsFraudScore } = useSmsOtp();
@@ -224,6 +237,13 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
   // ── Step 1: Score the transaction ──────────────────────────────────────────
   const handleScore = async () => {
+    const user = await getUser();
+    if (user && receiverVpa.trim().toLowerCase() === user.vpa.toLowerCase()) {
+      return Alert.alert(
+        'Self-Transfer Not Allowed',
+        'The recipient VPA matches your own account VPA. You cannot transfer money to yourself. Please enter or scan a different recipient\'s QR code.',
+      );
+    }
     if (!vpaValid)    return Alert.alert('Invalid VPA', 'Enter a valid VPA like name@bankname');
     if (!amountValid) return Alert.alert('Invalid Amount', 'Amount must be between ₹1 and ₹2,00,000');
 
@@ -362,10 +382,17 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
   const [showUpiPinModal, setShowUpiPinModal] = useState(false);
 
+  const [isExecutingPayment, setIsExecutingPayment] = useState(false);
+
   // ── Step 2: Direct payment execution without UPI PIN or biometric prompts ──
   const handleExecute = async () => {
-    if (!score) return;
-    await checkHoldAndProceed();
+    if (!score || isExecutingPayment) return;
+    setIsExecutingPayment(true);
+    try {
+      await checkHoldAndProceed();
+    } catch (err) {
+      setIsExecutingPayment(false);
+    }
   };
 
   // Legacy fallback handler
@@ -476,6 +503,7 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
       setStep('BLOCKED');
     } finally {
       isProcessingPaymentRef.current = false;
+      setIsExecutingPayment(false);
     }
   };
 
@@ -508,6 +536,13 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         created_at: new Date().toISOString(),
       };
       await addTransaction(newTxnRecord);
+
+      await notificationService.addNotification({
+        title: `💸 ₹${amount.toLocaleString('en-IN')} Sent Successfully`,
+        body: `Payment of ₹${amount.toLocaleString('en-IN')} sent to ${receiverVpa.trim()}. Ref: ${transferRes.transaction_id || txnId}`,
+        type: 'PAYMENT_SENT',
+        transaction_id: transferRes.transaction_id || txnId,
+      });
 
       // Send SMS notification
       const settings = await getSettings();
@@ -870,8 +905,18 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
           {/* Action buttons based on decision */}
           {score.decision === 'APPROVE' && (
-            <TouchableOpacity style={styles.approveBtn} onPress={handleExecute}>
-              <Text style={styles.approveBtnText}>🔒 Confirm Payment</Text>
+            <TouchableOpacity
+              style={[styles.approveBtn, isExecutingPayment && styles.disabledBtn]}
+              onPress={handleExecute}
+              disabled={isExecutingPayment}>
+              {isExecutingPayment ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={styles.approveBtnText}>Confirming Payment...</Text>
+                </View>
+              ) : (
+                <Text style={styles.approveBtnText}>🔒 Confirm Payment</Text>
+              )}
             </TouchableOpacity>
           )}
 
@@ -883,16 +928,38 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
                 </Text>
               </View>
               <TouchableOpacity
-                style={[styles.reviewBtn, cooldown > 0 && styles.disabledBtn]}
+                style={[styles.reviewBtn, (cooldown > 0 || isExecutingPayment) && styles.disabledBtn]}
                 onPress={handleExecute}
-                disabled={cooldown > 0}>
-                <Text style={styles.approveBtnText}>
-                  {cooldown > 0 ? `Wait ${cooldown}s to confirm…` : '🔒 Proceed Anyway'}
-                </Text>
+                disabled={cooldown > 0 || isExecutingPayment}>
+                {isExecutingPayment ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.approveBtnText}>Confirming Payment...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.approveBtnText}>
+                    {cooldown > 0 ? `Wait ${cooldown}s to confirm…` : '🔒 Proceed Anyway'}
+                  </Text>
+                )}
               </TouchableOpacity>
-              <TouchableOpacity style={styles.cancelBtn} onPress={handleReject}>
-                <Text style={styles.cancelBtnText}>Cancel Payment</Text>
-              </TouchableOpacity>
+              {!isExecutingPayment && (
+                <TouchableOpacity style={styles.cancelBtn} onPress={handleReject}>
+                  <Text style={styles.cancelBtnText}>Cancel Payment</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Visual Settlement Progress Banner */}
+          {isExecutingPayment && (
+            <View style={styles.settlementStatusCard}>
+              <View style={styles.settlementStatusHeader}>
+                <ActivityIndicator size="small" color="#2E8B57" />
+                <Text style={styles.settlementStatusTitle}>NPCI Sentinel Settlement Engine Active</Text>
+              </View>
+              <Text style={styles.settlementStatusBody}>
+                Verifying guardian limit compliance and processing multi-user P2P settlement...
+              </Text>
             </View>
           )}
 
@@ -931,24 +998,24 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7F3EA' },
+  root: { flex: 1, backgroundColor: '#FAF7F0' },
 
   simulatedBanner: {
-    backgroundColor: '#E5DCCB', paddingVertical: 8,
-    alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#DCD1BF',
+    backgroundColor: '#F1F5F9', paddingVertical: 8,
+    alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
   },
-  simulatedText: { fontSize: 12, fontWeight: '700', color: '#236847' },
+  simulatedText: { fontSize: 12, fontWeight: '700', color: '#2E8B57' },
 
   // Phase 5 call warning
   callWarningBanner: {
-    backgroundColor: 'rgba(192, 57, 43, 0.1)', borderLeftWidth: 4, borderLeftColor: '#C0392B',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)', borderLeftWidth: 4, borderLeftColor: '#EF4444',
     marginHorizontal: 16, marginTop: 12, borderRadius: 10, padding: 12,
   },
-  callWarningText: { fontSize: 13, color: '#C0392B', lineHeight: 19, fontWeight: '600' },
+  callWarningText: { fontSize: 13, color: '#DC2626', lineHeight: 19, fontWeight: '600' },
 
   // Phase 4 OTP warning
   otpWarningBanner: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)', borderLeftWidth: 4, borderLeftColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)', borderLeftWidth: 4, borderLeftColor: '#F59E0B',
     marginHorizontal: 16, marginTop: 8, borderRadius: 10, padding: 12,
   },
   otpWarningText: { fontSize: 13, color: '#B45309', lineHeight: 19, fontWeight: '600' },
@@ -958,26 +1025,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32, paddingTop: 80,
   },
   bigEmoji: { fontSize: 64, marginBottom: 16 },
-  scoringTitle: { fontSize: 18, fontWeight: '800', color: '#181818', marginTop: 16 },
-  scoringSubtitle: { fontSize: 14, color: '#666666', marginTop: 6 },
+  scoringTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A2E', marginTop: 16 },
+  scoringSubtitle: { fontSize: 14, color: '#64748B', marginTop: 6 },
 
   // Phase 8.1.3 — Skeleton loading
   skeletonIcon: { marginBottom: 8 },
   skeletonBars: { width: '100%', marginTop: 20, gap: 10 },
   skeletonRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#EFE7DA', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#FFFFFF', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  skeletonLabel: { fontSize: 12, fontWeight: '600', color: '#666666', width: 80 },
+  skeletonLabel: { fontSize: 12, fontWeight: '600', color: '#64748B', width: 80 },
   skeletonBar: {
     flex: 1, height: 10, borderRadius: 5,
-    backgroundColor: '#DCD1BF', marginLeft: 12,
+    backgroundColor: '#E2E8F0', marginLeft: 12,
   },
-  successTitle: { fontSize: 24, fontWeight: '900', color: '#181818', marginBottom: 4 },
+  successTitle: { fontSize: 24, fontWeight: '900', color: '#1A1A2E', marginBottom: 4 },
   successAmount: { fontSize: 32, fontWeight: '900', color: '#2E8B57' },
-  successTo: { fontSize: 15, color: '#666666', marginBottom: 16 },
-  blockedTitle: { fontSize: 24, fontWeight: '900', color: '#C0392B', marginBottom: 8 },
-  blockedReason: { fontSize: 14, color: '#666666', textAlign: 'center', marginBottom: 16 },
+  successTo: { fontSize: 15, color: '#64748B', marginBottom: 16 },
+  blockedTitle: { fontSize: 24, fontWeight: '900', color: '#DC2626', marginBottom: 8 },
+  blockedReason: { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 16 },
 
   // Scoring state pills
   otpBadge: {
@@ -986,27 +1053,28 @@ const styles = StyleSheet.create({
   },
   otpBadgeText: { fontSize: 12, color: '#B45309', fontWeight: '600' },
   callBadge: {
-    marginTop: 8, backgroundColor: 'rgba(192, 57, 43, 0.1)', borderRadius: 8,
-    paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#C0392B',
+    marginTop: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 8,
+    paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#EF4444',
   },
-  callBadgeText: { fontSize: 12, color: '#C0392B', fontWeight: '600' },
+  callBadgeText: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
 
   formCard: {
-    backgroundColor: '#EFE7DA', margin: 16, borderRadius: 20,
-    padding: 20, borderWidth: 1, borderColor: '#DCD1BF', elevation: 2,
+    backgroundColor: '#FFFFFF', margin: 16, borderRadius: 20,
+    padding: 20, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3,
   },
-  formTitle: { fontSize: 22, fontWeight: '900', color: '#181818', marginBottom: 20 },
-  label: { fontSize: 12, fontWeight: '800', color: '#666666', marginBottom: 6, marginTop: 12, letterSpacing: 0.5 },
+  formTitle: { fontSize: 22, fontWeight: '900', color: '#1A1A2E', marginBottom: 20 },
+  label: { fontSize: 12, fontWeight: '800', color: '#64748B', marginBottom: 6, marginTop: 12, letterSpacing: 0.5 },
   input: {
-    borderWidth: 1.5, borderColor: '#DCD1BF', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: '#181818', backgroundColor: '#F7F3EA',
+    borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: '#1A1A2E', backgroundColor: '#F8FAFC',
   },
-  fieldError: { fontSize: 12, color: '#C0392B', marginTop: 4 },
+  fieldError: { fontSize: 12, color: '#DC2626', marginTop: 4 },
   apiError: {
-    fontSize: 13, color: '#C0392B', backgroundColor: 'rgba(192, 57, 43, 0.1)',
-    borderRadius: 10, padding: 10, marginTop: 12, borderWidth: 1, borderColor: '#C0392B',
+    fontSize: 13, color: '#DC2626', backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderRadius: 10, padding: 10, marginTop: 12, borderWidth: 1, borderColor: '#EF4444',
   },
-  hint: { fontSize: 12, color: '#666666', textAlign: 'center', marginTop: 12 },
+  hint: { fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 12 },
 
   primaryBtn: {
     backgroundColor: '#2E8B57', borderRadius: 14, paddingVertical: 15,
@@ -1015,10 +1083,10 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   disabledBtn: { opacity: 0.45 },
   secondaryBtn: {
-    backgroundColor: '#E5DCCB', borderRadius: 14, paddingVertical: 15,
-    alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F1F5F9', borderRadius: 14, paddingVertical: 15,
+    alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  secondaryBtnText: { color: '#181818', fontSize: 16, fontWeight: '700' },
+  secondaryBtnText: { color: '#1A1A2E', fontSize: 16, fontWeight: '700' },
   approveBtn: {
     backgroundColor: '#2E8B57', borderRadius: 14, paddingVertical: 15,
     alignItems: 'center', marginTop: 16,
@@ -1029,23 +1097,24 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginTop: 16,
   },
   cancelBtn: {
-    backgroundColor: '#E5DCCB', borderRadius: 14, paddingVertical: 14,
-    alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F1F5F9', borderRadius: 14, paddingVertical: 14,
+    alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  cancelBtnText: { color: '#181818', fontSize: 15, fontWeight: '700' },
+  cancelBtnText: { color: '#475569', fontSize: 15, fontWeight: '700' },
 
   resultCard: {
-    backgroundColor: '#EFE7DA', margin: 16, borderRadius: 20,
-    padding: 20, borderWidth: 1, borderColor: '#DCD1BF', elevation: 2,
+    backgroundColor: '#FFFFFF', margin: 16, borderRadius: 20,
+    padding: 20, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3,
   },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  resultTitle: { fontSize: 18, fontWeight: '800', color: '#181818' },
+  resultTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A2E' },
   txnSummaryBox: {
-    backgroundColor: '#F7F3EA', borderRadius: 14, padding: 14,
-    alignItems: 'center', marginBottom: 4, borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F8FAFC', borderRadius: 14, padding: 16,
+    alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  txnSummaryAmount: { fontSize: 28, fontWeight: '900', color: '#181818' },
-  txnSummaryTo: { fontSize: 14, color: '#666666', marginTop: 2 },
+  txnSummaryAmount: { fontSize: 32, fontWeight: '900', color: '#1A1A2E' },
+  txnSummaryTo: { fontSize: 14, color: '#64748B', fontWeight: '600', marginTop: 4 },
 
   // Phase 4/5 signal banner in result card
   signalBanners: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
@@ -1057,11 +1126,11 @@ const styles = StyleSheet.create({
 
   signalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 8 },
   signalChip: {
-    backgroundColor: '#F7F3EA', borderRadius: 10, padding: 10,
-    alignItems: 'center', minWidth: '22%', borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10,
+    alignItems: 'center', minWidth: '22%', borderWidth: 1, borderColor: '#E2E8F0',
   },
-  signalLabel: { fontSize: 10, color: '#666666', fontWeight: '700', marginBottom: 2 },
-  signalVal: { fontSize: 15, fontWeight: '800', color: '#181818' },
+  signalLabel: { fontSize: 10, color: '#64748B', fontWeight: '700', marginBottom: 2 },
+  signalVal: { fontSize: 15, fontWeight: '800', color: '#1A1A2E' },
 
   reviewWarning: {
     backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 12, padding: 12, marginTop: 12,
@@ -1069,61 +1138,61 @@ const styles = StyleSheet.create({
   },
   reviewWarningText: { fontSize: 13, color: '#B45309', lineHeight: 18, fontWeight: '600' },
   rejectBanner: {
-    backgroundColor: 'rgba(192, 57, 43, 0.1)', borderRadius: 12, padding: 12, marginTop: 12,
-    borderWidth: 1, borderColor: '#C0392B',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 12, padding: 12, marginTop: 12,
+    borderWidth: 1, borderColor: '#EF4444',
   },
-  rejectBannerText: { fontSize: 13, color: '#C0392B', lineHeight: 18, fontWeight: '600' },
-  latencyNote: { fontSize: 11, color: '#666666', textAlign: 'center', marginTop: 16 },
+  rejectBannerText: { fontSize: 13, color: '#DC2626', lineHeight: 18, fontWeight: '600' },
+  latencyNote: { fontSize: 11, color: '#94A3B8', textAlign: 'center', marginTop: 16 },
 
   // Phase 6.3 — QR trust badge styles
   trustBadgeLoading: {
     marginTop: 8, padding: 8, borderRadius: 10,
-    backgroundColor: '#F7F3EA', alignItems: 'center', borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F8FAFC', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0',
   },
-  trustBadgeLoadingText: { fontSize: 12, color: '#666666' },
+  trustBadgeLoadingText: { fontSize: 12, color: '#64748B' },
   trustBadge: {
     marginTop: 8, padding: 10, borderRadius: 10,
     borderWidth: 1,
   },
   trustVerified: { backgroundColor: 'rgba(46, 139, 87, 0.1)', borderColor: '#2E8B57' },
   trustCaution:  { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: '#F59E0B' },
-  trustFlagged:  { backgroundColor: 'rgba(192, 57, 43, 0.1)', borderColor: '#C0392B' },
-  trustBadgeText: { fontSize: 13, fontWeight: '700', color: '#181818' },
-  trustBadgeFlags: { fontSize: 11, color: '#666666', marginTop: 2 },
+  trustFlagged:  { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#EF4444' },
+  trustBadgeText: { fontSize: 13, fontWeight: '700', color: '#1A1A2E' },
+  trustBadgeFlags: { fontSize: 11, color: '#64748B', marginTop: 2 },
 
   // Phase 9 — Transaction Hold styles
-  holdTitle: { fontSize: 24, fontWeight: '900', color: '#181818', marginTop: 12 },
-  holdSubtitle: { fontSize: 14, color: '#666666', marginTop: 4, marginBottom: 20 },
+  holdTitle: { fontSize: 24, fontWeight: '900', color: '#1A1A2E', marginTop: 12 },
+  holdSubtitle: { fontSize: 14, color: '#64748B', marginTop: 4, marginBottom: 20 },
   holdCountdownBox: {
-    backgroundColor: '#EFE7DA', borderRadius: 16, padding: 20,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20,
     alignItems: 'center', marginBottom: 20, borderWidth: 2, borderColor: '#2E8B57', width: '100%',
   },
   holdCountdownLabel: { fontSize: 12, fontWeight: '800', color: '#2E8B57', textTransform: 'uppercase', letterSpacing: 1 },
-  holdCountdown: { fontSize: 48, fontWeight: '900', color: '#236847', marginVertical: 8 },
-  holdCountdownHint: { fontSize: 11, color: '#666666' },
+  holdCountdown: { fontSize: 48, fontWeight: '900', color: '#2E8B57', marginVertical: 8 },
+  holdCountdownHint: { fontSize: 11, color: '#64748B' },
   holdDetailsCard: {
-    backgroundColor: '#F7F3EA', borderRadius: 14, padding: 16, width: '100%',
-    marginBottom: 16, borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F8FAFC', borderRadius: 14, padding: 16, width: '100%',
+    marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  holdDetailsTitle: { fontSize: 14, fontWeight: '800', color: '#181818', marginBottom: 12, textAlign: 'center' },
+  holdDetailsTitle: { fontSize: 14, fontWeight: '800', color: '#1A1A2E', marginBottom: 12, textAlign: 'center' },
   holdDetailRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#DCD1BF',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
   },
-  holdDetailLabel: { fontSize: 13, color: '#666666', fontWeight: '600' },
-  holdDetailValue: { fontSize: 13, color: '#181818', fontWeight: '800', textAlign: 'right', flex: 1, marginLeft: 12 },
+  holdDetailLabel: { fontSize: 13, color: '#64748B', fontWeight: '600' },
+  holdDetailValue: { fontSize: 13, color: '#1A1A2E', fontWeight: '800', textAlign: 'right', flex: 1, marginLeft: 12 },
   holdConfirmBtn: {
     backgroundColor: '#2E8B57', borderRadius: 14, paddingVertical: 15,
     alignItems: 'center', width: '100%', marginBottom: 10,
   },
   holdConfirmBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   holdCancelBtn: {
-    backgroundColor: '#E5DCCB', borderRadius: 14, paddingVertical: 15,
-    alignItems: 'center', width: '100%', borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#F1F5F9', borderRadius: 14, paddingVertical: 15,
+    alignItems: 'center', width: '100%', borderWidth: 1, borderColor: '#E2E8F0',
   },
-  holdCancelBtnText: { color: '#181818', fontSize: 16, fontWeight: '700' },
+  holdCancelBtnText: { color: '#1A1A2E', fontSize: 16, fontWeight: '700' },
   holdWarning: {
-    fontSize: 11, color: '#666666', textAlign: 'center', marginTop: 16,
+    fontSize: 11, color: '#64748B', textAlign: 'center', marginTop: 16,
     paddingHorizontal: 20, lineHeight: 16,
   },
   // Guardian approval styles
@@ -1133,9 +1202,43 @@ const styles = StyleSheet.create({
     marginBottom: 20, borderWidth: 2, borderColor: '#2E8B57',
   },
   guardianCountdownCard: {
-    backgroundColor: '#EFE7DA', borderRadius: 16, padding: 20,
-    alignItems: 'center', marginVertical: 24, borderWidth: 1, borderColor: '#DCD1BF',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 1.5,
+    borderColor: '#2E8B57',
     width: '100%',
+  },
+  settlementStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  settlementStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  settlementStatusTitle: {
+    color: '#1A1A2E',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  settlementStatusBody: {
+    color: '#64748B',
+    fontSize: 11,
+    lineHeight: 16,
   },
   countdownLabel: { fontSize: 11, fontWeight: '800', color: '#2E8B57', textTransform: 'uppercase', letterSpacing: 1 },
   countdownTime: { fontSize: 44, fontWeight: '900', color: '#C0392B', marginVertical: 6 },

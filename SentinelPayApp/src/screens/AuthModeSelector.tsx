@@ -17,7 +17,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
-        <AppIcon name="shield" size={54} color="#10B981" />
+        <AppIcon name="shield" size={54} color="#2D6A4F" />
         <Text style={styles.title}>SentinelPay AI</Text>
         <Text style={styles.subtitle}>Choose Your Login Method</Text>
       </View>
@@ -29,7 +29,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
           style={styles.optionCard}
           onPress={() => navigation.navigate('PhoneAuth', { useMock: true })}>
           <View style={styles.optionIcon}>
-            <AppIcon name="phone" size={24} color="#10B981" />
+            <AppIcon name="phone" size={24} color="#2D6A4F" />
           </View>
           <View style={styles.optionContent}>
             <Text style={styles.optionTitle}>Phone + OTP</Text>
@@ -40,7 +40,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
               <Text style={styles.badgeText}>MOCK MODE</Text>
             </View>
           </View>
-          <AppIcon name="chevronRight" size={18} color="#64748B" />
+          <AppIcon name="chevronRight" size={18} color="#7A8B7B" />
         </TouchableOpacity>
 
         {/* PIN + Biometric */}
@@ -48,7 +48,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
           style={styles.optionCard}
           onPress={() => navigation.navigate('PinSetup')}>
           <View style={styles.optionIcon}>
-            <AppIcon name="lock" size={24} color="#10B981" />
+            <AppIcon name="lock" size={24} color="#2D6A4F" />
           </View>
           <View style={styles.optionContent}>
             <Text style={styles.optionTitle}>PIN + Biometric</Text>
@@ -59,18 +59,18 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
               <Text style={[styles.badgeText, styles.badgeRecommendedText]}>RECOMMENDED</Text>
             </View>
           </View>
-          <AppIcon name="chevronRight" size={18} color="#64748B" />
+          <AppIcon name="chevronRight" size={18} color="#7A8B7B" />
         </TouchableOpacity>
 
         {/* Google Sign-In (Coming Soon) */}
         <TouchableOpacity
           style={[styles.optionCard, styles.optionDisabled]}
           disabled>
-          <View style={styles.optionIcon}>
-            <AppIcon name="profile" size={24} color="#64748B" />
+          <View style={[styles.optionIcon, styles.disabledIcon]}>
+            <AppIcon name="profile" size={24} color="#94A3B8" />
           </View>
           <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>Google Sign-In</Text>
+            <Text style={[styles.optionTitle, styles.disabledText]}>Google Sign-In</Text>
             <Text style={styles.optionDescription}>
               Sign in with your Google account
             </Text>
@@ -78,7 +78,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
               <Text style={styles.badgeText}>COMING SOON</Text>
             </View>
           </View>
-          <AppIcon name="chevronRight" size={18} color="#475569" />
+          <AppIcon name="chevronRight" size={18} color="#CBD5E1" />
         </TouchableOpacity>
       </View>
 
@@ -96,7 +96,7 @@ export default function AuthModeSelector({ navigation }: Props): React.JSX.Eleme
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FAF7F0',
   },
   content: {
     padding: 24,
@@ -109,12 +109,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     marginTop: 12,
   },
   subtitle: {
     fontSize: 15,
-    color: '#94A3B8',
+    color: '#64748B',
     marginTop: 4,
   },
   options: {
@@ -123,20 +123,33 @@ const styles = StyleSheet.create({
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#EAF0EB',
+    shadowColor: '#2D6A4F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   optionDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  disabledIcon: {
+    backgroundColor: '#F1F5F9',
+  },
+  disabledText: {
+    color: '#94A3B8',
   },
   optionIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: '#E6F4EA',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -147,34 +160,35 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#1A1A2E',
   },
   optionDescription: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: '#64748B',
     marginTop: 2,
     marginBottom: 6,
   },
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#818CF8',
+    color: '#64748B',
+    letterSpacing: 0.5,
   },
   badgeRecommended: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: '#D1FAE5',
   },
   badgeRecommendedText: {
-    color: '#34D399',
+    color: '#2D6A4F',
   },
   badgeDisabled: {
-    backgroundColor: 'rgba(100, 116, 139, 0.2)',
+    backgroundColor: '#E2E8F0',
   },
   footer: {
     marginTop: 40,
@@ -183,11 +197,12 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: '#64748B',
   },
   loginLink: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#10B981',
+    color: '#2D6A4F',
   },
 });
+

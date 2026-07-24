@@ -50,29 +50,34 @@ export default function NotificationsScreen({ navigation }: Props) {
   const getIconForType = (type: NotificationItem['type']) => {
     switch (type) {
       case 'PAYMENT_RECEIVED':
-        return <AppIcon name="arrowDownLeft" size={20} color="#10B981" />;
+        return <AppIcon name="arrowDownLeft" size={20} color="#2E8B57" />;
       case 'PAYMENT_SENT':
-        return <AppIcon name="arrowUpRight" size={20} color="#3B82F6" />;
+        return <AppIcon name="arrowUpRight" size={20} color="#2563EB" />;
       case 'GUARDIAN_APPROVED':
-        return <AppIcon name="checkCircle" size={20} color="#10B981" />;
+        return <AppIcon name="shieldCheck" size={20} color="#2E8B57" />;
       case 'GUARDIAN_REJECTED':
       case 'AI_RISK_BLOCK':
-        return <AppIcon name="shieldAlert" size={20} color="#EF4444" />;
+        return <AppIcon name="shieldAlert" size={20} color="#DC2626" />;
       case 'DEVICE_TRUST':
-        return <AppIcon name="shieldCheck" size={20} color="#6366F1" />;
+        return <AppIcon name="cpu" size={20} color="#6366F1" />;
       default:
-        return <AppIcon name="bell" size={20} color="#F59E0B" />;
+        return <AppIcon name="bell" size={20} color="#D97706" />;
     }
   };
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Light Enterprise Header */}
       <View style={styles.headerContainer}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <AppIcon name="chevronLeft" size={24} color="#F8FAFC" />
+          <AppIcon name="chevronLeft" size={24} color="#1A1A2E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Smart Notification Center</Text>
+        <View style={styles.headerTitleGroup}>
+          <Text style={styles.headerSubtitle}>ENTERPRISE INTELLIGENCE</Text>
+          <Text style={styles.headerTitle}>Smart Notification Center</Text>
+        </View>
         <TouchableOpacity style={styles.readAllBtn} onPress={handleMarkAllRead}>
           <Text style={styles.readAllText}>Mark Read</Text>
         </TouchableOpacity>
@@ -80,13 +85,34 @@ export default function NotificationsScreen({ navigation }: Props) {
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadNotifications} tintColor="#3B82F6" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadNotifications} tintColor="#2E8B57" />}
+        showsVerticalScrollIndicator={false}
       >
+        {/* Top Unread Status Bar */}
+        <View style={styles.summaryBar}>
+          <View style={styles.summaryLeft}>
+            <View style={styles.bellIconCircle}>
+              <AppIcon name="bell" size={16} color="#2E8B57" />
+            </View>
+            <Text style={styles.summaryText}>
+              {unreadCount > 0 ? `${unreadCount} Unread Alert${unreadCount > 1 ? 's' : ''}` : 'All Notifications Up to Date'}
+            </Text>
+          </View>
+          <View style={styles.livePulseBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>SYNCED</Text>
+          </View>
+        </View>
+
         {notifications.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <AppIcon name="bell" size={48} color="#475569" />
+            <View style={styles.emptyIconCircle}>
+              <AppIcon name="bell" size={32} color="#94A3B8" />
+            </View>
             <Text style={styles.emptyTitle}>No Notifications Yet</Text>
-            <Text style={styles.emptySubtitle}>Real-time payment updates, AI security alerts, and guardian requests will appear here.</Text>
+            <Text style={styles.emptySubtitle}>
+              Real-time payment updates, AI security alerts, and guardian requests will appear here.
+            </Text>
           </View>
         ) : (
           notifications.map((item) => (
@@ -94,12 +120,14 @@ export default function NotificationsScreen({ navigation }: Props) {
               key={item.id}
               style={[styles.notifCard, !item.read && styles.unreadCard]}
               onPress={() => handleItemPress(item)}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
             >
               <View style={styles.iconCircle}>{getIconForType(item.type)}</View>
               <View style={styles.notifBody}>
                 <View style={styles.titleRow}>
-                  <Text style={styles.notifTitle}>{item.title}</Text>
+                  <Text style={styles.notifTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
                   {!item.read && <View style={styles.unreadDot} />}
                 </View>
                 <Text style={styles.notifText}>{item.body}</Text>
@@ -123,7 +151,7 @@ export default function NotificationsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FAF7F0',
   },
   headerContainer: {
     flexDirection: 'row',
@@ -132,69 +160,156 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FAF7F0',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#E2E8F0',
   },
   backBtn: {
     padding: 6,
   },
+  headerTitleGroup: {
+    alignItems: 'center',
+  },
+  headerSubtitle: {
+    color: '#2E8B57',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
   headerTitle: {
-    color: '#F8FAFC',
-    fontSize: 17,
+    color: '#1A1A2E',
+    fontSize: 16,
     fontWeight: '700',
+    marginTop: 2,
   },
   readAllBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
   readAllText: {
-    color: '#60A5FA',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#2E8B57',
+    fontSize: 12,
+    fontWeight: '700',
   },
   scrollContainer: {
     padding: 16,
+  },
+  summaryBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  summaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bellIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryText: {
+    color: '#1A1A2E',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  livePulseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2E8B57',
+  },
+  liveText: {
+    color: '#2E8B57',
+    fontSize: 10,
+    fontWeight: '800',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 80,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
-    color: '#F8FAFC',
-    fontSize: 18,
+    color: '#1A1A2E',
+    fontSize: 16,
     fontWeight: '700',
-    marginTop: 16,
+    marginTop: 14,
   },
   emptySubtitle: {
-    color: '#94A3B8',
-    fontSize: 13,
+    color: '#64748B',
+    fontSize: 12,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
     paddingHorizontal: 32,
+    lineHeight: 18,
   },
   notifCard: {
     flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   unreadCard: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#1E293B',
+    borderColor: '#2E8B57',
+    borderLeftWidth: 4,
+    backgroundColor: '#FFFFFF',
   },
   iconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   notifBody: {
     flex: 1,
@@ -206,7 +321,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   notifTitle: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 14,
     fontWeight: '700',
     flex: 1,
@@ -215,11 +330,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E8B57',
     marginLeft: 6,
   },
   notifText: {
-    color: '#CBD5E1',
+    color: '#475569',
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 6,
@@ -230,11 +345,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timestampText: {
-    color: '#64748B',
+    color: '#94A3B8',
     fontSize: 11,
   },
   refText: {
-    color: '#60A5FA',
+    color: '#2E8B57',
     fontSize: 11,
     fontWeight: '600',
   },

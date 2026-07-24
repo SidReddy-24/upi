@@ -28,13 +28,19 @@ export default function DeviceTrustScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Light Enterprise Header */}
       <View style={styles.headerContainer}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <AppIcon name="chevronLeft" size={24} color="#F8FAFC" />
+          <AppIcon name="chevronLeft" size={24} color="#1A1A2E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Enterprise Device Trust</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerTitleGroup}>
+          <Text style={styles.headerSubtitle}>ENTERPRISE INTELLIGENCE</Text>
+          <Text style={styles.headerTitle}>Enterprise Device Trust</Text>
+        </View>
+        <View style={styles.livePulseBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>LIVE</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -42,7 +48,7 @@ export default function DeviceTrustScreen({ navigation }: Props) {
         <View style={styles.heroCard}>
           <View style={styles.trustBadgeRow}>
             <View style={styles.shieldIconBg}>
-              <AppIcon name="shieldCheck" size={36} color="#10B981" />
+              <AppIcon name="shieldCheck" size={32} color="#2E8B57" />
             </View>
             <View>
               <Text style={styles.trustScoreVal}>94%</Text>
@@ -66,7 +72,7 @@ export default function DeviceTrustScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Security Checks List */}
+        {/* Security Checks List Header */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>System Security Checks (7/7 Passed)</Text>
         </View>
@@ -75,7 +81,7 @@ export default function DeviceTrustScreen({ navigation }: Props) {
           <View key={idx} style={styles.checkCard}>
             <View style={styles.checkTitleRow}>
               <View style={styles.checkTitleGroup}>
-                <AppIcon name="checkCircle" size={18} color="#10B981" />
+                <AppIcon name="checkCircle" size={18} color="#2E8B57" />
                 <Text style={styles.checkTitle}>{item.title}</Text>
               </View>
               <View style={styles.passedPill}>
@@ -88,7 +94,7 @@ export default function DeviceTrustScreen({ navigation }: Props) {
 
         {/* Security Note */}
         <View style={styles.infoFooterCard}>
-          <AppIcon name="info" size={18} color="#60A5FA" />
+          <AppIcon name="info" size={18} color="#2563EB" />
           <Text style={styles.infoFooterText}>
             Device trust signals are evaluated dynamically during every transaction scoring request by FraudShield AI to protect your wallet.
           </Text>
@@ -101,7 +107,7 @@ export default function DeviceTrustScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FAF7F0',
   },
   headerContainer: {
     flexDirection: 'row',
@@ -110,56 +116,91 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FAF7F0',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#E2E8F0',
   },
   backBtn: {
     padding: 6,
   },
+  headerTitleGroup: {
+    alignItems: 'center',
+  },
+  headerSubtitle: {
+    color: '#2E8B57',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
   headerTitle: {
-    color: '#F8FAFC',
-    fontSize: 17,
+    color: '#1A1A2E',
+    fontSize: 16,
     fontWeight: '700',
+    marginTop: 2,
+  },
+  livePulseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2E8B57',
+  },
+  liveText: {
+    color: '#2E8B57',
+    fontSize: 10,
+    fontWeight: '800',
   },
   scrollContainer: {
     padding: 16,
   },
   heroCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#10B981',
-    marginBottom: 18,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   trustBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
     marginBottom: 12,
   },
   shieldIconBg: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   trustScoreVal: {
-    color: '#10B981',
-    fontSize: 28,
-    fontWeight: '900',
+    color: '#1A1A2E',
+    fontSize: 26,
+    fontWeight: '800',
   },
   trustScoreText: {
-    color: '#94A3B8',
+    color: '#2E8B57',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   heroDesc: {
-    color: '#CBD5E1',
+    color: '#64748B',
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 14,
@@ -170,16 +211,19 @@ const styles = StyleSheet.create({
   },
   metaBox: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     padding: 10,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   metaLabel: {
-    color: '#64748B',
+    color: '#94A3B8',
     fontSize: 10,
+    fontWeight: '600',
   },
   metaVal: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
@@ -188,17 +232,22 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
+    color: '#1A1A2E',
+    fontSize: 14,
     fontWeight: '700',
   },
   checkCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     padding: 14,
-    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   checkTitleRow: {
     flexDirection: 'row',
@@ -213,23 +262,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   checkTitle: {
-    color: '#F8FAFC',
+    color: '#1A1A2E',
     fontSize: 13,
     fontWeight: '700',
+    flex: 1,
   },
   passedPill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingVertical: 2,
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
     paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   passedPillText: {
-    color: '#10B981',
+    color: '#2E8B57',
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   checkDesc: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 11,
     lineHeight: 16,
     paddingLeft: 26,
@@ -238,18 +288,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-    marginTop: 8,
+    borderColor: 'rgba(37, 99, 235, 0.2)',
+    marginTop: 6,
     marginBottom: 24,
   },
   infoFooterText: {
-    color: '#93C5FD',
-    fontSize: 11,
+    color: '#1E40AF',
+    fontSize: 12,
     flex: 1,
-    lineHeight: 16,
+    lineHeight: 17,
   },
 });

@@ -23,6 +23,13 @@ async function getActivePhone(): Promise<string> {
       if (profile.phone) return profile.phone;
     } catch (e) {}
   }
+  const sessionRaw = await AsyncStorage.getItem('auth_session');
+  if (sessionRaw) {
+    try {
+      const session = JSON.parse(sessionRaw);
+      if (session?.user?.phone) return session.user.phone;
+    } catch (e) {}
+  }
   return 'default';
 }
 

@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
 import { authService } from '../services/authService';
+import { formatApiError } from '../utils/errorUtils';
 import AppIcon from '../components/AppIcon';
 
 type Props = {
@@ -56,7 +57,7 @@ export default function LoginScreen({ navigation }: Props) {
       }
       Alert.alert('OTP Sent', 'A verification OTP code has been generated for your mobile number.');
     } catch (e: any) {
-      const msg = e.response?.data?.detail || 'Failed to send OTP for password reset.';
+      const msg = formatApiError(e, 'Failed to send OTP for password reset.');
       Alert.alert('Reset Error', msg);
     } finally {
       setForgotLoading(false);
@@ -183,7 +184,7 @@ export default function LoginScreen({ navigation }: Props) {
         }
       }
     } catch (error: any) {
-      const msg = error.response?.data?.detail || 'Invalid phone/email or password';
+      const msg = formatApiError(error, 'Invalid phone/email or password');
       Alert.alert('Login Failed', msg);
     } finally {
       setLoading(false);
@@ -197,7 +198,7 @@ export default function LoginScreen({ navigation }: Props) {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.headerContainer}>
-          <AppIcon name="shield" size={54} color="#10B981" />
+          <AppIcon name="shield" size={54} color="#2E8B57" />
           <Text style={styles.title}>SentinelPay AI</Text>
           <Text style={styles.subtitle}>India's First AI-Native Secure Wallet</Text>
         </View>
@@ -208,8 +209,8 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.label}>Mobile Number or VPA</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. 9999999901 or name@sentinelpay"
-            placeholderTextColor="#94a3b8"
+            placeholder="e.g. 9876543210 or name@sentinelpay"
+            placeholderTextColor="#94A3B8"
             value={identifier}
             onChangeText={setIdentifier}
             keyboardType="email-address"
@@ -222,7 +223,7 @@ export default function LoginScreen({ navigation }: Props) {
             <TextInput
               style={[styles.input, styles.passwordInput]}
               placeholder="••••••••"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor="#94A3B8"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -248,7 +249,7 @@ export default function LoginScreen({ navigation }: Props) {
               setForgotModalVisible(true);
             }}
           >
-            <Text style={{ color: '#60A5FA', fontSize: 13, fontWeight: '600' }}>Forgot Password?</Text>
+            <Text style={{ color: '#2E8B57', fontSize: 13, fontWeight: '700' }}>Forgot Password?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -290,10 +291,10 @@ export default function LoginScreen({ navigation }: Props) {
         visible={forgotModalVisible}
         onRequestClose={() => setForgotModalVisible(false)}
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#1E293B', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#334155' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0', elevation: 5 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '700' }}>Reset Password</Text>
+              <Text style={{ color: '#1A1A2E', fontSize: 18, fontWeight: '700' }}>Reset Password</Text>
               <TouchableOpacity onPress={() => setForgotModalVisible(false)}>
                 <Text style={{ color: '#94A3B8', fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
@@ -301,14 +302,14 @@ export default function LoginScreen({ navigation }: Props) {
 
             {forgotStage === 1 ? (
               <>
-                <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 14 }}>
+                <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 14 }}>
                   Enter your registered mobile phone number to receive a sandbox verification OTP code.
                 </Text>
                 <Text style={styles.label}>Registered Phone Number</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g. 9999999901"
-                  placeholderTextColor="#64748B"
+                  placeholder="e.g. 9876543210"
+                  placeholderTextColor="#94A3B8"
                   value={forgotPhone}
                   onChangeText={setForgotPhone}
                   keyboardType="phone-pad"
@@ -328,9 +329,9 @@ export default function LoginScreen({ navigation }: Props) {
             ) : (
               <>
                 {forgotDemoOtp ? (
-                  <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: '#10B981', borderRadius: 8, padding: 10, marginBottom: 12 }}>
-                    <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600' }}>📱 Sandbox OTP Code (Demo):</Text>
-                    <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800', letterSpacing: 4 }}>{forgotDemoOtp}</Text>
+                  <View style={{ backgroundColor: 'rgba(46, 139, 87, 0.1)', borderWidth: 1, borderColor: '#2E8B57', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                    <Text style={{ color: '#2E8B57', fontSize: 11, fontWeight: '600' }}>📱 Sandbox OTP Code (Demo):</Text>
+                    <Text style={{ color: '#1A1A2E', fontSize: 18, fontWeight: '800', letterSpacing: 4 }}>{forgotDemoOtp}</Text>
                   </View>
                 ) : null}
 
@@ -388,7 +389,7 @@ export default function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a', // Slate 900
+    backgroundColor: '#FAF7F0',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -406,50 +407,50 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#1A1A2E',
     letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748B',
     marginTop: 6,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: '#1e293b', // Slate 800
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   cardTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1A1A2E',
     marginBottom: 20,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#f8fafc',
+    color: '#1A1A2E',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
   },
   passwordContainer: {
     position: 'relative',
@@ -467,7 +468,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   loginButton: {
-    backgroundColor: '#6366f1', // Indigo 500
+    backgroundColor: '#2E8B57',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -478,12 +479,12 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#ffffff',
   },
   biometricButton: {
-    borderWidth: 1,
-    borderColor: '#6366f1',
+    borderWidth: 1.5,
+    borderColor: '#2E8B57',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -491,8 +492,8 @@ const styles = StyleSheet.create({
   },
   biometricButtonText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#818cf8',
+    fontWeight: '700',
+    color: '#2E8B57',
   },
   footerContainer: {
     alignItems: 'center',
@@ -500,10 +501,10 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748B',
   },
   footerLink: {
-    color: '#6366f1',
-    fontWeight: '700',
+    color: '#2E8B57',
+    fontWeight: '800',
   },
 });

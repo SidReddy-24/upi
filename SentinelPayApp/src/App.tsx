@@ -65,29 +65,45 @@ export default function App(): React.JSX.Element {
         const { inviter_name, code } = event.data || {};
         notificationService.showGuardianCodeAlert(inviter_name || 'Ward', code);
       } else if (event.type === 'PAYMENT_RECEIVED') {
-        const { amount, sender_vpa, sender_name, transaction_id } = event.data || {};
+        const { amount, sender_vpa, sender_name, transaction_id, receiver_vpa } = event.data || {};
         const parsedAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
-        const formattedAmount = parsedAmount.toLocaleString('en-IN');
-        const senderLabel = sender_name || sender_vpa || 'Someone';
-        const refId = transaction_id || `SP${Date.now()}`;
+        
+        getUser().then(user => {
+          if (user && user.vpa === receiver_vpa) {
+            const formattedAmount = parsedAmount.toLocaleString('en-IN');
+            const senderLabel = sender_name || sender_vpa || 'Someone';
+            const refId = transaction_id || `SP${Date.now()}`;
 
-        // 1. Credit receiver balance & local transaction ledger
-        receivePayment(sender_vpa || 'sender@sentinelpay', parsedAmount, refId);
+            // 1. Credit receiver balance & local transaction ledger
+            receivePayment(sender_vpa || 'sender@sentinelpay', parsedAmount, refId);
 
-        // 2. Persistent notification feed
-        notificationService.addNotification({
-          title: '💰 Payment Received!',
-          body: `Received ₹${formattedAmount} from ${senderLabel} (${sender_vpa}). Ref: ${refId}`,
-          type: 'PAYMENT_RECEIVED',
-          transaction_id: refId,
+            // 2. Persistent notification feed & Truecaller-style floating banner
+            notificationService.addNotification({
+              title: '💰 Payment Received!',
+              body: `Received ₹${formattedAmount} from ${senderLabel} (${sender_vpa}). Ref: ${refId}`,
+              type: 'PAYMENT_RECEIVED',
+              transaction_id: refId,
+            });
+          }
         });
+      } else if (event.type === 'PAYMENT_SENT') {
+        const { amount, receiver_vpa, receiver_name, transaction_id, sender_vpa } = event.data || {};
+        const parsedAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+        
+        getUser().then(user => {
+          if (user && user.vpa === sender_vpa) {
+            const formattedAmount = parsedAmount.toLocaleString('en-IN');
+            const receiverLabel = receiver_name || receiver_vpa || 'Someone';
+            const refId = transaction_id || `SP${Date.now()}`;
 
-        // 3. Real-time In-App Popup Alert
-        Alert.alert(
-          '💰 Payment Received!',
-          `You received ₹${formattedAmount} from ${senderLabel}.\n\nReference ID: ${refId}`,
-          [{ text: 'Awesome!', style: 'default' }]
-        );
+            notificationService.addNotification({
+              title: '💸 Payment Sent!',
+              body: `Sent ₹${formattedAmount} to ${receiverLabel} (${receiver_vpa}). Ref: ${refId}`,
+              type: 'PAYMENT_SENT',
+              transaction_id: refId,
+            });
+          }
+        });
       }
     });
 

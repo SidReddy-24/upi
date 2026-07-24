@@ -12,6 +12,7 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { getUser } from '../utils/walletDb';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ScanQR'> };
 
@@ -154,9 +155,22 @@ export default function ScanQRScreen({ navigation }: Props) {
     const parsed = parseUpiQr(raw);
     if (parsed) {
       console.log('[ScanQR] Successfully parsed UPI QR:', parsed);
-      navigation.replace('SendMoney', {
-        prefillVpa: parsed.vpa,
-        prefillAmount: parsed.amount,
+      getUser().then(currentUser => {
+        if (currentUser && currentUser.vpa.toLowerCase() === parsed.vpa.toLowerCase()) {
+          Alert.alert(
+            'Self QR Code Scanned',
+            `This QR code (${parsed.vpa}) belongs to your own logged-in account.\n\nYou cannot send money to yourself. Please scan a QR code belonging to another user.`,
+            [
+              { text: 'Scan Another', onPress: () => setScanned(false) },
+              { text: 'Cancel', onPress: () => navigation.goBack(), style: 'cancel' },
+            ],
+          );
+        } else {
+          navigation.replace('SendMoney', {
+            prefillVpa: parsed.vpa,
+            prefillAmount: parsed.amount,
+          });
+        }
       });
     } else {
       console.log('[ScanQR] Failed to parse as valid UPI QR');

@@ -1,5 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import PushNotification, { Importance } from 'react-native-push-notification';
 import { authClient } from './authService';
+
+// Initialize Android Push Notification Channel
+try {
+  PushNotification.createChannel(
+    {
+      channelId: 'sentinelpay_payments_channel',
+      channelName: 'SentinelPay Real-Time Alerts',
+      channelDescription: 'Heads-up popups for incoming payments, fraud alerts, and guardian approvals',
+      playSound: true,
+      soundName: 'default',
+      importance: Importance.HIGH,
+      vibrate: true,
+    },
+    (created) => console.log(`[PushNotification] Channel created: ${created}`)
+  );
+} catch (e) {
+  console.debug('[PushNotification] Setup note:', e);
+}
 
 export interface NotificationItem {
   id: string;
@@ -56,7 +75,9 @@ class NotificationService {
   private subscribers: Set<NotificationCallback> = new Set();
 
   configure(): void {}
-  requestPermissions(): void {}
+  requestPermissions(): void {
+    // Safe no-op to prevent FirebaseApp IllegalStateException on devices without google-services.json
+  }
 
   async getNotifications(): Promise<NotificationItem[]> {
     try {
@@ -73,9 +94,23 @@ class NotificationService {
 
   async syncRemoteNotifications(): Promise<NotificationItem[]> {
     try {
-      const userStr = await AsyncStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      const userKey = user?.vpa || user?.phone || '';
+      let userKey = '';
+      const profileRaw = await AsyncStorage.getItem('userProfile');
+      if (profileRaw) {
+        try {
+          const profile = JSON.parse(profileRaw);
+          userKey = profile.vpa || profile.phone || '';
+        } catch (e) {}
+      }
+      if (!userKey) {
+        const sessionRaw = await AsyncStorage.getItem('auth_session');
+        if (sessionRaw) {
+          try {
+            const session = JSON.parse(sessionRaw);
+            userKey = session?.user?.vpa || session?.user?.phone || '';
+          } catch (e) {}
+        }
+      }
 
       if (userKey) {
         const res = await authClient.get(`/notifications/list?user_key=${encodeURIComponent(userKey)}`);
@@ -114,6 +149,23 @@ class NotificationService {
       timestamp: new Date().toISOString(),
       read: false,
     };
+
+    // Trigger Native Android System Push Notification
+    try {
+      PushNotification.localNotification({
+        channelId: 'sentinelpay_payments_channel',
+        title: newNotif.title,
+        message: newNotif.body,
+        playSound: true,
+        soundName: 'default',
+        importance: 'high',
+        priority: 'high',
+        vibrate: true,
+        vibration: 300,
+      });
+    } catch (pushErr) {
+      console.debug('[NotificationService] Local push trigger:', pushErr);
+    }
 
     const updated = [newNotif, ...current].slice(0, 50);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
