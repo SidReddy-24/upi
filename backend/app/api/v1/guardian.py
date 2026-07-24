@@ -178,16 +178,19 @@ async def list_guardians(current_user: dict = Depends(get_current_user)):
             """, (current_user['user_id'],))
             my_wards = cursor.fetchall()
 
-            # Format datetime columns to ISO string
+            # Format datetime columns to ISO string & inject verification_code for guardian to view
             for g in my_guardians:
                 g['id'] = str(g['id'])
                 g['invited_at'] = g['invited_at'].isoformat() if g['invited_at'] else None
                 g['accepted_at'] = g['accepted_at'].isoformat() if g['accepted_at'] else None
             
             for w in my_wards:
-                w['id'] = str(w['id'])
+                w_id = str(w['id'])
+                w['id'] = w_id
                 w['invited_at'] = w['invited_at'].isoformat() if w['invited_at'] else None
                 w['accepted_at'] = w['accepted_at'].isoformat() if w['accepted_at'] else None
+                if w_id in GUARDIAN_VERIFICATION_CODES:
+                    w['verification_code'] = GUARDIAN_VERIFICATION_CODES[w_id].get("code")
 
             return {
                 "guardians": my_guardians,
@@ -275,7 +278,6 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
                     return {
                         "relationship_id": rel_id,
                         "status": "PENDING_VERIFICATION",
-                        "verification_code": verification_code,
                         "message": "Verification code generated and sent to guardian."
                     }
 
@@ -318,7 +320,6 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             return {
                 "relationship_id": rel_id,
                 "status": "PENDING_VERIFICATION",
-                "verification_code": verification_code,
                 "message": "Verification code generated and sent to guardian."
             }
     except HTTPException:

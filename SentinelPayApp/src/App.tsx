@@ -47,12 +47,22 @@ import { notificationService } from './services/notificationService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+import guardianService from './services/guardianService';
+
 export default function App(): React.JSX.Element {
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
 
   useEffect(() => {
     notificationService.configure();
     notificationService.requestPermissions();
+    guardianService.initialize();
+
+    const unsubscribeWs = guardianService.subscribe(event => {
+      if (event.type === 'GUARDIAN_VERIFICATION_CODE') {
+        const { inviter_name, code } = event.data || {};
+        notificationService.showGuardianCodeAlert(inviter_name || 'Ward', code);
+      }
+    });
 
     const checkState = async () => {
       // Check if user has completed onboarding
@@ -75,6 +85,11 @@ export default function App(): React.JSX.Element {
       setInitialRoute('PhoneAuth');
     };
     checkState();
+
+    return () => {
+      unsubscribeWs();
+      guardianService.cleanup();
+    };
   }, []);
 
   if (!initialRoute) {

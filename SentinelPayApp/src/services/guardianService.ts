@@ -24,6 +24,7 @@ export interface WardRelationship {
   ward_name: string | null;
   ward_phone: string;
   ward_vpa: string;
+  verification_code?: string;
 }
 
 export interface PendingRequest {

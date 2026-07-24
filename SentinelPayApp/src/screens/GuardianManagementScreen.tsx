@@ -545,12 +545,20 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                   </View>
                   <View style={styles.itemActions}>
                     {item.status === 'PENDING' ? (
-                      <TouchableOpacity
-                        style={styles.acceptBtn}
-                        onPress={() => handleAcceptInvite(item.id)}
-                      >
-                        <Text style={styles.acceptBtnText}>Accept Invite</Text>
-                      </TouchableOpacity>
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        {item.verification_code && (
+                          <View style={styles.otpFeedItem}>
+                            <Text style={styles.otpFeedUser}>Code to share with ward:</Text>
+                            <Text style={styles.otpFeedCode}>{item.verification_code}</Text>
+                          </View>
+                        )}
+                        <TouchableOpacity
+                          style={styles.acceptBtn}
+                          onPress={() => handleAcceptInvite(item.id)}
+                        >
+                          <Text style={styles.acceptBtnText}>Accept & Link</Text>
+                        </TouchableOpacity>
+                      </View>
                     ) : (
                       <View style={styles.row}>
                         <View style={[styles.activePill, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>

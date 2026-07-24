@@ -364,6 +364,30 @@ class NotificationService {
   }
 
   /**
+   * Send a Guardian Verification Code P2P Heads-Up notification.
+   */
+  showGuardianCodeAlert(inviterName: string, code: string): void {
+    if (!this.configured) {
+      this.configure();
+    }
+
+    PushNotification.localNotification({
+      channelId: 'sentinelpay-transactions',
+      title: `🔑 Guardian Request from ${inviterName}`,
+      message: `Verification Code: ${code} — Share this code with ${inviterName} or accept in app.`,
+      color: '#2E8B57',
+      vibrate: true,
+      vibration: 500,
+      playSound: true,
+      soundName: 'default',
+      priority: 'high',
+      importance: 'high',
+      visibility: 'public',
+      tag: 'guardian_code_alert',
+    });
+  }
+
+  /**
    * Cancel all pending notifications (utility method).
    */
   cancelAllNotifications(): void {
