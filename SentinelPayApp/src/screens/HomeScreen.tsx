@@ -45,6 +45,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [backendStatus, setBackendStatus] = useState<'UP' | 'DOWN' | 'CHECKING'>('CHECKING');
   const [refreshing, setRefreshing] = useState(false);
   const isFetchingRef = useRef(false);
+  const failedCheckCountRef = useRef(0);
 
   const loadData = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -90,10 +91,27 @@ export default function HomeScreen({ navigation }: Props) {
   const checkBackend = useCallback(async () => {
     try {
       const h = await fraudShieldApi.checkHealth();
-      const isUp = h && (h.status === 'HEALTHY' || h.status === 'DEGRADED' || h.status === 'UP' || h.status === 'active');
-      setBackendStatus(isUp ? 'UP' : 'DOWN');
+      const isUp = h && (
+        h.status === 'HEALTHY' ||
+        h.status === 'DEGRADED' ||
+        h.status === 'UP' ||
+        h.status === 'active' ||
+        h.status === 'OK'
+      );
+      if (isUp) {
+        failedCheckCountRef.current = 0;
+        setBackendStatus('UP');
+      } else {
+        failedCheckCountRef.current += 1;
+        if (failedCheckCountRef.current >= 2) {
+          setBackendStatus('DOWN');
+        }
+      }
     } catch {
-      setBackendStatus('DOWN');
+      failedCheckCountRef.current += 1;
+      if (failedCheckCountRef.current >= 2) {
+        setBackendStatus('DOWN');
+      }
     }
   }, []);
 

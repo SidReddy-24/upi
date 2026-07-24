@@ -35,12 +35,17 @@ const fraudShieldApi = {
    */
   async checkHealth(): Promise<{ status: string; components?: Record<string, unknown> }> {
     try {
-      const resp = await axios.get(`${API_BASE_URL}/health`, { timeout: 5000 });
+      const resp = await axios.get(`${API_BASE_URL}/health`, { timeout: 15000 });
       return resp.data;
     } catch {
-      // Fallback check to root API URL if /health endpoint structure differs
-      const resp = await axios.get(`${API_BASE_URL.replace(/\/api\/v1$/, '')}/`, { timeout: 5000 });
-      return { status: resp.status === 200 ? 'HEALTHY' : 'DOWN' };
+      try {
+        // Fallback check to root API URL if /health endpoint times out
+        const rootUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '') + '/';
+        const resp = await axios.get(rootUrl, { timeout: 10000 });
+        return { status: resp.status === 200 ? 'HEALTHY' : 'DOWN' };
+      } catch {
+        return { status: 'DOWN' };
+      }
     }
   },
 
