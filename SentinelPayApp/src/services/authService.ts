@@ -136,6 +136,18 @@ export const authService = {
   },
 
   /**
+   * Reset password with verified OTP.
+   */
+  async resetPassword(phone: string, otpCode: string, newPassword: string): Promise<any> {
+    const resp = await authClient.post('/auth/reset-password', {
+      phone,
+      otp_code: otpCode,
+      new_password: newPassword,
+    });
+    return resp.data;
+  },
+
+  /**
    * Logout user.
    */
   async logout(): Promise<void> {

@@ -282,6 +282,33 @@ async def send_otp(request: SendOTPRequest):
     
     try:
         with conn.cursor() as cursor:
+            clean_phone = request.phone.strip()
+            digits_only = ''.join(filter(str.isdigit, clean_phone))[-10:]
+
+            # 1. Block duplicate registrations with existing phone number
+            if request.purpose == 'REGISTRATION':
+                cursor.execute("""
+                    SELECT id FROM auth_users 
+                    WHERE phone = %s OR phone = %s OR RIGHT(phone, 10) = %s
+                """, (clean_phone, f"+91{digits_only}", digits_only))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="This phone number is already registered. Please log in instead."
+                    )
+
+            # 2. Check existence for password reset
+            if request.purpose == 'PASSWORD_RESET':
+                cursor.execute("""
+                    SELECT id FROM auth_users 
+                    WHERE phone = %s OR phone = %s OR RIGHT(phone, 10) = %s
+                """, (clean_phone, f"+91{digits_only}", digits_only))
+                if not cursor.fetchone():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="This phone number is not registered with SentinelPay. Please register first."
+                    )
+
             # Generate OTP
             otp_code = generate_otp()
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)

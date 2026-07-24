@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,6 +31,72 @@ export default function LoginScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+
+  // Forgot Password modal state
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [forgotStage, setForgotStage] = useState<1 | 2>(1);
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotDemoOtp, setForgotDemoOtp] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleSendResetOtp = async () => {
+    if (forgotPhone.trim().length < 10) {
+      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await authService.sendOtp(forgotPhone.trim(), 'PASSWORD_RESET');
+      setForgotStage(2);
+      if (res && res.data && res.data.otp_code) {
+        setForgotDemoOtp(res.data.otp_code);
+      }
+      Alert.alert('OTP Sent', 'A verification OTP code has been generated for your mobile number.');
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Failed to send OTP for password reset.';
+      Alert.alert('Reset Error', msg);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleCompleteReset = async () => {
+    if (forgotOtp.trim().length !== 6) {
+      Alert.alert('Validation Error', 'Please enter valid 6-digit OTP code');
+      return;
+    }
+    if (forgotNewPassword.length < 8) {
+      Alert.alert('Validation Error', 'New password must be at least 8 characters long');
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      Alert.alert('Validation Error', 'Passwords do not match');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      await authService.resetPassword(forgotPhone.trim(), forgotOtp.trim(), forgotNewPassword);
+      Alert.alert('Password Reset Successful', 'Your password has been reset securely. You can now log in with your new password.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setForgotModalVisible(false);
+            setIdentifier(forgotPhone.trim());
+            setPassword('');
+          }
+        }
+      ]);
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Password reset failed. Please check OTP and try again.';
+      Alert.alert('Reset Failed', msg);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   useEffect(() => {
     checkBiometricsSupport();
@@ -171,6 +238,20 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity
+            style={{ alignSelf: 'flex-end', marginBottom: 16 }}
+            onPress={() => {
+              setForgotPhone(identifier);
+              setForgotStage(1);
+              setForgotOtp('');
+              setForgotNewPassword('');
+              setForgotConfirmPassword('');
+              setForgotModalVisible(true);
+            }}
+          >
+            <Text style={{ color: '#60A5FA', fontSize: 13, fontWeight: '600' }}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
@@ -201,6 +282,105 @@ export default function LoginScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* FORGOT PASSWORD MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={forgotModalVisible}
+        onRequestClose={() => setForgotModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#1E293B', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#334155' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '700' }}>Reset Password</Text>
+              <TouchableOpacity onPress={() => setForgotModalVisible(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 18, fontWeight: '700' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {forgotStage === 1 ? (
+              <>
+                <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 14 }}>
+                  Enter your registered mobile phone number to receive a sandbox verification OTP code.
+                </Text>
+                <Text style={styles.label}>Registered Phone Number</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 9999999901"
+                  placeholderTextColor="#64748B"
+                  value={forgotPhone}
+                  onChangeText={setForgotPhone}
+                  keyboardType="phone-pad"
+                />
+                <TouchableOpacity
+                  style={[styles.loginButton, forgotLoading && styles.buttonDisabled, { marginTop: 12 }]}
+                  onPress={handleSendResetOtp}
+                  disabled={forgotLoading}
+                >
+                  {forgotLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Send Reset OTP</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {forgotDemoOtp ? (
+                  <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: '#10B981', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                    <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600' }}>📱 Sandbox OTP Code (Demo):</Text>
+                    <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800', letterSpacing: 4 }}>{forgotDemoOtp}</Text>
+                  </View>
+                ) : null}
+
+                <Text style={styles.label}>6-Digit Verification OTP</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="123456"
+                  placeholderTextColor="#64748B"
+                  value={forgotOtp}
+                  onChangeText={setForgotOtp}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+
+                <Text style={styles.label}>New Password (min 8 chars)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#64748B"
+                  value={forgotNewPassword}
+                  onChangeText={setForgotNewPassword}
+                  secureTextEntry
+                />
+
+                <Text style={styles.label}>Confirm New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#64748B"
+                  value={forgotConfirmPassword}
+                  onChangeText={setForgotConfirmPassword}
+                  secureTextEntry
+                />
+
+                <TouchableOpacity
+                  style={[styles.loginButton, forgotLoading && styles.buttonDisabled, { marginTop: 12 }]}
+                  onPress={handleCompleteReset}
+                  disabled={forgotLoading}
+                >
+                  {forgotLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Reset Password</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

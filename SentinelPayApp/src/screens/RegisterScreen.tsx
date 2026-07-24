@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
 import { authService } from '../services/authService';
 
@@ -65,7 +66,7 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
     if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter your Full Name');
+      Alert.alert('Validation Error', 'Please enter your Full Name (Given name & surname)');
       return;
     }
     if (email.trim() && !validateEmail(email.trim())) {
@@ -94,11 +95,11 @@ export default function RegisterScreen({ navigation }: Props) {
       }
       Alert.alert(
         'OTP Sent Successfully',
-        'We have sent a 6-digit verification code to your device.'
+        'We have generated a 6-digit sandbox verification OTP code for your mobile number.'
       );
     } catch (error: any) {
-      const msg = error.response?.data?.detail || 'Failed to send OTP. Phone number may already be registered.';
-      Alert.alert('OTP Request Failed', msg);
+      const msg = error.response?.data?.detail || 'This phone number is already registered.';
+      Alert.alert('Registration Blocked', msg);
     } finally {
       setLoading(false);
     }
@@ -124,14 +125,36 @@ export default function RegisterScreen({ navigation }: Props) {
       );
       
       if (response && response.access_token) {
-        Alert.alert('Registration Successful', 'Welcome to SentinelPay AI! Your unique VPA has been generated.', [
-          {
-            text: 'Let\'s Go',
-            onPress: () => {
-              navigation.replace('Home');
+        const phoneDigits = phone.trim().replace(/\D/g, '').slice(-10);
+        const autoVpa = `${phoneDigits}@sentinelpay`;
+
+        Alert.alert(
+          'Registration Successful 🎉',
+          `Welcome to SentinelPay! Your account is created with unique UPI ID: ${autoVpa}.\n\nWould you like to enable biometric authentication (Fingerprint / Face ID) for faster future logins?`,
+          [
+            {
+              text: 'Skip',
+              onPress: async () => {
+                await AsyncStorage.setItem('biometric_login_enabled', 'false');
+                navigation.replace('Home');
+              },
+              style: 'cancel',
             },
-          },
-        ]);
+            {
+              text: 'Enable Biometrics',
+              onPress: async () => {
+                const bioSuccess = await authService.authenticateWithBiometrics();
+                if (bioSuccess) {
+                  await AsyncStorage.setItem('biometric_login_enabled', 'true');
+                  Alert.alert('Biometrics Enabled', 'Biometric authentication configured successfully!');
+                } else {
+                  await AsyncStorage.setItem('biometric_login_enabled', 'false');
+                }
+                navigation.replace('Home');
+              },
+            },
+          ]
+        );
       }
     } catch (error: any) {
       const msg = error.response?.data?.detail || 'OTP verification or registration failed.';
