@@ -711,7 +711,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
   },
   scrollContainer: {
     padding: 18,
@@ -720,16 +720,17 @@ const styles = StyleSheet.create({
 
   /* HERO DASHBOARD */
   heroCard: {
-    backgroundColor: '#161F30',
-    borderRadius: 20,
+    backgroundColor: '#EFE7DA',
+    borderRadius: 22,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#1E293B',
-    shadowColor: '#10B981',
+    borderColor: '#DCD1BF',
+    shadowColor: '#181818',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   heroHeaderRow: {
     flexDirection: 'row',
@@ -740,14 +741,14 @@ const styles = StyleSheet.create({
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(46, 139, 87, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 12,
     gap: 6,
   },
   heroBadgeText: {
-    color: '#34D399',
+    color: '#236847',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -757,24 +758,26 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontWeight: '900',
+    color: '#181818',
   },
   heroSubtitle: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#666666',
     marginTop: 6,
     lineHeight: 18,
   },
   metricsGrid: {
     flexDirection: 'row',
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 8,
     marginTop: 16,
     justifyContent: 'space-around',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
   },
   metricBox: {
     alignItems: 'center',
@@ -782,28 +785,30 @@ const styles = StyleSheet.create({
   },
   metricVal: {
     fontSize: 17,
-    fontWeight: '800',
-    color: '#10B981',
+    fontWeight: '900',
+    color: '#2E8B57',
   },
   metricLabel: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#666666',
     marginTop: 2,
     fontWeight: '600',
   },
   metricDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#DCD1BF',
   },
 
   /* SEGMENTED TAB SELECTOR */
   segmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: '#161F30',
+    backgroundColor: '#EFE7DA',
     borderRadius: 14,
     padding: 4,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
   },
   segmentBtn: {
     flex: 1,
@@ -812,7 +817,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   segmentBtnActive: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#2E8B57',
   },
   tabIconRow: {
     flexDirection: 'row',
@@ -821,8 +826,8 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontWeight: '700',
+    color: '#666666',
   },
   segmentTextActive: {
     color: '#FFFFFF',
@@ -834,7 +839,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tabCountPill: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#C0392B',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
@@ -848,12 +853,12 @@ const styles = StyleSheet.create({
 
   /* CARDS */
   card: {
-    backgroundColor: '#161F30',
-    borderRadius: 18,
+    backgroundColor: '#EFE7DA',
+    borderRadius: 20,
     padding: 18,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#DCD1BF',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -869,12 +874,12 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontWeight: '800',
+    color: '#181818',
   },
   cardDescription: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#666666',
     marginBottom: 14,
     lineHeight: 18,
   },
@@ -883,7 +888,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fullScreenLink: {
-    color: '#10B981',
+    color: '#2E8B57',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -896,24 +901,24 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     flex: 1,
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
     paddingVertical: 8,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#DCD1BF',
   },
   presetChipActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderColor: '#10B981',
+    backgroundColor: 'rgba(46, 139, 87, 0.15)',
+    borderColor: '#2E8B57',
   },
   presetChipText: {
-    color: '#94A3B8',
+    color: '#666666',
     fontSize: 12,
     fontWeight: '700',
   },
   presetChipTextActive: {
-    color: '#34D399',
+    color: '#236847',
   },
 
   inputRow: {
@@ -921,32 +926,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   currencyPrefix: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#E5DCCB',
     height: 48,
     paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
     borderTopLeftRadius: 10,
     borderBottomLeftRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
   },
   currencyText: {
-    color: '#10B981',
+    color: '#2E8B57',
     fontSize: 18,
     fontWeight: '800',
   },
   input: {
     flex: 1,
     height: 48,
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
     borderRadius: 10,
     paddingHorizontal: 14,
-    color: '#F8FAFC',
+    color: '#181818',
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#DCD1BF',
   },
   inviteButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#2E8B57',
     height: 48,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -956,11 +963,11 @@ const styles = StyleSheet.create({
   },
   inviteButtonText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 13,
   },
   saveLimitButton: {
-    backgroundColor: '#059669',
+    backgroundColor: '#236847',
     height: 48,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -970,7 +977,7 @@ const styles = StyleSheet.create({
   },
   saveLimitButtonText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 13,
   },
   buttonDisabled: {
@@ -983,13 +990,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
+    borderBottomColor: '#DCD1BF',
   },
   avatarCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#059669',
+    backgroundColor: '#2E8B57',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1005,11 +1012,11 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#181818',
   },
   itemSub: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: '#666666',
     marginTop: 2,
   },
   itemActions: {
@@ -1021,18 +1028,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activePill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: 'rgba(46, 139, 87, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   activePillText: {
-    color: '#34D399',
+    color: '#236847',
     fontSize: 11,
     fontWeight: '800',
   },
   enterCodePill: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E8B57',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
@@ -1050,7 +1057,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   acceptBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#2E8B57',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1072,14 +1079,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   emptyTitle: {
-    color: '#F8FAFC',
+    color: '#181818',
     fontSize: 15,
     fontWeight: '700',
     marginTop: 10,
     marginBottom: 4,
   },
   emptyText: {
-    color: '#64748B',
+    color: '#666666',
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
@@ -1087,26 +1094,28 @@ const styles = StyleSheet.create({
 
   /* OTP FEED */
   otpFeedItem: {
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
     borderRadius: 10,
     padding: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
   },
   otpFeedUser: {
-    color: '#CBD5E1',
+    color: '#666666',
     fontSize: 12,
   },
   otpFeedCode: {
-    color: '#38BDF8',
+    color: '#2E8B57',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '900',
     marginTop: 2,
   },
   verifyDirectBtn: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#2E8B57',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1119,12 +1128,12 @@ const styles = StyleSheet.create({
 
   /* APPROVAL CARDS IN TAB */
   reqCardInner: {
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#DCD1BF',
   },
   reqHeaderRow: {
     flexDirection: 'row',
@@ -1133,12 +1142,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   reqWardName: {
-    color: '#F8FAFC',
+    color: '#181818',
     fontSize: 14,
     fontWeight: '700',
   },
   reqWardSub: {
-    color: '#94A3B8',
+    color: '#666666',
     fontSize: 12,
   },
   riskChip: {
@@ -1157,14 +1166,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   reqLabel: {
-    color: '#64748B',
+    color: '#666666',
     fontSize: 10,
     fontWeight: '700',
   },
   reqAmount: {
-    color: '#10B981',
+    color: '#2E8B57',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '900',
     marginTop: 2,
   },
   timerRow: {
@@ -1188,15 +1197,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rejectActionBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    backgroundColor: 'rgba(192, 57, 43, 0.15)',
   },
   rejectActionText: {
-    color: '#EF4444',
+    color: '#C0392B',
     fontSize: 12,
     fontWeight: '700',
   },
   approveActionBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#2E8B57',
   },
   approveActionText: {
     color: '#FFF',
@@ -1207,19 +1216,19 @@ const styles = StyleSheet.create({
   /* MODAL */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#161F30',
+    backgroundColor: '#EFE7DA',
     borderRadius: 20,
     padding: 22,
     width: '100%',
     maxWidth: 380,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#DCD1BF',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1229,29 +1238,29 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontWeight: '900',
+    color: '#181818',
   },
   modalCloseIcon: {
-    color: '#94A3B8',
+    color: '#666666',
     fontSize: 18,
     fontWeight: '700',
   },
   modalSubtitle: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#666666',
     lineHeight: 18,
     marginBottom: 20,
   },
   otpInput: {
-    backgroundColor: '#0B0F17',
+    backgroundColor: '#F7F3EA',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: '#2E8B57',
     height: 54,
     fontSize: 22,
-    fontWeight: '800',
-    color: '#34D399',
+    fontWeight: '900',
+    color: '#2E8B57',
     textAlign: 'center',
     letterSpacing: 8,
     marginBottom: 20,
@@ -1267,12 +1276,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   modalCancelBtnText: {
-    color: '#94A3B8',
+    color: '#666666',
     fontWeight: '600',
     fontSize: 14,
   },
   modalSubmitBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#2E8B57',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 10,

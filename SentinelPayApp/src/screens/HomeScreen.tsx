@@ -1,5 +1,6 @@
 /**
- * HomeScreen — SentinelPay Wallet Dashboard
+ * HomeScreen — Luxury Cybersecurity AI Wallet Dashboard
+ * Design Theme: Warm Stone (#F7F3EA) + Charcoal (#181818) + Sea Green (#2E8B57)
  */
 import React, { useCallback, useState } from 'react';
 import {
@@ -10,6 +11,7 @@ import {
   StyleSheet,
   RefreshControl,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,6 +23,8 @@ import RiskBadge from '../components/RiskBadge';
 import AppIcon from '../components/AppIcon';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function formatAmount(n: number) {
   return '₹' + n.toLocaleString('en-IN');
@@ -76,7 +80,7 @@ export default function HomeScreen({ navigation }: Props) {
     } catch (e) {
       console.error('HomeScreen loadData:', e);
     }
-  }, []);
+  }, [navigation]);
 
   const checkBackend = useCallback(async () => {
     try {
@@ -113,151 +117,194 @@ export default function HomeScreen({ navigation }: Props) {
   return (
     <ScrollView
       style={styles.root}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" />}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F0" />
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2E8B57" />}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F3EA" />
 
-      {/* ── TOP HEADER BAR ── */}
+      {/* ── 1. TOP HEADER BAR ── */}
       <View style={styles.topHeader}>
         <View>
-          <Text style={styles.appTitle}>SentinelPay</Text>
-          <Text style={styles.simulatedSubtitle}>Simulated Credit Wallet</Text>
+          <Text style={styles.brandTitle}>SentinelPay</Text>
+          <Text style={styles.brandSubtitle}>AI CYBERSECURITY WALLET</Text>
         </View>
         <View style={styles.topHeaderIcons}>
           <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Profile')}>
-            <AppIcon name="profile" size={20} color="#1A1A2E" />
+            <AppIcon name="profile" size={18} color="#181818" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Settings')}>
-            <AppIcon name="settings" size={20} color="#1A1A2E" />
+            <AppIcon name="settings" size={18} color="#181818" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── MAIN BALANCE CARD ── */}
-      <View style={styles.balanceCard}>
-        {user && (
-          <View style={styles.userHeaderRow}>
-            <Text style={styles.vpaText}>UPI: {user.vpa}</Text>
-            <View style={styles.statusPill}>
-              <View style={[styles.statusDot, { backgroundColor: backendStatus === 'UP' ? '#4ADE80' : '#F87171' }]} />
-              <Text style={styles.statusPillText}>{backendStatus === 'UP' ? 'Online' : 'Offline'}</Text>
+      {/* ── 2. HERO AI PROTECTION & BALANCE DASHBOARD ── */}
+      <View style={styles.heroCard}>
+        {/* User Identity & Backend Status Header */}
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.userVpaChip}>
+            <AppIcon name="shield" size={12} color="#2E8B57" />
+            <Text style={styles.vpaChipText} numberOfLines={1}>{user?.vpa || 'account@sentinelpay'}</Text>
+          </View>
+
+          <View style={[styles.statusBadge, { backgroundColor: backendStatus === 'UP' ? 'rgba(46, 139, 87, 0.12)' : 'rgba(192, 57, 43, 0.12)' }]}>
+            <View style={[styles.statusDot, { backgroundColor: backendStatus === 'UP' ? '#2E8B57' : '#C0392B' }]} />
+            <Text style={[styles.statusText, { color: backendStatus === 'UP' ? '#236847' : '#C0392B' }]}>
+              {backendStatus === 'UP' ? 'AI Shield Active' : 'Offline'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Protection Score Ring & Main Balance */}
+        <View style={styles.heroBodyGrid}>
+          <View style={styles.balanceCol}>
+            <Text style={styles.balanceLabel}>AVAILABLE BALANCE</Text>
+            <Text style={styles.balanceValue}>{formatAmount(balance)}</Text>
+            <Text style={styles.balanceSubtext}>{balancePct}% of ₹1,00,000 SPC available</Text>
+          </View>
+
+          {/* Protection Score Ring Widget */}
+          <View style={styles.scoreGaugeBox}>
+            <View style={styles.scoreOuterRing}>
+              <View style={styles.scoreInnerRing}>
+                <Text style={styles.scoreValText}>98</Text>
+                <Text style={styles.scoreLabelText}>PROTECTED</Text>
+              </View>
             </View>
           </View>
-        )}
+        </View>
 
-        <Text style={styles.balanceLabel}>Available Balance</Text>
-        <Text style={styles.balanceAmount}>{formatAmount(balance)}</Text>
-
-        <View style={styles.balanceBarBg}>
+        {/* Progress Bar */}
+        <View style={styles.balanceBarTrack}>
           <View style={[styles.balanceBarFill, { width: `${balancePct}%` as any }]} />
         </View>
-        <Text style={styles.balanceBarLabel}>{balancePct}% of ₹1,00,000 SPC remaining</Text>
       </View>
 
-      {/* ── QUICK PAY ACTIONS ── */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionHeaderTitle}>Quick Pay</Text>
-        <View style={styles.actionsGrid}>
-          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('SendMoney', {})}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="send" size={22} color="#2D6A4F" />
+      {/* ── 3. AI INSIGHTS & SECURITY TIMELINE ── */}
+      <View style={styles.aiInsightBanner}>
+        <View style={styles.aiInsightIconCol}>
+          <AppIcon name="assistant" size={20} color="#2E8B57" />
+        </View>
+        <View style={styles.aiInsightTextCol}>
+          <View style={styles.aiHeaderRow}>
+            <Text style={styles.aiInsightTitle}>Real-time Protection Engine</Text>
+            <View style={styles.aiLiveBadge}>
+              <Text style={styles.aiLiveBadgeText}>6ms LATENCY</Text>
             </View>
-            <Text style={styles.actionTitle}>Send</Text>
+          </View>
+          <Text style={styles.aiInsightBody}>
+            FraudShield ML model & 10-rule engine monitoring active device & SMS vectors.
+          </Text>
+        </View>
+      </View>
+
+      {/* ── 4. QUICK PAY ACTIONS ── */}
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionTitle}>Quick Pay</Text>
+        <View style={styles.quickGrid}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('SendMoney', {})}>
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="send" size={20} color="#2E8B57" />
+            </View>
+            <Text style={styles.actionCardText}>Send</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ReceiveMoney')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="receive" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="receive" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>Receive</Text>
+            <Text style={styles.actionCardText}>Receive</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ScanQR')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="scan" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="scan" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>Scan QR</Text>
+            <Text style={styles.actionCardText}>Scan QR</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('TransactionHistory')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="history" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="history" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>History</Text>
+            <Text style={styles.actionCardText}>History</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── AI & SAFETY SUITE ── */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionHeaderTitle}>Safety & Security Suite</Text>
-        <View style={styles.actionsGrid}>
+      {/* ── 5. SAFETY & SECURITY SUITE ── */}
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionTitle}>Cybersecurity Suite</Text>
+        <View style={styles.quickGrid}>
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('GuardianManagement')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="guardian" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="guardian" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>Guardians</Text>
+            <Text style={styles.actionCardText}>Guardians</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('SmsTracker')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="sms" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="sms" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>SMS Shield</Text>
+            <Text style={styles.actionCardText}>SMS Shield</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ScamAssistant')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="assistant" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="assistant" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>Assistant</Text>
+            <Text style={styles.actionCardText}>AI Assistant</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ScamHeatMap')}>
-            <View style={styles.iconCircle}>
-              <AppIcon name="heatmap" size={22} color="#2D6A4F" />
+            <View style={styles.actionIconContainer}>
+              <AppIcon name="heatmap" size={20} color="#2E8B57" />
             </View>
-            <Text style={styles.actionTitle}>Threat Map</Text>
+            <Text style={styles.actionCardText}>Threat Map</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── RECENT TRANSACTIONS ── */}
-      <View style={styles.sectionContainer}>
+      {/* ── 6. RECENT ACTIVITY FEED ── */}
+      <View style={styles.sectionBlock}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeaderTitle}>Recent Activity</Text>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
           {txns.length > 0 && (
             <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
-              <Text style={styles.seeAllText}>See all →</Text>
+              <Text style={styles.seeAllText}>View All →</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {txns.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <AppIcon name="coin" size={32} color="#94a3b8" />
-            <Text style={styles.emptyText}>No transactions yet</Text>
+          <View style={styles.emptyContainer}>
+            <AppIcon name="coin" size={32} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Transactions Recorded</Text>
+            <Text style={styles.emptySubtitle}>Your recent scored transfers will appear here in real time.</Text>
           </View>
         ) : (
           txns.map(txn => (
             <TouchableOpacity
               key={txn.id}
-              style={styles.txnCard}
+              style={styles.txnItemCard}
               onPress={() => navigation.navigate('TransactionDetail', { txnId: txn.id })}>
-              <View style={[styles.txnTypeCircle, { backgroundColor: txn.type === 'DEBIT' ? '#FEE2E2' : '#D1FAE5' }]}>
-                <AppIcon name={txn.type === 'DEBIT' ? 'send' : 'receive'} size={16} color={txn.type === 'DEBIT' ? '#E63946' : '#2D6A4F'} />
+              <View style={[styles.txnIconCircle, { backgroundColor: txn.type === 'DEBIT' ? 'rgba(192, 57, 43, 0.1)' : 'rgba(46, 139, 87, 0.1)' }]}>
+                <AppIcon name={txn.type === 'DEBIT' ? 'send' : 'receive'} size={16} color={txn.type === 'DEBIT' ? '#C0392B' : '#2E8B57'} />
               </View>
-              <View style={styles.txnMain}>
-                <Text style={styles.txnVpa} numberOfLines={1}>
+              <View style={styles.txnMainCol}>
+                <Text style={styles.txnVpaText} numberOfLines={1}>
                   {txn.type === 'DEBIT' ? txn.receiver_vpa : txn.sender_vpa}
                 </Text>
-                <Text style={styles.txnDate}>{formatTime(txn.created_at)}</Text>
+                <Text style={styles.txnTimeText}>{formatTime(txn.created_at)}</Text>
               </View>
-              <View style={styles.txnRight}>
-                <Text style={[styles.txnAmount, { color: txn.type === 'DEBIT' ? '#E63946' : '#2D6A4F' }]}>
+              <View style={styles.txnAmountCol}>
+                <Text style={[styles.txnAmountText, { color: txn.type === 'DEBIT' ? '#C0392B' : '#2E8B57' }]}>
                   {txn.type === 'DEBIT' ? '-' : '+'}{formatAmount(txn.amount)}
                 </Text>
                 {txn.decision && (
-                  <RiskBadge decision={txn.decision} riskScore={txn.risk_score} />
+                  <View style={{ marginTop: 2 }}>
+                    <RiskBadge decision={txn.decision} riskScore={txn.risk_score} />
+                  </View>
                 )}
               </View>
             </TouchableOpacity>
@@ -265,18 +312,18 @@ export default function HomeScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* ── FRAUD SHIELD FOOTER ── */}
-      <View style={styles.infoCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <AppIcon name="shield" size={18} color="#2D6A4F" />
-          <Text style={styles.infoTitle}>Protected by FraudShield AI</Text>
+      {/* ── 7. SECURITY INFRASTRUCTURE BANNER ── */}
+      <View style={styles.footerSecurityCard}>
+        <View style={styles.footerTitleRow}>
+          <AppIcon name="shield" size={16} color="#2E8B57" />
+          <Text style={styles.footerTitle}>SentinelPay AI Security Infrastructure</Text>
         </View>
-        <Text style={styles.infoText}>
-          Real-time transaction scoring via machine learning, rule checks, and behavioral intelligence in under 200ms.
+        <Text style={styles.footerBody}>
+          Continuous fraud scoring backed by graph analytics, model drift checks, and sub-200ms transaction authorization.
         </Text>
       </View>
 
-      <View style={{ height: 32 }} />
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
@@ -284,74 +331,96 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FAF7F0',
+    backgroundColor: '#F7F3EA',
   },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+
+  /* 1. TOP HEADER */
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    marginBottom: 16,
+    paddingTop: 8,
   },
-  appTitle: {
-    fontSize: 22,
+  brandTitle: {
+    fontSize: 24,
     fontWeight: '900',
-    color: '#1A1A2E',
+    color: '#181818',
+    letterSpacing: -0.5,
   },
-  simulatedSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2D6A4F',
+  brandSubtitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#2E8B57',
+    letterSpacing: 1,
+    marginTop: 1,
   },
   topHeaderIcons: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   headerIconButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    backgroundColor: '#EFE7DA',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E8C4B8',
+    borderColor: '#DCD1BF',
   },
-  balanceCard: {
-    marginHorizontal: 16,
-    marginTop: 8,
+
+  /* 2. HERO DASHBOARD CARD */
+  heroCard: {
+    backgroundColor: '#EFE7DA',
+    borderRadius: 22,
+    padding: 20,
     marginBottom: 16,
-    borderRadius: 24,
-    padding: 22,
-    backgroundColor: '#2D6A4F',
-    shadowColor: '#1A1A2E',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
+    shadowColor: '#181818',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  userHeaderRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 10,
+    marginBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(250, 247, 240, 0.2)',
+    borderBottomColor: '#DCD1BF',
   },
-  vpaText: {
-    color: '#FAF7F0',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  statusPill: {
+  userVpaChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    paddingHorizontal: 8,
+    backgroundColor: '#F7F3EA',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
+  },
+  vpaChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#181818',
+    maxWidth: 160,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
     gap: 6,
   },
   statusDot: {
@@ -359,45 +428,140 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  statusPillText: {
-    color: '#FAF7F0',
+  statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '800',
+  },
+
+  heroBodyGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  balanceCol: {
+    flex: 1,
   },
   balanceLabel: {
-    color: '#E8C4B8',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#666666',
     letterSpacing: 0.8,
+    marginBottom: 4,
   },
-  balanceAmount: {
-    color: '#FAF7F0',
-    fontSize: 36,
+  balanceValue: {
+    fontSize: 32,
     fontWeight: '900',
-    marginVertical: 4,
+    color: '#181818',
+    letterSpacing: -0.5,
   },
-  balanceBarBg: {
+  balanceSubtext: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+
+  /* Protection Gauge Box */
+  scoreGaugeBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  scoreOuterRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 4,
+    borderColor: '#2E8B57',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F3EA',
+  },
+  scoreInnerRing: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scoreValText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#2E8B57',
+    lineHeight: 20,
+  },
+  scoreLabelText: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: '#666666',
+    letterSpacing: 0.5,
+  },
+
+  balanceBarTrack: {
     height: 6,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: '#DCD1BF',
     borderRadius: 3,
     overflow: 'hidden',
-    marginTop: 12,
-    marginBottom: 6,
   },
   balanceBarFill: {
     height: '100%',
-    backgroundColor: '#E8C4B8',
+    backgroundColor: '#2E8B57',
     borderRadius: 3,
   },
-  balanceBarLabel: {
-    color: 'rgba(250, 247, 240, 0.75)',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sectionContainer: {
-    marginHorizontal: 16,
+
+  /* 3. AI INSIGHT BANNER */
+  aiInsightBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#E5DCCB',
+    borderRadius: 18,
+    padding: 14,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
+  },
+  aiInsightIconCol: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F7F3EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
+  },
+  aiInsightTextCol: {
+    flex: 1,
+  },
+  aiHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  aiInsightTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#181818',
+  },
+  aiLiveBadge: {
+    backgroundColor: 'rgba(46, 139, 87, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  aiLiveBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#236847',
+  },
+  aiInsightBody: {
+    fontSize: 12,
+    color: '#666666',
+    lineHeight: 16,
+  },
+
+  /* 4. SECTION BLOCK & GRIDS */
+  sectionBlock: {
+    marginBottom: 18,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -405,76 +569,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  sectionHeaderTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 15,
     fontWeight: '800',
-    color: '#1A1A2E',
+    color: '#181818',
     marginBottom: 10,
+    letterSpacing: -0.2,
   },
   seeAllText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#2D6A4F',
+    color: '#2E8B57',
   },
-  actionsGrid: {
+  quickGrid: {
     flexDirection: 'row',
     gap: 10,
   },
   actionCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    backgroundColor: '#EFE7DA',
+    borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E8C4B8',
-    elevation: 2,
-    shadowColor: '#1A1A2E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    borderColor: '#DCD1BF',
   },
-  iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FAF7F0',
+  actionIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F7F3EA',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#DCD1BF',
   },
-  actionTitle: {
+  actionCardText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: '#181818',
   },
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
+
+  /* RECENT ACTIVITY ITEMS */
+  emptyContainer: {
+    backgroundColor: '#EFE7DA',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E8C4B8',
+    borderColor: '#DCD1BF',
   },
-  emptyText: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 6,
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#181818',
+    marginTop: 8,
+    marginBottom: 2,
   },
-  txnCard: {
-    backgroundColor: '#FFFFFF',
+  emptySubtitle: {
+    fontSize: 12,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  txnItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFE7DA',
     borderRadius: 16,
     padding: 14,
     marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E8C4B8',
-    elevation: 1,
+    borderColor: '#DCD1BF',
   },
-  txnTypeCircle: {
+  txnIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -482,43 +651,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  txnMain: {
+  txnMainCol: {
     flex: 1,
   },
-  txnVpa: {
+  txnVpaText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: '#181818',
   },
-  txnDate: {
+  txnTimeText: {
     fontSize: 11,
-    color: '#64748b',
+    color: '#666666',
     marginTop: 2,
   },
-  txnRight: {
+  txnAmountCol: {
     alignItems: 'flex-end',
-    gap: 4,
   },
-  txnAmount: {
+  txnAmountText: {
     fontSize: 15,
     fontWeight: '800',
   },
-  infoCard: {
-    marginHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+
+  /* FOOTER CARD */
+  footerSecurityCard: {
+    backgroundColor: '#E5DCCB',
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E8C4B8',
+    borderColor: '#DCD1BF',
+    marginTop: 4,
   },
-  infoTitle: {
+  footerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  footerTitle: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#1A1A2E',
+    color: '#181818',
   },
-  infoText: {
+  footerBody: {
     fontSize: 12,
-    color: '#64748b',
-    lineHeight: 18,
+    color: '#666666',
+    lineHeight: 17,
   },
 });
