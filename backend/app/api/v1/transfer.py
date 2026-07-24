@@ -113,13 +113,14 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
     conn = get_db()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT phone, balance FROM auth_users WHERE vpa = %s", (sender_vpa,))
+            cursor.execute("SELECT id, phone, name, balance FROM auth_users WHERE vpa = %s", (sender_vpa,))
             sender_row = cursor.fetchone()
             
             if not sender_row:
                 raise HTTPException(status_code=404, detail=f"Sender VPA {sender_vpa} not found in system.")
             
             sender_phone = sender_row['phone']
+            sender_name = sender_row.get('name') or sender_vpa
             sender_balance = float(sender_row['balance']) if sender_row['balance'] is not None else 100000.0
 
             if sender_balance < amount:
@@ -128,13 +129,14 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
                     detail=f"Insufficient balance. Available: ₹{sender_balance:,.2f} SPC, Required: ₹{amount:,.2f} SPC."
                 )
 
-            cursor.execute("SELECT phone FROM auth_users WHERE vpa = %s", (receiver_vpa,))
+            cursor.execute("SELECT id, phone, name FROM auth_users WHERE vpa = %s", (receiver_vpa,))
             receiver_row = cursor.fetchone()
             
             if not receiver_row:
                 raise HTTPException(status_code=404, detail=f"Receiver VPA {receiver_vpa} not found in system.")
                 
             receiver_phone = receiver_row['phone']
+            receiver_id = str(receiver_row.get('id') or receiver_phone)
 
             # Atomic Settlement: Deduct sender & Credit receiver
             updated_sender_balance = sender_balance - amount
@@ -153,6 +155,39 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
             logger.info(f"P2P Transfer settled: {sender_phone} → {receiver_phone} | ₹{amount} | Sender Balance: ₹{updated_sender_balance}")
             
             ts_str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            # Dispatch real-time WebSocket event & persistent notification to receiver
+            try:
+                from app.api.v1.guardian import manager
+                from app.api.v1.notifications import add_notification_item
+
+                payment_notif_payload = {
+                    "type": "PAYMENT_RECEIVED",
+                    "data": {
+                        "transaction_id": txn_id,
+                        "sender_vpa": sender_vpa,
+                        "sender_name": sender_name,
+                        "receiver_vpa": receiver_vpa,
+                        "amount": amount,
+                        "status": status_str,
+                        "timestamp": ts_str
+                    }
+                }
+
+                await manager.send_personal_message(payment_notif_payload, receiver_id)
+                await manager.send_personal_message(payment_notif_payload, receiver_phone)
+                await manager.send_personal_message(payment_notif_payload, receiver_vpa)
+                await manager.broadcast(payment_notif_payload)
+
+                add_notification_item(
+                    title="💰 Payment Received",
+                    body=f"Received ₹{amount:,.2f} from {sender_name} ({sender_vpa}). Ref: {txn_id}",
+                    type_str="PAYMENT_RECEIVED",
+                    txn_id=txn_id,
+                    user_key=receiver_vpa
+                )
+            except Exception as notif_err:
+                logger.warning(f"Failed to dispatch real-time payment notification: {notif_err}")
 
             return P2PTransferResponse(
                 transaction_id=txn_id,
