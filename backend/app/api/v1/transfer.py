@@ -186,6 +186,14 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
                     txn_id=txn_id,
                     user_key=receiver_vpa
                 )
+                if receiver_phone:
+                    add_notification_item(
+                        title="💰 Payment Received",
+                        body=f"Received ₹{amount:,.2f} from {sender_name} ({sender_vpa}). Ref: {txn_id}",
+                        type_str="PAYMENT_RECEIVED",
+                        txn_id=txn_id,
+                        user_key=receiver_phone
+                    )
             except Exception as notif_err:
                 logger.warning(f"Failed to dispatch real-time payment notification: {notif_err}")
 

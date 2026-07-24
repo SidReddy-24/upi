@@ -131,10 +131,15 @@ async def score_transaction(txn: TransactionRequest) -> ScoringResponse:
     )
 
     signals = Signals(
+        ml_score=round(ensemble_ml_score, 4),
+        rule_score=round(rule_risk, 4),
+        behavior_score=round(deviation_score, 4),
+        graph_score=round(graph_risk, 4),
+        device_risk=round(dev_trust_res.device_risk_score, 4),
+        velocity_risk=round(float(features.get("velocity_risk", 0.05)), 4),
         rule_flags=[f.rule_id for f in rule_flags],
         behavioral_deviation=round(deviation_score, 4),
-        graph_risk=round(graph_risk, 4),
-        device_risk=round(dev_trust_res.device_risk_score, 4)
+        graph_risk=round(graph_risk, 4)
     )
 
     latency_ms = int((time.time() - start_time) * 1000)

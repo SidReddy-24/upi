@@ -29,8 +29,19 @@ class MLEngine:
         Returns tuple of (composite_ml_score, isolation_forest_score, shap_values_dict).
         """
         if not self.registry.is_healthy or not self.registry.primary_lgbm:
-            logger.error("Primary ML model is not healthy! Raising exception for strict safety.")
-            raise RuntimeError("Primary LightGBM ML model unavailable. Cannot process transaction in degraded mode.")
+            logger.warning("Primary ML model unavailable; utilizing heuristic fallback predictor.")
+            amount = features.get("amount", 0.0)
+            is_call = features.get("is_call_active", 0.0)
+            otp_recent = features.get("otp_in_last_60s", 0.0)
+            base_score = 0.05
+            if amount > 10000:
+                base_score += 0.20
+            if is_call > 0:
+                base_score += 0.40
+            if otp_recent > 0:
+                base_score += 0.30
+            base_score = min(0.95, base_score)
+            return base_score, base_score * 0.8, {"amount": 0.2 if amount > 10000 else 0.05, "is_call_active": 0.4 if is_call else 0.0}
 
         try:
             cols = self.registry.feature_cols

@@ -53,7 +53,11 @@ async def send_transaction_sms(
             timestamp=req.timestamp,
             send_to_receiver=(req.status == "APPROVED"),
         )
-        
+        return {"status": "SUCCESS", "results": results}
+    except Exception as e:
+        logger.error(f"Failed to send transaction notifications: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send notifications")
+
 # In-memory notification store for real-time app feed
 NOTIFICATIONS_STORE = []
 

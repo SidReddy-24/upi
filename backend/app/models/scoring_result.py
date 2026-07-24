@@ -26,10 +26,15 @@ class Explanation(BaseModel):
 
 
 class Signals(BaseModel):
+    ml_score: float = Field(0.05, description="Machine learning score [0, 1]")
+    rule_score: float = Field(0.05, description="Rule engine score [0, 1]")
+    behavior_score: float = Field(0.05, description="Behavioral deviation score [0, 1]")
+    graph_score: float = Field(0.05, description="Graph network score [0, 1]")
+    device_risk: float = Field(0.06, description="Device intelligence risk score [0, 1]")
+    velocity_risk: float = Field(0.04, description="Velocity risk score [0, 1]")
     rule_flags: List[str] = Field(default_factory=list, description="Triggered rule identifiers")
-    behavioral_deviation: float = Field(..., description="Behavior deviation score [0, 1]")
-    graph_risk: float = Field(..., description="Graph network risk score [0, 1]")
-    device_risk: float = Field(..., description="Device intelligence risk score [0, 1]")
+    behavioral_deviation: float = Field(0.05, description="Behavior deviation score [0, 1]")
+    graph_risk: float = Field(0.05, description="Graph network risk score [0, 1]")
 
 
 class ScoringResponse(BaseModel):

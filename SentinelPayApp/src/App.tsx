@@ -49,6 +49,7 @@ import { notificationService } from './services/notificationService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+import HeadsUpNotificationBanner from './components/HeadsUpNotificationBanner';
 import guardianService from './services/guardianService';
 
 export default function App(): React.JSX.Element {
@@ -59,7 +60,7 @@ export default function App(): React.JSX.Element {
     notificationService.requestPermissions();
     guardianService.initialize();
 
-    const unsubscribeWs = guardianService.subscribe(event => {
+    const unsubscribeWs = guardianService.subscribe((event: any) => {
       if (event.type === 'GUARDIAN_VERIFICATION_CODE') {
         const { inviter_name, code } = event.data || {};
         notificationService.showGuardianCodeAlert(inviter_name || 'Ward', code);
@@ -129,6 +130,7 @@ export default function App(): React.JSX.Element {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
+        <HeadsUpNotificationBanner />
         <NavigationContainer>
           <View style={{ flex: 1 }}>
             <Stack.Navigator

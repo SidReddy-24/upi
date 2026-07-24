@@ -30,7 +30,7 @@ export default function NotificationsScreen({ navigation }: Props) {
 
   const loadNotifications = async () => {
     setRefreshing(true);
-    const list = await notificationService.getNotifications();
+    const list = await notificationService.syncRemoteNotifications();
     setNotifications(list);
     setRefreshing(false);
   };
