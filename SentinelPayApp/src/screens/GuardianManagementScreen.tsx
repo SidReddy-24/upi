@@ -57,11 +57,12 @@ export default function GuardianManagementScreen({ navigation }: Props) {
           { id: relationship_id || String(Date.now()), code, inviter: inviter_name || 'Sentinel User', phone: inviter_phone },
           ...prev,
         ]);
+        fetchRelationships();
         Alert.alert(
           'Guardian Verification OTP Code',
           `Verification code for ${inviter_name || 'User'} (${inviter_phone || ''}): ${code}\n\nShare this code with your ward to complete guardian setup.`
         );
-      } else if (event.type === 'GUARDIAN_LINKED' || event.type === 'APPROVAL_REQUEST' || event.type === 'APPROVAL_RESPONSE') {
+      } else if (event.type === 'GUARDIAN_LINKED' || event.type === 'GUARDIAN_INVITATION_ACCEPTED' || event.type === 'APPROVAL_REQUEST' || event.type === 'APPROVAL_RESPONSE') {
         fetchRelationships();
       }
     });

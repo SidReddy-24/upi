@@ -50,6 +50,8 @@ class VerifyGuardianCodeRequest(BaseModel):
 
 class SetGuardianLimitRequest(BaseModel):
     limit: float = Field(..., gt=0)
+    ward_vpa: Optional[str] = None
+    ward_phone: Optional[str] = None
 
 
 class RespondApprovalRequest(BaseModel):
@@ -392,26 +394,42 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
 @router.post("/set-limit")
 async def set_guardian_limit(req: SetGuardianLimitRequest, current_user: dict = Depends(get_current_user)):
     """
-    Set user's maximum transaction spending limit threshold.
+    Set user's or ward's maximum transaction spending limit threshold.
     """
+    if req.ward_vpa:
+        GUARDIAN_LIMITS_STORE[req.ward_vpa.strip().lower()] = req.limit
+    if req.ward_phone:
+        GUARDIAN_LIMITS_STORE[req.ward_phone.strip()] = req.limit
+
     user_key = str(current_user.get("user_id") or current_user.get("phone") or current_user.get("vpa"))
-    GUARDIAN_LIMITS_STORE[user_key] = req.limit
+    GUARDIAN_LIMITS_STORE[user_key.strip().lower()] = req.limit
     if current_user.get("phone"):
-        GUARDIAN_LIMITS_STORE[current_user["phone"]] = req.limit
+        GUARDIAN_LIMITS_STORE[current_user["phone"].strip()] = req.limit
     if current_user.get("vpa"):
-        GUARDIAN_LIMITS_STORE[current_user["vpa"]] = req.limit
+        GUARDIAN_LIMITS_STORE[current_user["vpa"].strip().lower()] = req.limit
 
     return {"success": True, "limit": req.limit, "message": f"Guardian transaction limit set to ₹{req.limit:,.2f}"}
 
 
 @router.get("/get-limit")
-async def get_guardian_limit(current_user: dict = Depends(get_current_user)):
+async def get_guardian_limit(target_vpa: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """
     Get user's maximum transaction spending limit threshold.
     """
-    user_key = str(current_user.get("user_id") or current_user.get("phone") or current_user.get("vpa"))
-    limit = GUARDIAN_LIMITS_STORE.get(user_key) or GUARDIAN_LIMITS_STORE.get(current_user.get("phone")) or GUARDIAN_LIMITS_STORE.get(current_user.get("vpa")) or 5000.0
-    return {"limit": limit}
+    keys = []
+    if target_vpa:
+        keys.append(target_vpa.strip().lower())
+    keys.extend([
+        str(current_user.get("user_id")),
+        current_user.get("phone"),
+        current_user.get("vpa")
+    ])
+
+    for k in keys:
+        if k and k in GUARDIAN_LIMITS_STORE:
+            return {"limit": GUARDIAN_LIMITS_STORE[k]}
+
+    return {"limit": 5000.0}
 
 
 
