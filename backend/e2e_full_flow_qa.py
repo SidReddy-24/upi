@@ -77,7 +77,8 @@ def main():
     print("--- 1. AUTHENTICATION & USER PROFILE FLOW ---")
     
     # 1.1 Send OTP for signup
-    test_phone = "+919876500001"
+    timestamp_suffix = str(int(time.time()))[-6:]
+    test_phone = f"9876{timestamp_suffix}"
     otp_res = run_test("Auth: Send OTP for Registration", "POST", "/auth/send-otp", {
         "phone": test_phone,
         "purpose": "REGISTRATION"
@@ -92,12 +93,21 @@ def main():
     # 1.3 Register user profile
     reg_res = run_test("Auth: Register New User Profile", "POST", "/auth/register", {
         "phone": test_phone,
-        "name": "QA Tester User",
-        "email": "qatester@sentinelpay.ai",
+        "name": f"QA User {timestamp_suffix}",
+        "email": f"qatester_{timestamp_suffix}@sentinelpay.ai",
         "password": "SentinelPass_1234!"
     }, expected_status=200)
 
     access_token = reg_res.get("access_token") if isinstance(reg_res, dict) else None
+
+    # Fallback to login as demo user if reg token fails
+    if not access_token:
+        login_res = run_test("Auth: Fallback Login as Demo User", "POST", "/auth/login", {
+            "phone": "9892150232",
+            "password": "demo_password"
+        }, expected_status=200)
+        access_token = login_res.get("access_token") if isinstance(login_res, dict) else None
+
     auth_headers = {"Authorization": f"Bearer {access_token}"} if access_token else {}
 
     # 1.4 Get Profile

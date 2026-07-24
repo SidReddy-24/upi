@@ -102,31 +102,29 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
 
     conn = get_db()
     try:
-        # Start short DB transaction block ONLY for atomic balances & ledger insert
-        with conn.transaction():
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT phone, balance FROM auth_users WHERE vpa = %s FOR UPDATE", (sender_vpa,))
-                sender_row = cursor.fetchone()
-                
-                if not sender_row:
-                    raise HTTPException(status_code=404, detail=f"Sender VPA {sender_vpa} not found in system.")
-                
-                sender_phone = sender_row['phone']
-                sender_balance = float(sender_row['balance']) if sender_row['balance'] is not None else 100000.0
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT phone, balance FROM auth_users WHERE vpa = %s", (sender_vpa,))
+            sender_row = cursor.fetchone()
+            
+            if not sender_row:
+                raise HTTPException(status_code=404, detail=f"Sender VPA {sender_vpa} not found in system.")
+            
+            sender_phone = sender_row['phone']
+            sender_balance = float(sender_row['balance']) if sender_row['balance'] is not None else 100000.0
 
-                if sender_balance < amount:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Insufficient balance. Available: ₹{sender_balance:,.2f} SPC, Required: ₹{amount:,.2f} SPC."
-                    )
+            if sender_balance < amount:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient balance. Available: ₹{sender_balance:,.2f} SPC, Required: ₹{amount:,.2f} SPC."
+                )
 
-                cursor.execute("SELECT phone FROM auth_users WHERE vpa = %s FOR UPDATE", (receiver_vpa,))
-                receiver_row = cursor.fetchone()
+            cursor.execute("SELECT phone FROM auth_users WHERE vpa = %s", (receiver_vpa,))
+            receiver_row = cursor.fetchone()
+            
+            if not receiver_row:
+                raise HTTPException(status_code=404, detail=f"Receiver VPA {receiver_vpa} not found in system.")
                 
-                if not receiver_row:
-                    raise HTTPException(status_code=404, detail=f"Receiver VPA {receiver_vpa} not found in system.")
-                    
-                receiver_phone = receiver_row['phone']
+            receiver_phone = receiver_row['phone']
 
                 # Atomic Settlement: Deduct sender & Credit receiver
                 updated_sender_balance = sender_balance - amount
@@ -140,6 +138,7 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
                     VALUES (%s, %s, %s, %s, 'INR', 'P2P', %s, %s, %s)
                     ON CONFLICT (transaction_id) DO NOTHING
                 """, (txn_id, sender_vpa, receiver_vpa, amount, status_str, decision, risk_score))
+                conn.commit()
 
                 logger.info(f"P2P Transfer settled: {sender_phone} → {receiver_phone} | ₹{amount} | Sender Balance: ₹{updated_sender_balance}")
                 
