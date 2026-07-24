@@ -2,7 +2,7 @@
  * HomeScreen — Luxury Cybersecurity AI Wallet Dashboard
  * Design Theme: Warm Stone (#F7F3EA) + Charcoal (#181818) + Sea Green (#2E8B57)
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -44,8 +44,11 @@ export default function HomeScreen({ navigation }: Props) {
   const [txns, setTxns] = useState<WalletTransaction[]>([]);
   const [backendStatus, setBackendStatus] = useState<'UP' | 'DOWN' | 'CHECKING'>('CHECKING');
   const [refreshing, setRefreshing] = useState(false);
+  const isFetchingRef = useRef(false);
 
   const loadData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const u = await getUser();
       if (!u) {
@@ -79,6 +82,8 @@ export default function HomeScreen({ navigation }: Props) {
       }
     } catch (e) {
       console.error('HomeScreen loadData:', e);
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [navigation]);
 

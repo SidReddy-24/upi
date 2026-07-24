@@ -151,7 +151,9 @@ class RedisService:
             self.client = aioredis.from_url(
                 settings.REDIS_URL,
                 decode_responses=True,
-                max_connections=settings.REDIS_MAX_CONNECTIONS
+                max_connections=settings.REDIS_MAX_CONNECTIONS,
+                socket_timeout=1.0,
+                socket_connect_timeout=1.0
             )
             # Ping to verify connection
             await self.client.ping()

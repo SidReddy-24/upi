@@ -93,7 +93,7 @@ async def add_process_time_and_log(request: Request, call_next):
     return response
 
 # Root endpoint
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
         "app": settings.APP_NAME,
