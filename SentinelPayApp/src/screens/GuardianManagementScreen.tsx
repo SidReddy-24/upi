@@ -148,14 +148,13 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         setInviteInput('');
         fetchRelationships();
 
-        if (res.verification_code) {
-          setVerificationLogs((prev) => [
-            { id: res.relationship_id, code: res.verification_code!, inviter: 'You', phone: input },
-            ...prev,
-          ]);
-        }
+        // Code is sent to the guardian via WebSocket/SMS, notify ward to ask guardian for code
+        Alert.alert(
+          'Invitation Sent',
+          `Guardian invitation sent to ${input}. Please ask your guardian for the 6-digit verification code to complete setup.`
+        );
 
-        // Open OTP verification modal
+        // Open OTP verification modal for ward to enter guardian's code
         setVerifyingRelId(res.relationship_id);
         setOtpInput('');
         setOtpModalVisible(true);

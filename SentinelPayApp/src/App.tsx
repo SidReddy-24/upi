@@ -43,6 +43,7 @@ import GuardianManagementScreen from './screens/GuardianManagementScreen';
 import GuardianApprovalScreen from './screens/GuardianApprovalScreen';
 import { authService } from './services/authService';
 import unifiedAuthService from './services/unifiedAuthService';
+import { notificationService } from './services/notificationService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -50,6 +51,9 @@ export default function App(): React.JSX.Element {
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
 
   useEffect(() => {
+    notificationService.configure();
+    notificationService.requestPermissions();
+
     const checkState = async () => {
       // Check if user has completed onboarding
       const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);

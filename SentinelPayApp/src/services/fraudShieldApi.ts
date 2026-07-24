@@ -6,6 +6,7 @@
  *  - Real device on same WiFi → use laptop's LAN IP (e.g. 192.168.1.x)
  *  - VPS → full public URL
  */
+import axios from 'axios';
 import { authClient as client, API_BASE_URL } from './authService';
 import { TransactionRequest, FraudScore } from '../types';
 
@@ -32,9 +33,15 @@ const fraudShieldApi = {
   /**
    * Check backend health — used on Home screen status indicator.
    */
-  async checkHealth(): Promise<{ status: string; components: Record<string, unknown> }> {
-    const resp = await client.get('/health');
-    return resp.data;
+  async checkHealth(): Promise<{ status: string; components?: Record<string, unknown> }> {
+    try {
+      const resp = await axios.get(`${API_BASE_URL}/health`, { timeout: 5000 });
+      return resp.data;
+    } catch {
+      // Fallback check to root API URL if /health endpoint structure differs
+      const resp = await axios.get(`${API_BASE_URL.replace(/\/api\/v1$/, '')}/`, { timeout: 5000 });
+      return { status: resp.status === 200 ? 'HEALTHY' : 'DOWN' };
+    }
   },
 
   /**

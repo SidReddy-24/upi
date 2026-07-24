@@ -10,7 +10,7 @@
 import PushNotification, {
   PushNotificationObject,
 } from 'react-native-push-notification';
-import { Platform } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import type { TransactionNotificationPayload } from '../types';
 import { formatTransactionNotification } from '../utils/formatters';
 import type { TransactionNotification } from '../types';
@@ -140,9 +140,12 @@ class NotificationService {
         // For older Android versions, notifications are enabled by default
         // react-native-push-notification handles this automatically
         console.log('[NotificationService] Requesting Android notification permissions');
-        
-        // The library handles permission requests automatically on configure()
-        // We just need to check if notifications are enabled
+        if (Platform.Version as number >= 33) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+          );
+          return granted === PermissionsAndroid.RESULTS.GRANTED;
+        }
         return true;
       } else if (Platform.OS === 'ios') {
         // iOS requires explicit permission request
@@ -322,6 +325,42 @@ class NotificationService {
       // This will be wired up in Task 15.1 when integrating all services
       console.log(`[NotificationService] Navigate to TransactionDetail: ${txnId}`);
     }
+  }
+
+  /**
+   * Send a Truecaller-style Realtime SMS Heads-Up Pop-up notification.
+   */
+  showSmsFraudAlert(sender: string, classification: string, fraudScore: number, snippet: string): void {
+    if (!this.configured) {
+      this.configure();
+    }
+
+    const isFraud = classification === 'fraud' || classification === 'SCAM' || classification === 'PHISHING';
+    const isSuspicious = classification === 'suspicious';
+
+    const title = isFraud
+      ? `🚨 FRAUD SMS DETECTED: ${sender}`
+      : isSuspicious
+      ? `⚠️ SUSPICIOUS SMS: ${sender}`
+      : `✓ Genuine SMS: ${sender}`;
+
+    const body = `Risk Score: ${Math.round(fraudScore * 100)}% • "${snippet.substring(0, 70)}..."`;
+    const color = isFraud ? '#EF4444' : isSuspicious ? '#F59E0B' : '#10B981';
+
+    PushNotification.localNotification({
+      channelId: 'sentinelpay-sms-alerts',
+      title,
+      message: body,
+      color,
+      vibrate: true,
+      vibration: 500,
+      playSound: true,
+      soundName: 'default',
+      priority: 'high',
+      importance: 'high',
+      visibility: 'public',
+      tag: 'sms_alert',
+    });
   }
 
   /**

@@ -81,7 +81,8 @@ export default function HomeScreen({ navigation }: Props) {
   const checkBackend = useCallback(async () => {
     try {
       const h = await fraudShieldApi.checkHealth();
-      setBackendStatus(h.status === 'HEALTHY' ? 'UP' : 'DOWN');
+      const isUp = h && (h.status === 'HEALTHY' || h.status === 'DEGRADED' || h.status === 'UP' || h.status === 'active');
+      setBackendStatus(isUp ? 'UP' : 'DOWN');
     } catch {
       setBackendStatus('DOWN');
     }

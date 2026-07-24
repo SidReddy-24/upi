@@ -17,6 +17,8 @@ import {
   getStats,
 } from '../utils/smsDb';
 
+import { notificationService } from '../services/notificationService';
+
 const { SmsReaderModule, SmsReceiverModule } = NativeModules;
 
 export interface SmsTrackerState {
@@ -281,11 +283,14 @@ export function useSmsTracker() {
           genuineCount: stats.genuineCount,
         }));
 
-        // Trigger notification if fraud detected
-        if (message.classification === 'fraud') {
-          console.log(`[useSmsTracker] FRAUD SMS detected from ${message.sender}`);
-          // Notification will be handled by notification manager
-        }
+        // Trigger Truecaller-style pop-up notification for incoming SMS
+        console.log(`[useSmsTracker] Realtime SMS received from ${message.sender}, classification: ${message.classification}`);
+        notificationService.showSmsFraudAlert(
+          message.sender,
+          message.classification,
+          message.fraudScore,
+          message.body
+        );
       });
 
       SmsReceiverModule.startListening();
