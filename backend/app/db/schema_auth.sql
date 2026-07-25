@@ -166,3 +166,29 @@ COMMENT ON COLUMN otp_verifications.otp_code IS '6-digit OTP code';
 COMMENT ON COLUMN otp_verifications.expires_at IS 'OTP expires 5 minutes after creation';
 COMMENT ON COLUMN refresh_tokens.expires_at IS 'Refresh token expires after 30 days';
 COMMENT ON COLUMN guardian_approval_requests.expires_at IS 'Approval request expires after 5 minutes';
+
+-- ======================== GRAPH ENGINE PERSISTENCE ========================
+CREATE TABLE IF NOT EXISTS graph_edges (
+    id           BIGSERIAL PRIMARY KEY,
+    sender       VARCHAR(128) NOT NULL,
+    receiver     VARCHAR(128) NOT NULL,
+    amount       DECIMAL(15, 2) DEFAULT 0.0,
+    txn_id       VARCHAR(64),
+    edge_type    VARCHAR(32) DEFAULT 'TRANSFERRED',
+    created_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS graph_nodes (
+    node_id      VARCHAR(128) PRIMARY KEY,
+    node_type    VARCHAR(32) NOT NULL,
+    fraud_flag   BOOLEAN DEFAULT FALSE,
+    pagerank     DECIMAL(10, 8) DEFAULT 0.0,
+    risk_score   DECIMAL(5, 4) DEFAULT 0.0,
+    updated_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_graph_edges_sender   ON graph_edges(sender);
+CREATE INDEX IF NOT EXISTS idx_graph_edges_receiver ON graph_edges(receiver);
+CREATE INDEX IF NOT EXISTS idx_graph_edges_created  ON graph_edges(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_graph_nodes_fraud    ON graph_nodes(fraud_flag) WHERE fraud_flag = TRUE;
+
