@@ -3,6 +3,7 @@ SentinelPay AI — Real Multi-User P2P Settlement Engine
 """
 import uuid
 import time
+import json
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
@@ -11,7 +12,7 @@ from pydantic import BaseModel, Field
 from app.services.auth_service import verify_api_key
 from app.models.transaction import TransactionRequest, DeviceInfo, LocationInfo, NetworkInfo, TransactionMetadata
 from app.core.scoring_engine import score_transaction
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from app.api.v1.auth import get_db
 
 logger = logging.getLogger("fraudshield.transfer")
@@ -138,10 +139,100 @@ async def execute_p2p_transfer(payload: P2PTransferRequest):
             receiver_phone = receiver_row['phone']
             receiver_id = str(receiver_row.get('id') or receiver_phone)
 
+            # ─── Server-Side Guardian Enforcement Check ───────────────────────
+            sender_id = str(sender_row['id'])
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM guardian_relationships
+                WHERE user_id = %s AND status = 'ACTIVE'
+            """, (sender_id,))
+            guard_count_row = cursor.fetchone()
+            has_active_guardians = (guard_count_row['count'] if guard_count_row else 0) > 0
+
+            if has_active_guardians:
+                from app.api.v1.guardian import _get_ward_config, _increment_cumulative_spent, manager
+                cfg = _get_ward_config(cursor, sender_id)
+                spending_limit = cfg['spending_limit']
+                cumulative_spent = cfg['cumulative_spent']
+                timeout_mins = cfg['timeout_minutes']
+
+                if (cumulative_spent + amount) > spending_limit:
+                    # Hard-stop: transaction exceeds cumulative spending limit
+                    expires_at = datetime.now(timezone.utc) + timedelta(minutes=timeout_mins)
+                    
+                    # Fetch active guardians
+                    cursor.execute("""
+                        SELECT id, guardian_user_id FROM guardian_relationships
+                        WHERE user_id = %s AND status = 'ACTIVE'
+                    """, (sender_id,))
+                    active_guardians = cursor.fetchall()
+
+                    # Record transaction as GUARDIAN_HOLD in ledger
+                    cursor.execute("""
+                        INSERT INTO transactions (transaction_id, sender_vpa, receiver_vpa, amount, currency, txn_type, status, decision, risk_score)
+                        VALUES (%s, %s, %s, %s, 'INR', 'P2P', 'GUARDIAN_HOLD', 'REVIEW', %s)
+                        ON CONFLICT (transaction_id) DO UPDATE SET status = 'GUARDIAN_HOLD', decision = 'REVIEW'
+                    """, (txn_id, sender_vpa, receiver_vpa, amount, risk_score))
+
+                    req_ids = []
+                    for g in active_guardians:
+                        req_signals = ["CUMULATIVE_LIMIT_EXCEEDED"]
+                        if score_result.explanation:
+                            if hasattr(score_result.explanation, "top_features") and score_result.explanation.top_features:
+                                req_signals.extend([str(f) for f in score_result.explanation.top_features])
+                            elif hasattr(score_result.explanation, "reasons") and score_result.explanation.reasons:
+                                req_signals.extend([str(r) for r in score_result.explanation.reasons])
+
+                        cursor.execute("""
+                            INSERT INTO guardian_approval_requests (transaction_id, user_id, guardian_id, amount, recipient_vpa, fraud_score, risk_signals, expires_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING id
+                        """, (
+                            txn_id,
+                            sender_id,
+                            g['id'],
+                            amount,
+                            receiver_vpa,
+                            risk_score,
+                            json.dumps(req_signals),
+                            expires_at
+                        ))
+                        req_row = cursor.fetchone()
+                        req_id = str(req_row['id'])
+                        req_ids.append(req_id)
+
+                        # Send WebSocket notification to guardian
+                        try:
+                            import asyncio
+                            asyncio.create_task(manager.send_personal_message({
+                                "type": "APPROVAL_REQUEST",
+                                "data": {
+                                    "request_id": req_id,
+                                    "transaction_id": txn_id,
+                                    "amount": amount,
+                                    "recipient_vpa": receiver_vpa,
+                                    "fraud_score": risk_score,
+                                    "risk_signals": req_signals,
+                                    "requester_name": sender_name,
+                                    "expires_at": expires_at.isoformat() + "Z"
+                                }
+                            }, str(g['guardian_user_id'])))
+                        except Exception as notif_err:
+                            logger.warning(f"Failed to push guardian notification: {notif_err}")
+
+                    conn.commit()
+
+                    raise HTTPException(
+                        status_code=423, # Locked / Awaiting Guardian Approval
+                        detail=f"🛡️ GUARDIAN APPROVAL REQUIRED: Cumulative limit of ₹{spending_limit:,.2f} exceeded. Approval request sent to guardian."
+                    )
+
             # Atomic Settlement: Deduct sender & Credit receiver
             updated_sender_balance = sender_balance - amount
             cursor.execute("UPDATE auth_users SET balance = %s WHERE phone = %s", (updated_sender_balance, sender_phone))
             cursor.execute("UPDATE auth_users SET balance = COALESCE(balance, 100000.0) + %s WHERE phone = %s", (amount, receiver_phone))
+
+            if has_active_guardians:
+                _increment_cumulative_spent(cursor, sender_id, amount)
 
             # Record Transaction in ledger
             status_str = "APPROVED" if decision == "APPROVE" else "REVIEWED"

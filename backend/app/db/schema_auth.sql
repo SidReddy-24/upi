@@ -167,6 +167,36 @@ COMMENT ON COLUMN otp_verifications.expires_at IS 'OTP expires 5 minutes after c
 COMMENT ON COLUMN refresh_tokens.expires_at IS 'Refresh token expires after 30 days';
 COMMENT ON COLUMN guardian_approval_requests.expires_at IS 'Approval request expires after 5 minutes';
 
+-- ======================== GUARDIAN WARD CONFIG (PERSISTENT) ========================
+-- Phase 9.1: Persistent guardian-configured spending limits & timeouts per ward
+CREATE TABLE IF NOT EXISTS guardian_ward_config (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ward_user_id        UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+    guardian_user_id    UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+    spending_limit      DECIMAL(12, 2) NOT NULL DEFAULT 5000.00,
+    timeout_minutes     INT NOT NULL DEFAULT 5,
+    cumulative_spent    DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    last_reset_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    CONSTRAINT chk_spending_limit_positive CHECK (spending_limit > 0),
+    CONSTRAINT chk_timeout_range CHECK (timeout_minutes >= 1 AND timeout_minutes <= 60),
+    CONSTRAINT chk_cumulative_non_negative CHECK (cumulative_spent >= 0),
+    CONSTRAINT unique_ward_guardian_config UNIQUE (ward_user_id, guardian_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gwc_ward ON guardian_ward_config(ward_user_id);
+CREATE INDEX IF NOT EXISTS idx_gwc_guardian ON guardian_ward_config(guardian_user_id);
+CREATE INDEX IF NOT EXISTS idx_gwc_ward_guardian ON guardian_ward_config(ward_user_id, guardian_user_id);
+
+COMMENT ON TABLE guardian_ward_config IS 'Persistent guardian-configured spending limits and approval timeouts per ward relationship';
+COMMENT ON COLUMN guardian_ward_config.cumulative_spent IS 'Running total of approved transactions; reset manually by guardian';
+
+-- Performance index for cumulative spend queries on transactions
+CREATE INDEX IF NOT EXISTS idx_txn_sender_status ON transactions(sender_vpa, status)
+    WHERE status IN ('APPROVED', 'SUCCESS');
+
 -- ======================== GRAPH ENGINE PERSISTENCE ========================
 CREATE TABLE IF NOT EXISTS graph_edges (
     id           BIGSERIAL PRIMARY KEY,

@@ -941,17 +941,53 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={[styles.saveLimitButton, wardSaving && styles.buttonDisabled, { width: '100%', marginBottom: 16 }]}
-                onPress={handleSaveWardConfig}
-                disabled={wardSaving}
-              >
-                {wardSaving ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.saveLimitButtonText}>Save Ward Configuration</Text>
-                )}
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                <TouchableOpacity
+                  style={[styles.saveLimitButton, wardSaving && styles.buttonDisabled, { flex: 2 }]}
+                  onPress={handleSaveWardConfig}
+                  disabled={wardSaving}
+                >
+                  {wardSaving ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.saveLimitButtonText}>Save Ward Config</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.saveLimitButton, { flex: 1, backgroundColor: '#DC2626' }]}
+                  onPress={async () => {
+                    if (!selectedWard) return;
+                    Alert.alert(
+                      'Reset Spending Counter',
+                      `Reset cumulative spending counter for ${selectedWard.ward_name || 'ward'} to ₹0.00?`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Reset',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              setWardSaving(true);
+                              await guardianService.resetWardSpending({ ward_vpa: selectedWard.ward_vpa, ward_phone: selectedWard.ward_phone });
+                              Alert.alert('Reset Complete', 'Cumulative spending counter has been reset to ₹0.00.');
+                              setWardModalVisible(false);
+                              fetchRelationships();
+                            } catch (e: any) {
+                              Alert.alert('Error', e?.message || 'Failed to reset spending counter.');
+                            } finally {
+                              setWardSaving(false);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  disabled={wardSaving}
+                >
+                  <Text style={styles.saveLimitButtonText}>Reset Spend</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* 3. Ward Transaction History */}
               <View style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#334155' }]}>

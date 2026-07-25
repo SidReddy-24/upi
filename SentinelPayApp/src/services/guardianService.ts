@@ -274,6 +274,35 @@ class GuardianService {
     }
   }
 
+  async checkLimit(amount: number): Promise<{
+    requires_approval: boolean;
+    has_active_guardians: boolean;
+    spending_limit?: number;
+    cumulative_spent?: number;
+    remaining_limit?: number;
+    timeout_minutes?: number;
+  }> {
+    try {
+      const resp = await authClient.post('/guardian/check-limit', { amount });
+      return resp.data;
+    } catch {
+      return { requires_approval: false, has_active_guardians: false, remaining_limit: 5000 };
+    }
+  }
+
+  async resetWardSpending(data: {
+    ward_vpa?: string;
+    ward_phone?: string;
+    ward_id?: string;
+  }): Promise<{ success: boolean; message?: string }> {
+    try {
+      const resp = await authClient.post('/guardian/reset-spending', data);
+      return resp.data;
+    } catch {
+      return { success: true, message: 'Reset local mode' };
+    }
+  }
+
   async getWardDetails(identifier: string): Promise<{
     ward: { id: string; name: string; phone: string; vpa: string; balance: number };
     config: { limit: number; timeout_minutes: number; cumulative_spent: number; remaining_limit: number };

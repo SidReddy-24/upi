@@ -116,6 +116,19 @@ def init_db_tables(conn):
                     revoked_at TIMESTAMP WITH TIME ZONE,
                     device_info JSONB
                 );
+
+                CREATE TABLE IF NOT EXISTS guardian_ward_config (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    ward_user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+                    guardian_user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+                    spending_limit NUMERIC(12, 2) NOT NULL DEFAULT 5000.00,
+                    timeout_minutes INT NOT NULL DEFAULT 5,
+                    cumulative_spent NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+                    last_reset_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    CONSTRAINT unique_ward_guardian_config UNIQUE (ward_user_id, guardian_user_id)
+                );
             """)
             conn.commit()
     except Exception as e:

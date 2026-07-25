@@ -31,10 +31,72 @@ from app.api.v1.auth import get_current_user, get_db, verify_access_token
 logger = logging.getLogger("fraudshield.api.guardian")
 router = APIRouter()
 
-# In-Memory stores for guardian verification, limits & timeout configurations
+# In-Memory store for OTP verification codes (ephemeral by design)
 GUARDIAN_VERIFICATION_CODES: Dict[str, dict] = {} # rel_id -> { code, expires_at, guardian_phone }
-GUARDIAN_LIMITS_STORE: Dict[str, float] = {}        # user_id / phone / vpa -> limit float (default 5000.0)
-GUARDIAN_TIMEOUTS_STORE: Dict[str, int] = {}       # user_id / phone / vpa -> timeout_minutes int (default 5)
+
+
+# ─── DB-Backed Config Helpers ─────────────────────────────────────────────────
+
+def _get_ward_config(cursor, ward_user_id: str) -> dict:
+    """Fetch the tightest (minimum) spending limit config for a ward from guardian_ward_config."""
+    cursor.execute("""
+        SELECT gwc.spending_limit, gwc.timeout_minutes, gwc.cumulative_spent,
+               gwc.guardian_user_id, gwc.last_reset_at
+        FROM guardian_ward_config gwc
+        JOIN guardian_relationships gr
+            ON gwc.ward_user_id = gr.user_id AND gwc.guardian_user_id = gr.guardian_user_id
+        WHERE gwc.ward_user_id::text = %s AND gr.status = 'ACTIVE'
+        ORDER BY gwc.spending_limit ASC
+        LIMIT 1
+    """, (str(ward_user_id),))
+    row = cursor.fetchone()
+    if row:
+        return {
+            "spending_limit": float(row['spending_limit']),
+            "timeout_minutes": int(row['timeout_minutes']),
+            "cumulative_spent": float(row['cumulative_spent']),
+            "remaining_limit": max(0.0, float(row['spending_limit']) - float(row['cumulative_spent'])),
+            "guardian_user_id": str(row['guardian_user_id']),
+            "last_reset_at": row['last_reset_at'].isoformat() if row.get('last_reset_at') else None,
+        }
+    return {
+        "spending_limit": 5000.0,
+        "timeout_minutes": 5,
+        "cumulative_spent": 0.0,
+        "remaining_limit": 5000.0,
+        "guardian_user_id": None,
+        "last_reset_at": None,
+    }
+
+
+def _get_ward_config_by_vpa(cursor, ward_vpa: str) -> dict:
+    """Fetch ward config using VPA lookup."""
+    cursor.execute("SELECT id FROM auth_users WHERE LOWER(vpa) = %s", (ward_vpa.strip().lower(),))
+    user_row = cursor.fetchone()
+    if user_row:
+        return _get_ward_config(cursor, str(user_row['id']))
+    return _get_ward_config(cursor, ward_vpa)
+
+
+def _upsert_ward_config(cursor, ward_user_id: str, guardian_user_id: str, limit: float, timeout_minutes: int):
+    """Insert or update guardian_ward_config row."""
+    cursor.execute("""
+        INSERT INTO guardian_ward_config (ward_user_id, guardian_user_id, spending_limit, timeout_minutes, updated_at)
+        VALUES (%s::uuid, %s::uuid, %s, %s, NOW())
+        ON CONFLICT (ward_user_id, guardian_user_id)
+        DO UPDATE SET spending_limit = EXCLUDED.spending_limit,
+                     timeout_minutes = EXCLUDED.timeout_minutes,
+                     updated_at = NOW()
+    """, (ward_user_id, guardian_user_id, limit, timeout_minutes))
+
+
+def _increment_cumulative_spent(cursor, ward_user_id: str, amount: float):
+    """Atomically increment cumulative_spent for all configs of a ward."""
+    cursor.execute("""
+        UPDATE guardian_ward_config
+        SET cumulative_spent = cumulative_spent + %s, updated_at = NOW()
+        WHERE ward_user_id::text = %s
+    """, (amount, str(ward_user_id)))
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
@@ -67,6 +129,16 @@ class RespondApprovalRequest(BaseModel):
     request_id: str
     decision: str = Field(..., pattern='^(APPROVED|REJECTED)$')
     note: Optional[str] = None
+
+
+class CheckLimitRequest(BaseModel):
+    amount: float = Field(..., gt=0)
+
+
+class ResetSpendingRequest(BaseModel):
+    ward_vpa: Optional[str] = None
+    ward_phone: Optional[str] = None
+    ward_id: Optional[str] = None
 
 
 class CreateApprovalRequest(BaseModel):
@@ -206,27 +278,24 @@ async def list_guardians(current_user: dict = Depends(get_current_user)):
                 if w_id in GUARDIAN_VERIFICATION_CODES:
                     w['verification_code'] = GUARDIAN_VERIFICATION_CODES[w_id].get("code")
 
-                # Calculate cumulative spent & remaining limit for ward
+                # Fetch persistent ward config from guardian_ward_config table
+                ward_user_id = None
                 ward_vpa = (w.get('ward_vpa') or "").strip().lower()
-                ward_phone = (w.get('ward_phone') or "").strip()
-                
-                total_spent = 0.0
                 if ward_vpa:
-                    cursor.execute("""
-                        SELECT COALESCE(SUM(amount), 0.0) as total_spent
-                        FROM transactions
-                        WHERE sender_vpa = %s AND (status = 'APPROVED' OR status = 'SUCCESS')
-                    """, (ward_vpa,))
-                    spent_row = cursor.fetchone()
-                    total_spent = float(spent_row['total_spent']) if spent_row else 0.0
+                    cursor.execute("SELECT id FROM auth_users WHERE LOWER(vpa) = %s", (ward_vpa,))
+                    ward_user_row = cursor.fetchone()
+                    if ward_user_row:
+                        ward_user_id = str(ward_user_row['id'])
 
-                limit = GUARDIAN_LIMITS_STORE.get(ward_vpa) or GUARDIAN_LIMITS_STORE.get(ward_phone) or 5000.0
-                timeout_mins = GUARDIAN_TIMEOUTS_STORE.get(ward_vpa) or GUARDIAN_TIMEOUTS_STORE.get(ward_phone) or 5
+                if ward_user_id:
+                    ward_cfg = _get_ward_config(cursor, ward_user_id)
+                else:
+                    ward_cfg = {"spending_limit": 5000.0, "timeout_minutes": 5, "cumulative_spent": 0.0, "remaining_limit": 5000.0}
 
-                w['cumulative_spent'] = total_spent
-                w['spending_limit'] = limit
-                w['remaining_limit'] = max(0.0, limit - total_spent)
-                w['timeout_minutes'] = timeout_mins
+                w['cumulative_spent'] = ward_cfg['cumulative_spent']
+                w['spending_limit'] = ward_cfg['spending_limit']
+                w['remaining_limit'] = ward_cfg['remaining_limit']
+                w['timeout_minutes'] = ward_cfg['timeout_minutes']
 
             return {
                 "guardians": my_guardians,
@@ -389,12 +458,14 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
                     UPDATE guardian_relationships
                     SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
                     WHERE id::text = %s AND user_id = %s
-                    RETURNING guardian_user_id
+                    RETURNING user_id, guardian_user_id
                 """, (rel_id, current_user['user_id']))
                 res = cursor.fetchone()
-                conn.commit()
 
                 if res and res.get('guardian_user_id'):
+                    _upsert_ward_config(cursor, str(res['user_id']), str(res['guardian_user_id']), 5000.0, 5)
+                    conn.commit()
+
                     await manager.send_personal_message({
                         "type": "GUARDIAN_LINKED",
                         "data": {
@@ -402,6 +473,8 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
                             "ward_name": current_user.get("name") or current_user.get("phone") or "Sentinel User"
                         }
                     }, str(res['guardian_user_id']))
+                else:
+                    conn.commit()
 
                 GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
                 return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
@@ -420,11 +493,12 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
                 UPDATE guardian_relationships
                 SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
                 WHERE id::text = %s AND user_id = %s
-                RETURNING id
+                RETURNING user_id, guardian_user_id
             """, (rel_id, current_user['user_id']))
             res = cursor.fetchone()
-            conn.commit()
             if res:
+                _upsert_ward_config(cursor, str(res['user_id']), str(res['guardian_user_id']), 5000.0, 5)
+                conn.commit()
                 GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
                 return {"success": True, "status": "ACTIVE", "message": "Guardian verified and linked!"}
             raise HTTPException(status_code=400, detail="Invalid verification code or relationship not found.")
@@ -440,19 +514,34 @@ async def set_guardian_limit(req: SetGuardianLimitRequest, current_user: dict = 
     """
     Set user's or ward's maximum transaction spending limit threshold.
     """
-    if req.ward_vpa:
-        GUARDIAN_LIMITS_STORE[req.ward_vpa.strip().lower()] = req.limit
-    if req.ward_phone:
-        GUARDIAN_LIMITS_STORE[req.ward_phone.strip()] = req.limit
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            ward_id = None
+            if req.ward_vpa:
+                cursor.execute("SELECT id FROM auth_users WHERE LOWER(vpa) = %s", (req.ward_vpa.strip().lower(),))
+                row = cursor.fetchone()
+                if row:
+                    ward_id = str(row['id'])
+            elif req.ward_phone:
+                cursor.execute("SELECT id FROM auth_users WHERE phone = %s", (req.ward_phone.strip(),))
+                row = cursor.fetchone()
+                if row:
+                    ward_id = str(row['id'])
+            
+            if not ward_id:
+                ward_id = str(current_user['user_id'])
 
-    user_key = str(current_user.get("user_id") or current_user.get("phone") or current_user.get("vpa"))
-    GUARDIAN_LIMITS_STORE[user_key.strip().lower()] = req.limit
-    if current_user.get("phone"):
-        GUARDIAN_LIMITS_STORE[current_user["phone"].strip()] = req.limit
-    if current_user.get("vpa"):
-        GUARDIAN_LIMITS_STORE[current_user["vpa"].strip().lower()] = req.limit
+            _upsert_ward_config(cursor, ward_id, str(current_user['user_id']), req.limit, 5)
+            conn.commit()
 
-    return {"success": True, "limit": req.limit, "message": f"Guardian transaction limit set to ₹{req.limit:,.2f}"}
+            return {"success": True, "limit": req.limit, "message": f"Guardian transaction limit set to ₹{req.limit:,.2f}"}
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Failed to set limit: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to set limit: {str(e)}")
+    finally:
+        conn.close()
 
 
 @router.post("/set-ward-config")
@@ -462,23 +551,40 @@ async def set_ward_config(req: SetWardConfigRequest, current_user: dict = Depend
     """
     key = (req.ward_vpa or req.ward_phone or req.ward_id or "").strip().lower()
     if not key:
-        raise HTTPException(status_code=400, detail="Must provide ward_vpa or ward_phone")
+        raise HTTPException(status_code=400, detail="Must provide ward_vpa, ward_phone, or ward_id")
 
-    GUARDIAN_LIMITS_STORE[key] = req.limit
-    GUARDIAN_TIMEOUTS_STORE[key] = req.timeout_minutes
-    if req.ward_phone:
-        GUARDIAN_LIMITS_STORE[req.ward_phone.strip()] = req.limit
-        GUARDIAN_TIMEOUTS_STORE[req.ward_phone.strip()] = req.timeout_minutes
-    if req.ward_vpa:
-        GUARDIAN_LIMITS_STORE[req.ward_vpa.strip().lower()] = req.limit
-        GUARDIAN_TIMEOUTS_STORE[req.ward_vpa.strip().lower()] = req.timeout_minutes
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id FROM auth_users
+                WHERE LOWER(vpa) = %s OR phone = %s OR id::text = %s
+            """, (key, key, key))
+            ward_row = cursor.fetchone()
+            if not ward_row:
+                raise HTTPException(status_code=404, detail="Ward user not found")
 
-    return {
-        "success": True,
-        "limit": req.limit,
-        "timeout_minutes": req.timeout_minutes,
-        "message": f"Ward config updated: Limit ₹{req.limit:,.2f}, Timeout {req.timeout_minutes}m"
-    }
+            ward_id = str(ward_row['id'])
+            guardian_id = str(current_user['user_id'])
+
+            _upsert_ward_config(cursor, ward_id, guardian_id, req.limit, req.timeout_minutes)
+            conn.commit()
+
+            return {
+                "success": True,
+                "limit": req.limit,
+                "timeout_minutes": req.timeout_minutes,
+                "message": f"Ward config updated: Limit ₹{req.limit:,.2f}, Timeout {req.timeout_minutes}m"
+            }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Failed to set ward config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to set ward config: {str(e)}")
+    finally:
+        conn.close()
 
 
 @router.get("/get-limit")
@@ -489,44 +595,108 @@ async def get_guardian_limit(target_vpa: Optional[str] = None, current_user: dic
     conn = get_db()
     try:
         with conn.cursor() as cursor:
-            vpa_clean = (target_vpa or current_user.get("vpa") or "").strip().lower()
-            phone_clean = (current_user.get("phone") or "").strip()
-            user_id_str = str(current_user.get("user_id"))
-
-            limit = 5000.0
-            for k in [vpa_clean, phone_clean, user_id_str]:
-                if k and k in GUARDIAN_LIMITS_STORE:
-                    limit = GUARDIAN_LIMITS_STORE[k]
-                    break
-
-            timeout_mins = 5
-            for k in [vpa_clean, phone_clean, user_id_str]:
-                if k and k in GUARDIAN_TIMEOUTS_STORE:
-                    timeout_mins = GUARDIAN_TIMEOUTS_STORE[k]
-                    break
-
-            total_spent = 0.0
-            if vpa_clean:
-                cursor.execute("""
-                    SELECT COALESCE(SUM(amount), 0.0) as total_spent
-                    FROM transactions
-                    WHERE sender_vpa = %s AND (status = 'APPROVED' OR status = 'SUCCESS')
-                """, (vpa_clean,))
-                row = cursor.fetchone()
-                if row:
-                    total_spent = float(row['total_spent'])
-
-            remaining = max(0.0, limit - total_spent)
+            if target_vpa:
+                cfg = _get_ward_config_by_vpa(cursor, target_vpa)
+            else:
+                cfg = _get_ward_config(cursor, str(current_user['user_id']))
 
             return {
-                "limit": limit,
-                "cumulative_spent": total_spent,
-                "remaining_limit": remaining,
-                "timeout_minutes": timeout_mins
+                "limit": cfg['spending_limit'],
+                "cumulative_spent": cfg['cumulative_spent'],
+                "remaining_limit": cfg['remaining_limit'],
+                "timeout_minutes": cfg['timeout_minutes']
             }
     except Exception as e:
         logger.error(f"Failed to get limit: {e}")
         return {"limit": 5000.0, "cumulative_spent": 0.0, "remaining_limit": 5000.0, "timeout_minutes": 5}
+    finally:
+        conn.close()
+
+
+@router.post("/check-limit")
+async def check_guardian_limit(req: CheckLimitRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Check if transaction amount exceeds ward's remaining cumulative limit.
+    Requirements: Phase 3 Transaction Enforcement
+    """
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            # Check if user has active guardians
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM guardian_relationships
+                WHERE user_id = %s AND status = 'ACTIVE'
+            """, (current_user['user_id'],))
+            row = cursor.fetchone()
+            active_guardians = row['count'] if row else 0
+
+            if active_guardians == 0:
+                return {
+                    "requires_approval": False,
+                    "has_active_guardians": False,
+                    "remaining_limit": 999999999.0
+                }
+
+            cfg = _get_ward_config(cursor, str(current_user['user_id']))
+            spending_limit = cfg['spending_limit']
+            cumulative_spent = cfg['cumulative_spent']
+            remaining = cfg['remaining_limit']
+            timeout_minutes = cfg['timeout_minutes']
+
+            requires_approval = (cumulative_spent + req.amount) > spending_limit
+
+            return {
+                "requires_approval": requires_approval,
+                "has_active_guardians": True,
+                "spending_limit": spending_limit,
+                "cumulative_spent": cumulative_spent,
+                "remaining_limit": remaining,
+                "requested_amount": req.amount,
+                "timeout_minutes": timeout_minutes
+            }
+    except Exception as e:
+        logger.error(f"Failed to check guardian limit: {e}")
+        return {"requires_approval": False, "has_active_guardians": False, "remaining_limit": 5000.0}
+    finally:
+        conn.close()
+
+
+@router.post("/reset-spending")
+async def reset_ward_spending(req: ResetSpendingRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Guardian resets cumulative spending counter for a ward.
+    """
+    key = (req.ward_vpa or req.ward_phone or req.ward_id or "").strip().lower()
+    if not key:
+        raise HTTPException(status_code=400, detail="Must provide ward_vpa, ward_phone, or ward_id")
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id FROM auth_users
+                WHERE LOWER(vpa) = %s OR phone = %s OR id::text = %s
+            """, (key, key, key))
+            ward_row = cursor.fetchone()
+            if not ward_row:
+                raise HTTPException(status_code=404, detail="Ward user not found")
+
+            ward_id = str(ward_row['id'])
+            cursor.execute("""
+                UPDATE guardian_ward_config
+                SET cumulative_spent = 0.0, last_reset_at = NOW(), updated_at = NOW()
+                WHERE ward_user_id = %s::uuid AND guardian_user_id = %s::uuid
+            """, (ward_id, str(current_user['user_id'])))
+            conn.commit()
+
+            return {"success": True, "message": "Cumulative spending counter reset to ₹0.00"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Failed to reset ward spending: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset ward spending: {str(e)}")
     finally:
         conn.close()
 
@@ -552,7 +722,7 @@ async def get_ward_details(identifier: str, current_user: dict = Depends(get_cur
                 raise HTTPException(status_code=404, detail="Ward profile not found")
 
             ward_vpa = ward_profile['vpa']
-            ward_phone = ward_profile['phone']
+            ward_id = str(ward_profile['id'])
 
             # Fetch ward transactions
             cursor.execute("""
@@ -566,33 +736,23 @@ async def get_ward_details(identifier: str, current_user: dict = Depends(get_cur
             for t in txns:
                 t['created_at'] = t['created_at'].isoformat() if t.get('created_at') else None
 
-            # Calculate metrics
-            limit = GUARDIAN_LIMITS_STORE.get(ward_vpa.lower()) or GUARDIAN_LIMITS_STORE.get(ward_phone) or 5000.0
-            timeout_mins = GUARDIAN_TIMEOUTS_STORE.get(ward_vpa.lower()) or GUARDIAN_TIMEOUTS_STORE.get(ward_phone) or 5
-
-            cursor.execute("""
-                SELECT COALESCE(SUM(amount), 0.0) as total_spent
-                FROM transactions
-                WHERE sender_vpa = %s AND (status = 'APPROVED' OR status = 'SUCCESS')
-            """, (ward_vpa,))
-            spent_row = cursor.fetchone()
-            total_spent = float(spent_row['total_spent']) if spent_row else 0.0
-
-            remaining = max(0.0, limit - total_spent)
+            # Persistent config metrics
+            cfg = _get_ward_config(cursor, ward_id)
 
             return {
                 "ward": {
-                    "id": str(ward_profile['id']),
+                    "id": ward_id,
                     "name": ward_profile['name'],
                     "phone": ward_profile['phone'],
                     "vpa": ward_profile['vpa'],
                     "balance": float(ward_profile['balance'] or 0.0)
                 },
                 "config": {
-                    "limit": limit,
-                    "timeout_minutes": timeout_mins,
-                    "cumulative_spent": total_spent,
-                    "remaining_limit": remaining
+                    "limit": cfg['spending_limit'],
+                    "timeout_minutes": cfg['timeout_minutes'],
+                    "cumulative_spent": cfg['cumulative_spent'],
+                    "remaining_limit": cfg['remaining_limit'],
+                    "last_reset_at": cfg['last_reset_at']
                 },
                 "transactions": txns
             }
@@ -619,7 +779,7 @@ async def accept_invitation(relationship_id: str, current_user: dict = Depends(g
                 SELECT gr.id, gr.user_id, gr.status, u.name as ward_name
                 FROM guardian_relationships gr
                 JOIN auth_users u ON gr.user_id = u.id
-                WHERE gr.id = %s AND gr.guardian_user_id = %s
+                WHERE gr.id::text = %s AND gr.guardian_user_id = %s
             """, (relationship_id, current_user['user_id']))
             rel = cursor.fetchone()
 
@@ -633,8 +793,10 @@ async def accept_invitation(relationship_id: str, current_user: dict = Depends(g
             cursor.execute("""
                 UPDATE guardian_relationships
                 SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
-                WHERE id = %s
+                WHERE id::text = %s
             """, (relationship_id,))
+
+            _upsert_ward_config(cursor, str(rel['user_id']), str(current_user['user_id']), 5000.0, 5)
             conn.commit()
 
             # Notify ward via WebSocket
@@ -669,7 +831,7 @@ async def remove_guardian(relationship_id: str, current_user: dict = Depends(get
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT id, user_id, guardian_user_id, status FROM guardian_relationships
-                WHERE id = %s AND (user_id = %s OR guardian_user_id = %s)
+                WHERE id::text = %s AND (user_id = %s OR guardian_user_id = %s)
             """, (relationship_id, current_user['user_id'], current_user['user_id']))
             rel = cursor.fetchone()
 
@@ -682,7 +844,7 @@ async def remove_guardian(relationship_id: str, current_user: dict = Depends(get
             cursor.execute("""
                 UPDATE guardian_relationships
                 SET status = 'REMOVED', removed_at = NOW(), updated_at = NOW()
-                WHERE id = %s
+                WHERE id::text = %s
             """, (relationship_id,))
             conn.commit()
 
@@ -723,10 +885,9 @@ async def request_approval(req: CreateApprovalRequest, current_user: dict = Depe
             if not guardians:
                 raise HTTPException(status_code=400, detail="You have no active guardians configured.")
 
-            # Determine dynamic timeout duration (configured by guardian or default 5 minutes)
-            vpa_clean = (current_user.get("vpa") or "").strip().lower()
-            phone_clean = (current_user.get("phone") or "").strip()
-            timeout_mins = GUARDIAN_TIMEOUTS_STORE.get(vpa_clean) or GUARDIAN_TIMEOUTS_STORE.get(phone_clean) or 5
+            # Determine dynamic timeout duration from persistent guardian_ward_config
+            cfg = _get_ward_config(cursor, str(current_user['user_id']))
+            timeout_mins = cfg.get("timeout_minutes", 5)
 
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=timeout_mins)
             created_requests = []
@@ -790,17 +951,20 @@ async def request_approval(req: CreateApprovalRequest, current_user: dict = Depe
 async def respond_to_request(req: RespondApprovalRequest, current_user: dict = Depends(get_current_user)):
     """
     Approve or Reject a pending transaction request as a guardian.
-    Requirements: 2.7, 2.8, 2.9
+    Handles race conditions with SELECT FOR UPDATE row locking.
+    Requirements: 2.7, 2.8, 2.9, Phase 4 Approval Process
     """
     conn = get_db()
     try:
         with conn.cursor() as cursor:
+            # Atomic row locking to prevent duplicate responses / race conditions
             cursor.execute("""
-                SELECT gar.id, gar.transaction_id, gar.user_id, gar.status, gar.expires_at,
+                SELECT gar.id, gar.transaction_id, gar.user_id, gar.amount, gar.recipient_vpa, gar.status, gar.expires_at,
                        gr.guardian_user_id
                 FROM guardian_approval_requests gar
                 LEFT JOIN guardian_relationships gr ON gar.guardian_id = gr.id
                 WHERE (gar.id::text = %s OR gar.transaction_id = %s)
+                FOR UPDATE OF gar
             """, (req.request_id, req.request_id))
             approval_req = cursor.fetchone()
 
@@ -812,7 +976,6 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
 
             # Check expiration
             expires_at = approval_req['expires_at']
-            # Make sure comparing both naive or both aware
             now_time = datetime.now(timezone.utc)
             if expires_at < now_time:
                 cursor.execute("""
@@ -820,15 +983,46 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
                     SET status = 'EXPIRED'
                     WHERE id::text = %s OR transaction_id = %s
                 """, (req.request_id, req.request_id))
+                
+                # Also mark transaction as EXPIRED / CANCELLED in ledger
+                cursor.execute("""
+                    UPDATE transactions
+                    SET status = 'EXPIRED'
+                    WHERE transaction_id = %s
+                """, (approval_req['transaction_id'],))
+                
                 conn.commit()
                 raise HTTPException(status_code=400, detail="Request has expired")
 
-            # Update status
+            # Update request status
             cursor.execute("""
                 UPDATE guardian_approval_requests
                 SET status = %s, responded_at = NOW(), response_note = %s
                 WHERE id::text = %s OR transaction_id = %s
             """, (req.decision, req.note, req.request_id, req.request_id))
+
+            txn_id = approval_req['transaction_id']
+            ward_user_id = str(approval_req['user_id'])
+            amount = float(approval_req['amount'])
+
+            if req.decision == 'APPROVED':
+                # Increment cumulative spent for the ward
+                _increment_cumulative_spent(cursor, ward_user_id, amount)
+                
+                # Update transaction status in ledger to APPROVED
+                cursor.execute("""
+                    UPDATE transactions
+                    SET status = 'APPROVED', decision = 'APPROVE'
+                    WHERE transaction_id = %s
+                """, (txn_id,))
+            else:
+                # REJECTED -> mark transaction as REJECTED / CANCELLED
+                cursor.execute("""
+                    UPDATE transactions
+                    SET status = 'REJECTED', decision = 'REJECT'
+                    WHERE transaction_id = %s
+                """, (txn_id,))
+
             conn.commit()
 
             # Push response to requester via WebSocket
@@ -836,12 +1030,12 @@ async def respond_to_request(req: RespondApprovalRequest, current_user: dict = D
                 "type": "APPROVAL_RESPONSE",
                 "data": {
                     "request_id": req.request_id,
-                    "transaction_id": approval_req['transaction_id'],
+                    "transaction_id": txn_id,
                     "status": req.decision,
                     "guardian_name": current_user.get("name") or current_user.get("phone") or "Sentinel User",
                     "note": req.note
                 }
-            }, str(approval_req['user_id']))
+            }, ward_user_id)
 
             return {"success": True, "status": req.decision}
     except HTTPException:

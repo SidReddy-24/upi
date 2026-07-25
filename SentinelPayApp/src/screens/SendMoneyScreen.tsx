@@ -306,63 +306,55 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
         return;
       }
 
-      try {
-        const gListRes = await guardianService.listGuardians();
-        const activeGuardians = gListRes?.guardians?.filter(g => g.status === 'ACTIVE') ?? [];
-        const gLimitRes = await guardianService.getGuardianLimit();
-        const guardianLimit = gLimitRes?.limit ?? 5000;
-
-        if (activeGuardians.length > 0 && amount > guardianLimit) {
-          const txnId = score.transaction_id || `TXN_${Date.now()}`;
-          await guardianService.requestApproval({
-            transaction_id: txnId,
-            amount,
-            recipient_vpa: receiverVpa.trim(),
-            fraud_score: score.risk_score ?? 0.1,
-            risk_signals: score.signals?.rule_flags || score.explanation?.top_factors || [],
-          });
-
-          setStep('AWAITING_GUARDIAN_APPROVAL');
-          setGuardianTimer(300);
-
-          if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
-          guardianTimerRef.current = setInterval(async () => {
-            setGuardianTimer(prev => {
-              if (prev <= 1) {
-                if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
-                setError('Guardian approval request timed out.');
-                setStep('BLOCKED');
-                isProcessingPaymentRef.current = false;
-                return 0;
-              }
-              return prev - 1;
-            });
-
-            try {
-              const statusRes = await guardianService.getRequestStatus(txnId);
-              if (statusRes.status === 'APPROVED') {
-                if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
-                await finalizeApprovedPayment(currentUser, txnId);
-              } else if (statusRes.status === 'REJECTED') {
-                if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
-                setError('🚨 Transaction Blocked: Your guardian rejected this payment request.');
-                setStep('BLOCKED');
-                isProcessingPaymentRef.current = false;
-              }
-            } catch (err) {
-              console.debug('Polling approval status note:', err);
-            }
-          }, 2000);
-
-          return;
-        }
-      } catch (gErr) {
-        console.warn('Guardian threshold check note:', gErr);
-      }
-
       await finalizeApprovedPayment(currentUser, score.transaction_id || `TXN_${Date.now()}`);
     } catch (e: any) {
-      const msg = e?.response?.data?.detail ?? e?.message ?? 'Payment failed';
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+
+      if (status === 423) {
+        // Server-enforced Guardian Approval required!
+        const txnId = score.transaction_id || `TXN_${Date.now()}`;
+        setStep('AWAITING_GUARDIAN_APPROVAL');
+        setGuardianTimer(300);
+
+        if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+        guardianTimerRef.current = setInterval(async () => {
+          setGuardianTimer(prev => {
+            if (prev <= 1) {
+              if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+              setError('Guardian approval request timed out.');
+              setStep('BLOCKED');
+              isProcessingPaymentRef.current = false;
+              return 0;
+            }
+            return prev - 1;
+          });
+
+          try {
+            const statusRes = await guardianService.getRequestStatus(txnId);
+            if (statusRes.status === 'APPROVED') {
+              if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+              const latestUser = await getUser();
+              if (latestUser) {
+                await updateBalance(latestUser.balance - amount);
+              }
+              setStep('SUCCESS');
+              isProcessingPaymentRef.current = false;
+            } else if (statusRes.status === 'REJECTED') {
+              if (guardianTimerRef.current) clearInterval(guardianTimerRef.current);
+              setError('🚨 Transaction Blocked: Your guardian rejected this payment request.');
+              setStep('BLOCKED');
+              isProcessingPaymentRef.current = false;
+            }
+          } catch (err) {
+            console.debug('Polling approval status note:', err);
+          }
+        }, 3000);
+
+        return;
+      }
+
+      const msg = typeof detail === 'string' ? detail : e?.message ?? 'Payment failed';
       setError(msg);
       setStep('BLOCKED');
     } finally {
@@ -372,43 +364,37 @@ export default function SendMoneyScreen({ navigation, route }: Props) {
   };
 
   const finalizeApprovedPayment = async (currentUser: any, txnId: string) => {
-    try {
-      const transferRes = await fraudShieldApi.executeP2PTransfer({
-        transaction_id: txnId,
-        sender_vpa: currentUser.vpa,
-        receiver_vpa: receiverVpa.trim(),
-        amount,
-        device_id: deviceInfo.device_id,
-        is_call_active: isCallActive,
-        otp_in_last_60s: otpInLast60s,
-        sms_fraud_score: latestSmsFraudScore ?? undefined,
-      });
+    const transferRes = await fraudShieldApi.executeP2PTransfer({
+      transaction_id: txnId,
+      sender_vpa: currentUser.vpa,
+      receiver_vpa: receiverVpa.trim(),
+      amount,
+      device_id: deviceInfo.device_id,
+      is_call_active: isCallActive,
+      otp_in_last_60s: otpInLast60s,
+      sms_fraud_score: latestSmsFraudScore ?? undefined,
+    });
 
-      await updateBalance(transferRes.updated_sender_balance);
+    await updateBalance(transferRes.updated_sender_balance);
 
-      const settings = await getSettings();
-      if (settings.smsNotificationsEnabled) {
-        try {
-          await fraudShieldApi.sendTransactionNotification({
-            transaction_id: transferRes.transaction_id || txnId,
-            sender_vpa: currentUser.vpa,
-            receiver_vpa: receiverVpa.trim(),
-            amount,
-            status: score?.decision || 'APPROVE',
-            risk_score: score?.risk_score || 0.0,
-            timestamp: new Date().toISOString(),
-          });
-        } catch (e) {
-          console.warn('[SMS] Failed to send notification:', e);
-        }
+    const settings = await getSettings();
+    if (settings.smsNotificationsEnabled) {
+      try {
+        await fraudShieldApi.sendTransactionNotification({
+          transaction_id: transferRes.transaction_id || txnId,
+          sender_vpa: currentUser.vpa,
+          receiver_vpa: receiverVpa.trim(),
+          amount,
+          status: score?.decision || 'APPROVE',
+          risk_score: score?.risk_score || 0.0,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('[SMS] Failed to send notification:', e);
       }
-
-      setStep('SUCCESS');
-    } catch (e: any) {
-      const msg = e?.response?.data?.detail ?? e?.message ?? 'Payment failed';
-      setError(msg);
-      setStep('BLOCKED');
     }
+
+    setStep('SUCCESS');
   };
 
   const handleConfirmHold = () => {
