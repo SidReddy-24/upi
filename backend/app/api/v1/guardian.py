@@ -383,8 +383,7 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
                     return {
                         "relationship_id": rel_id,
                         "status": "PENDING_VERIFICATION",
-                        "verification_code": verification_code,
-                        "message": "Verification code generated and sent to guardian."
+                        "message": "Verification code sent to guardian's device. Ask your guardian to share the code with you."
                     }
 
             # Enforce max 5 active guardians check
@@ -426,8 +425,7 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             return {
                 "relationship_id": rel_id,
                 "status": "PENDING_VERIFICATION",
-                "verification_code": verification_code,
-                "message": "Verification code generated and sent to guardian."
+                "message": "Verification code sent to guardian's device. Ask your guardian to share the code with you."
             }
     except HTTPException:
         conn.rollback()

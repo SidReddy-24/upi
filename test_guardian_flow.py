@@ -14,6 +14,7 @@ import json
 from fastapi.testclient import TestClient
 from app.main import app
 from app.api.v1.auth import get_db
+from app.api.v1.guardian import GUARDIAN_VERIFICATION_CODES
 
 client = TestClient(app)
 
@@ -85,8 +86,9 @@ def test_phase1_guardian_linking_otp(setup_users):
     data_invite = resp_invite.json()
     assert "relationship_id" in data_invite
     rel_id = data_invite["relationship_id"]
-    otp_code = data_invite.get("verification_code")
-    assert otp_code is not None
+    # OTP is in-memory only (NOT in response) — guardian receives it via WebSocket
+    otp_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
+    assert otp_code is not None, "OTP code should be in GUARDIAN_VERIFICATION_CODES"
 
     # Step 2: Ward enters OTP code to verify and link
     resp_verify = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": otp_code}, headers=headers_ward)
@@ -109,7 +111,7 @@ def test_phase2_config_and_permissions(setup_users):
     # Link guardian first
     resp_invite = client.post("/api/v1/guardian/add", json={"phone": guardian["phone"]}, headers=headers_ward)
     rel_id = resp_invite.json()["relationship_id"]
-    otp_code = resp_invite.json()["verification_code"]
+    otp_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
     client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": otp_code}, headers=headers_ward)
 
     # Guardian sets cumulative limit = ₹3000 and timeout = 10 min
@@ -141,7 +143,7 @@ def test_phase3_and_4_transaction_enforcement_and_approval(setup_users):
     # 1. Link guardian
     resp_invite = client.post("/api/v1/guardian/add", json={"phone": guardian["phone"]}, headers=headers_ward)
     rel_id = resp_invite.json()["relationship_id"]
-    otp_code = resp_invite.json()["verification_code"]
+    otp_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
     client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": otp_code}, headers=headers_ward)
 
     # 2. Guardian sets limit = ₹2000
@@ -201,7 +203,7 @@ def test_phase5_reset_spending_counter(setup_users):
     # Link and set limit
     resp_invite = client.post("/api/v1/guardian/add", json={"phone": guardian["phone"]}, headers=headers_ward)
     rel_id = resp_invite.json()["relationship_id"]
-    otp_code = resp_invite.json()["verification_code"]
+    otp_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
     client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": otp_code}, headers=headers_ward)
 
     client.post("/api/v1/guardian/set-ward-config", json={"ward_vpa": ward["vpa"], "limit": 1000.0, "timeout_minutes": 5}, headers=headers_guardian)

@@ -215,14 +215,15 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         setInviteInput('');
         await fetchRelationships();
 
-        const codeStr = res.verification_code ? `Verification Code: ${res.verification_code}\n\n` : '';
+        // ✅ DO NOT show or pre-fill the OTP — it is sent to the GUARDIAN's device.
+        // The Ward must ask the Guardian to share the code verbally (out-of-band).
         Alert.alert(
-          'Invitation Sent',
-          `Guardian invitation sent to ${input}.\n\n${codeStr}Please enter the 6-digit verification code to complete guardian linking.`
+          'Invitation Sent ✅',
+          `Guardian invitation sent to ${input}.\n\nAsk your guardian to check their SentinelPay app for a 6-digit verification code, then enter it below to complete linking.`
         );
 
         setVerifyingRelId(res.relationship_id);
-        setOtpInput(res.verification_code || '');
+        setOtpInput('');   // ← blank: ward must type code received from guardian
         setOtpModalVisible(true);
       }
     } catch (error: any) {
