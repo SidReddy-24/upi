@@ -191,9 +191,12 @@ async def list_guardians(current_user: dict = Depends(get_current_user)):
 
             # Format datetime columns to ISO string & inject verification_code for guardian to view
             for g in my_guardians:
-                g['id'] = str(g['id'])
+                g_id = str(g['id'])
+                g['id'] = g_id
                 g['invited_at'] = g['invited_at'].isoformat() if g['invited_at'] else None
                 g['accepted_at'] = g['accepted_at'].isoformat() if g['accepted_at'] else None
+                if g_id in GUARDIAN_VERIFICATION_CODES:
+                    g['verification_code'] = GUARDIAN_VERIFICATION_CODES[g_id].get("code")
             
             for w in my_wards:
                 w_id = str(w['id'])
@@ -279,8 +282,8 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             verification_code = f"{random.randint(100000, 999999)}"
 
             if existing:
-                if existing['status'] in ('ACTIVE', 'PENDING'):
-                    raise HTTPException(status_code=409, detail=f"Guardian relationship is already {existing['status']}")
+                if existing['status'] == 'ACTIVE':
+                    raise HTTPException(status_code=409, detail="Guardian relationship is already ACTIVE")
                 else:
                     rel_id = str(existing['id'])
                     cursor.execute("""
@@ -311,6 +314,7 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
                     return {
                         "relationship_id": rel_id,
                         "status": "PENDING_VERIFICATION",
+                        "verification_code": verification_code,
                         "message": "Verification code generated and sent to guardian."
                     }
 
@@ -353,6 +357,7 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             return {
                 "relationship_id": rel_id,
                 "status": "PENDING_VERIFICATION",
+                "verification_code": verification_code,
                 "message": "Verification code generated and sent to guardian."
             }
     except HTTPException:
@@ -383,7 +388,7 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
                 cursor.execute("""
                     UPDATE guardian_relationships
                     SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
-                    WHERE id = %s AND user_id = %s
+                    WHERE id::text = %s AND user_id = %s
                     RETURNING guardian_user_id
                 """, (rel_id, current_user['user_id']))
                 res = cursor.fetchone()
@@ -398,25 +403,33 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
                         }
                     }, str(res['guardian_user_id']))
 
+                GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
                 return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
         except Exception as e:
             logger.error(f"Failed to verify guardian code DB: {str(e)}")
+            GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
             return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
         finally:
             conn.close()
     
-    # If not in memory store or PostgreSQL check
+    # Check PostgreSQL database with safe id::text casting
     conn = get_db()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
                 UPDATE guardian_relationships
                 SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
-                WHERE id = %s AND user_id = %s
+                WHERE id::text = %s AND user_id = %s
+                RETURNING id
             """, (rel_id, current_user['user_id']))
+            res = cursor.fetchone()
             conn.commit()
-            return {"success": True, "status": "ACTIVE", "message": "Guardian verified and linked!"}
-    except Exception:
+            if res:
+                GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
+                return {"success": True, "status": "ACTIVE", "message": "Guardian verified and linked!"}
+            raise HTTPException(status_code=400, detail="Invalid verification code or relationship not found.")
+    except Exception as e:
+        logger.error(f"Verify code DB check failed: {e}")
         raise HTTPException(status_code=400, detail="Invalid verification code. Please try again.")
     finally:
         conn.close()

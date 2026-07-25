@@ -206,35 +206,15 @@ class GuardianService {
   }
 
   async addGuardian(phone?: string, vpa?: string): Promise<{ relationship_id: string; status: string; verification_code?: string; message?: string }> {
-    const relId = `REL_${Date.now()}`;
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
     try {
       const resp = await authClient.post('/guardian/add', { phone, vpa });
       return resp.data;
-    } catch (e) {
-      console.warn('[GuardianService] Remote addGuardian failed, using local simulation:', e);
-      const current = await this.listGuardians();
-      const newGuardian: GuardianRelationship = {
-        id: relId,
-        guardian_phone: phone || '9876543210',
-        guardian_vpa: vpa || `${phone}@sentinelpay`,
-        status: 'PENDING_VERIFICATION',
-        invited_at: new Date().toISOString(),
-        accepted_at: null,
-        guardian_name: phone || vpa || 'Guardian',
-        verification_code: code,
-      };
-
-      current.guardians.push(newGuardian);
-      await AsyncStorage.setItem('sentinelpay_local_guardians', JSON.stringify(current));
-
-      return {
-        relationship_id: relId,
-        status: 'PENDING_VERIFICATION',
-        verification_code: code,
-        message: 'Guardian invite created (simulation mode)',
-      };
+    } catch (e: any) {
+      console.warn('[GuardianService] Remote addGuardian failed:', e?.response?.data || e);
+      if (e?.response?.data?.detail) {
+        throw new Error(e.response.data.detail);
+      }
+      throw e;
     }
   }
 

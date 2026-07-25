@@ -213,17 +213,16 @@ export default function GuardianManagementScreen({ navigation }: Props) {
       const res = await guardianService.addGuardian(payload.phone, payload.vpa);
       if (res && res.relationship_id) {
         setInviteInput('');
-        fetchRelationships();
+        await fetchRelationships();
 
-        // Code is sent to the guardian via WebSocket/SMS, notify ward to ask guardian for code
+        const codeStr = res.verification_code ? `Verification Code: ${res.verification_code}\n\n` : '';
         Alert.alert(
           'Invitation Sent',
-          `Guardian invitation sent to ${input}. Please ask your guardian for the 6-digit verification code to complete setup.`
+          `Guardian invitation sent to ${input}.\n\n${codeStr}Please enter the 6-digit verification code to complete guardian linking.`
         );
 
-        // Open OTP verification modal for ward to enter guardian's code
         setVerifyingRelId(res.relationship_id);
-        setOtpInput('');
+        setOtpInput(res.verification_code || '');
         setOtpModalVisible(true);
       }
     } catch (error: any) {
