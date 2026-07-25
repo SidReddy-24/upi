@@ -9,12 +9,18 @@ export default function PanicButton() {
   const [modalVisible, setModalVisible] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
 
+  React.useEffect(() => {
+    AsyncStorage.getItem(PANIC_FROZEN_KEY).then(val => {
+      if (val === 'true') setIsFrozen(true);
+    });
+  }, []);
+
   const handlePanicAction = async () => {
     await AsyncStorage.setItem(PANIC_FROZEN_KEY, 'true');
     setIsFrozen(true);
     setModalVisible(false);
     Alert.alert(
-      'EMERGENCY PANIC ACTIVATED',
+      '🚨 EMERGENCY PANIC ACTIVATED',
       'Wallet payments have been instantly frozen. Your bank & guardian alerts (simulated) have been dispatched. Incident report generated.',
       [{ text: 'OK' }]
     );
@@ -23,13 +29,14 @@ export default function PanicButton() {
   const handleUnfreeze = async () => {
     await AsyncStorage.removeItem(PANIC_FROZEN_KEY);
     setIsFrozen(false);
-    Alert.alert('Wallet Unfrozen', 'Payments restored.');
+    Alert.alert('✅ Wallet Unfrozen', 'Payments restored.');
   };
 
   return (
     <>
       <TouchableOpacity
         style={[styles.panicFab, isFrozen && styles.frozenFab]}
+        activeOpacity={0.8}
         onPress={() => (isFrozen ? handleUnfreeze() : setModalVisible(true))}>
         <AppIcon name={isFrozen ? 'lock' : 'siren'} size={24} color="#FFFFFF" />
       </TouchableOpacity>
@@ -70,18 +77,18 @@ export default function PanicButton() {
 const styles = StyleSheet.create({
   panicFab: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
-    backgroundColor: '#dc2626',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 88,
+    right: 16,
+    backgroundColor: '#DC2626',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     zIndex: 999,
   },
   frozenFab: {

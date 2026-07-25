@@ -233,6 +233,12 @@ export async function executePayment(
   const user = await getUser();
   if (!user) return { success: false, error: 'User not logged in' };
 
+  // Check Emergency Panic Freeze State
+  const panicState = await AsyncStorage.getItem('sentinelpay_wallet_frozen');
+  if (panicState === 'true') {
+    return { success: false, error: 'EMERGENCY PANIC ACTIVE: Outbound UPI payments are frozen.' };
+  }
+
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
   if (amount > user.balance) return { success: false, error: 'Insufficient SPC balance' };
   if (decision === 'REJECT') return { success: false, error: 'Payment blocked by fraud detection' };
