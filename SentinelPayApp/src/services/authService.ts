@@ -10,31 +10,34 @@ const rnBiometrics = new ReactNativeBiometrics();
 
 let cachedAccessToken: string | null = null;
 
-// Create authenticated Axios client with low latency timeout
+// Create authenticated Axios client with 30s timeout for cloud backend resilience
 export const authClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 8000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'X-API-Key': API_KEY,
   },
 });
 
-// Fast server detection: Prefer local 1ms server when available
+// Fast server detection: Prefer local server in development mode only
 export const initFastBackend = async () => {
-  try {
-    const probe = await axios.get(`${FAST_LOCAL_URL}/health`, { timeout: 1500 });
-    if (probe.data?.status === 'HEALTHY' || probe.status === 200) {
-      API_BASE_URL = FAST_LOCAL_URL;
-      authClient.defaults.baseURL = FAST_LOCAL_URL;
-      console.log('[authClient] ⚡ Connected to Fast Local Backend (1ms latency)');
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    try {
+      const probe = await axios.get(`${FAST_LOCAL_URL}/health`, { timeout: 1500 });
+      if (probe.data?.status === 'HEALTHY' || probe.status === 200) {
+        API_BASE_URL = FAST_LOCAL_URL;
+        authClient.defaults.baseURL = FAST_LOCAL_URL;
+        authClient.defaults.timeout = 10000;
+        console.log('[authClient] ⚡ Connected to Fast Local Backend (1ms latency)');
+      }
+    } catch (e) {
+      console.log('[authClient] Using Cloud Production Backend');
     }
-  } catch (e) {
-    console.log('[authClient] Using Cloud Production Backend');
   }
 };
 
-// Fire fast backend probe on module load
+// Fire fast backend probe on module load in dev mode
 initFastBackend();
 
 // Request Interceptor: In-memory token injection for zero-latency headers

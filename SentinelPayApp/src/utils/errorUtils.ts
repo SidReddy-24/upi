@@ -6,6 +6,11 @@
 export function formatApiError(error: any, fallbackMessage: string = 'An error occurred'): string {
   if (!error) return fallbackMessage;
 
+  // Handle network connectivity / timeout errors explicitly
+  if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || error.message?.includes('timeout')) {
+    return 'Network request timed out or server is starting up. Please check your connection and try again.';
+  }
+
   const detail = error.response?.data?.detail ?? error.detail ?? error.message;
 
   if (!detail) return fallbackMessage;
