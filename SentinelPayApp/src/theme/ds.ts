@@ -1,7 +1,6 @@
 /**
  * SentinelPay Design System — Single Source of Truth
- * Extracted from HomeScreen.tsx — All screens MUST import from here.
- * Design Refs: Apple Wallet, Revolut, Linear, Stripe Dashboard
+ * Design Refs: Apple Wallet, Revolut, CRED, Google Wallet, Linear, Stripe Dashboard
  * Theme: Deep Slate (#0F172A), Slate Surface (#F8FAFC), Emerald (#10B981), Cobalt (#2563EB)
  */
 import { Dimensions, StyleSheet } from 'react-native';
@@ -55,12 +54,12 @@ export const DS = StyleSheet.create({
   // ── Screen ──────────────────────────────────────────────────────────────────
   screen:    { flex:1, backgroundColor:C.bg },
   safeArea:  { flex:1, backgroundColor:C.bg },
-  scrollContent: { paddingHorizontal:S.base, paddingTop:S.base, paddingBottom:100 },
+  scrollContent: { paddingHorizontal:S.xl, paddingTop:S.base, paddingBottom:120 },
 
   // ── Cards ───────────────────────────────────────────────────────────────────
   card: {
-    backgroundColor:C.surface, borderRadius:R.xl, padding:S.base,
-    marginBottom:S.md, borderWidth:1, borderColor:C.border,
+    backgroundColor:C.surface, borderRadius:R.xl, padding:S.lg,
+    marginBottom:S.base, borderWidth:1, borderColor:C.border,
     shadowColor:C.dark, shadowOffset:{width:0,height:2}, shadowOpacity:0.05, shadowRadius:8, elevation:2,
   },
   cardLg: {
@@ -74,27 +73,61 @@ export const DS = StyleSheet.create({
   },
   infoCard: {
     flexDirection:'row', alignItems:'flex-start', backgroundColor:C.surfaceAlt,
-    padding:S.base, borderRadius:R.lg, gap:S.md,
+    padding:S.md, borderRadius:R.lg, gap:S.md,
   },
   rowCard: {
     flexDirection:'row', alignItems:'center', backgroundColor:C.surface,
-    borderRadius:R.xl, padding:S.base, marginBottom:S.md,
+    borderRadius:R.xl, padding:S.base, marginBottom:S.sm,
     borderWidth:1, borderColor:C.border, gap:S.md,
     shadowColor:C.dark, shadowOffset:{width:0,height:2}, shadowOpacity:0.03, shadowRadius:4, elevation:1,
   },
   gridCard: {
-    width: (W - 44) / 2, backgroundColor:C.surface, borderRadius:R.xl,
+    width: (W - 56) / 2, backgroundColor:C.surface, borderRadius:R.xl,
     padding:S.base, borderWidth:1, borderColor:C.border,
     shadowColor:C.dark, shadowOffset:{width:0,height:2}, shadowOpacity:0.05, shadowRadius:8, elevation:2,
   },
-  // Stat card (for dashboards / summaries)
   statCard: {
     flex:1, backgroundColor:C.surface, borderRadius:R.xl, padding:S.base,
     alignItems:'center', borderWidth:1, borderColor:C.border,
     shadowColor:C.dark, shadowOffset:{width:0,height:2}, shadowOpacity:0.04, shadowRadius:6, elevation:2,
   },
   statsRow: {
-    flexDirection:'row', gap:S.md, marginBottom:S.base,
+    flexDirection:'row', gap:S.sm, marginBottom:S.base,
+  },
+
+  // ── 2x2 Metric Grid ─────────────────────────────────────────────────────────
+  metricGrid: {
+    flexDirection:'row', flexWrap:'wrap', gap:S.sm, marginBottom:S.md,
+  },
+  metricCell: {
+    width: (W - 96) / 2,
+    backgroundColor:C.surfaceAlt, borderRadius:R.lg, padding:S.base,
+    alignItems:'flex-start', borderWidth:1, borderColor:C.border,
+  },
+  metricCellNum: {
+    fontSize:T.xxl, fontWeight:T.black, color:C.textPrimary, marginBottom:2,
+  },
+  metricCellLabel: {
+    fontSize:T.xs, fontWeight:T.semibold, color:C.textSecondary, lineHeight:16,
+  },
+
+  // ── Segmented Controls ───────────────────────────────────────────────────────
+  segmentedBar: {
+    flexDirection:'row', backgroundColor:C.surfaceAlt, borderRadius:R.lg,
+    padding:3, marginBottom:S.lg, borderWidth:1, borderColor:C.border,
+  },
+  segmentTab: {
+    flex:1, height:36, borderRadius:R.md, alignItems:'center', justifyContent:'center',
+  },
+  segmentTabActive: {
+    backgroundColor:C.dark,
+    shadowColor:C.dark, shadowOffset:{width:0,height:2}, shadowOpacity:0.15, shadowRadius:4, elevation:2,
+  },
+  segmentTabText: {
+    fontSize:T.sm, fontWeight:T.bold, color:C.textSecondary,
+  },
+  segmentTabTextActive: {
+    color:C.textInverse,
   },
 
   // ── Buttons ─────────────────────────────────────────────────────────────────
@@ -154,28 +187,20 @@ export const DS = StyleSheet.create({
   statusDot: { width:6, height:6, borderRadius:3 },
   pillBadge: { flexDirection:'row', alignItems:'center', paddingHorizontal:S.sm, paddingVertical:S.xs, borderRadius:R.xs, gap:S.xs },
 
-  // ── Empty States ────────────────────────────────────────────────────────────
-  emptyCard:  { backgroundColor:C.surface, borderRadius:R.lg, padding:S.xl, alignItems:'center', marginTop:S.base, borderWidth:1, borderColor:C.border },
-  emptyTitle: { fontSize:T.md, fontWeight:T.bold, color:C.textPrimary, marginTop:S.sm },
-  emptySub:   { fontSize:T.sm, color:C.textTertiary, marginTop:2, textAlign:'center', lineHeight:18 },
+  // ── Premium Empty States ─────────────────────────────────────────────────────
+  emptyCard:  { backgroundColor:C.surface, borderRadius:R.card, padding:S.xxl, alignItems:'center', marginTop:S.base, borderWidth:1, borderColor:C.border },
+  emptyIcon:  { width:72, height:72, borderRadius:36, backgroundColor:C.surfaceAlt, alignItems:'center', justifyContent:'center', marginBottom:S.lg, borderWidth:1, borderColor:C.border },
+  emptyTitle: { fontSize:T.md, fontWeight:T.extrabold, color:C.textPrimary, marginBottom:S.xs, textAlign:'center' },
+  emptySub:   { fontSize:T.sm, fontWeight:T.medium, color:C.textTertiary, textAlign:'center', lineHeight:20, marginBottom:S.lg },
+  emptyCta:   { paddingHorizontal:S.xxl },
 
   // ── Headers ─────────────────────────────────────────────────────────────────
-  headerBar:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:S.base, paddingVertical:S.md, backgroundColor:C.bg, borderBottomWidth:1, borderBottomColor:C.border },
+  headerBar:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:S.xl, paddingVertical:S.md, backgroundColor:C.bg, borderBottomWidth:1, borderBottomColor:C.border },
   headerIconBtn:{ width:36, height:36, borderRadius:R.sm, backgroundColor:C.surface, alignItems:'center', justifyContent:'center', borderWidth:1, borderColor:C.border },
-  // Auth brand block (Login / Register hero area)
-  authBrand: {
-    alignItems:'center', paddingTop:S.xxl, paddingBottom:S.xl,
-  },
-  authBrandIcon: {
-    width:56, height:56, borderRadius:R.xl, backgroundColor:C.dark,
-    alignItems:'center', justifyContent:'center', marginBottom:S.md,
-  },
-  authBrandTitle: {
-    fontSize:T.xxl, fontWeight:T.black, color:C.textPrimary, letterSpacing:-0.5,
-  },
-  authBrandSub: {
-    fontSize:T.xs, fontWeight:T.extrabold, color:C.green, letterSpacing:1, marginTop:2,
-  },
+  authBrand:     { alignItems:'center', paddingTop:S.xxl, paddingBottom:S.xl },
+  authBrandIcon: { width:56, height:56, borderRadius:R.xl, backgroundColor:C.dark, alignItems:'center', justifyContent:'center', marginBottom:S.md },
+  authBrandTitle:{ fontSize:T.xxl, fontWeight:T.black, color:C.textPrimary, letterSpacing:-0.5 },
+  authBrandSub:  { fontSize:T.xs, fontWeight:T.extrabold, color:C.green, letterSpacing:1, marginTop:2 },
 
   // ── Modal / Bottom Sheet ─────────────────────────────────────────────────────
   modalOverlay:  { flex:1, backgroundColor:'rgba(15,23,42,0.5)', justifyContent:'flex-end' },

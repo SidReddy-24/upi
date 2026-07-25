@@ -1173,15 +1173,16 @@ const styles = StyleSheet.create({
   /* PRESETS & INPUTS */
   presetRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: S.sm,
     marginBottom: S.base,
   },
   presetChip: {
     flex: 1,
+    height: 44,
     backgroundColor: C.surfaceAlt,
-    paddingVertical: S.sm,
     borderRadius: R.md,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: C.border,
   },
@@ -1201,11 +1202,12 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 52,
   },
   currencyPrefix: {
     backgroundColor: C.surfaceAlt,
-    height: 48,
-    paddingHorizontal: 14,
+    height: 52,
+    paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderTopLeftRadius: R.md,
@@ -1225,7 +1227,7 @@ const styles = StyleSheet.create({
   },
   limitInput: {
     flex: 1,
-    height: 48,
+    height: 52,
     backgroundColor: C.surface,
     borderTopRightRadius: R.md,
     borderBottomRightRadius: R.md,
@@ -1239,8 +1241,8 @@ const styles = StyleSheet.create({
   },
   saveLimitBtn: {
     backgroundColor: C.dark,
-    paddingHorizontal: S.base,
-    height: 48,
+    paddingHorizontal: S.lg,
+    height: 52,
     borderRadius: R.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1248,8 +1250,8 @@ const styles = StyleSheet.create({
   },
   saveLimitButton: {
     backgroundColor: C.dark,
-    paddingHorizontal: S.base,
-    height: 48,
+    paddingHorizontal: S.lg,
+    height: 52,
     borderRadius: R.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1268,10 +1270,11 @@ const styles = StyleSheet.create({
   inviteButton: {
     backgroundColor: C.dark,
     borderRadius: R.md,
-    height: 48,
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: S.base,
+    paddingHorizontal: S.lg,
+    marginLeft: 8,
   },
   inviteButtonText: {
     color: C.textInverse,
@@ -1279,22 +1282,24 @@ const styles = StyleSheet.create({
     fontWeight: T.extrabold,
   },
   input: {
+    flex: 1,
     backgroundColor: C.surface,
     borderRadius: R.md,
     borderWidth: 1,
     borderColor: C.border,
     paddingHorizontal: 14,
-    height: 48,
+    height: 52,
     fontSize: T.body,
+    fontWeight: T.bold,
     color: C.textPrimary,
   },
   button: {
     backgroundColor: C.dark,
     borderRadius: R.md,
-    height: 48,
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: S.base,
+    paddingHorizontal: S.lg,
   },
   buttonText: {
     color: C.textInverse,
@@ -1318,17 +1323,17 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: C.dark,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: S.md,
+    justifyContent: 'center',
   },
   avatarLetter: {
     color: C.textInverse,
     fontSize: T.md,
-    fontWeight: T.extrabold,
+    fontWeight: T.black,
   },
   itemInfo: {
     flex: 1,
+    marginLeft: S.md,
   },
   itemName: {
     fontSize: T.body,
@@ -1397,20 +1402,22 @@ const styles = StyleSheet.create({
   /* EMPTY STATES */
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: S.xl,
+    paddingVertical: S.xxl,
+    paddingHorizontal: S.lg,
   },
   emptyTitle: {
     color: C.textPrimary,
     fontSize: T.md,
-    fontWeight: T.bold,
-    marginTop: 10,
-    marginBottom: 4,
+    fontWeight: T.extrabold,
+    marginTop: S.md,
+    marginBottom: S.xs,
+    textAlign: 'center',
   },
   emptyText: {
     color: C.textSecondary,
     fontSize: T.sm,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
   },
 
   /* OTP FEED */
