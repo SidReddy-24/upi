@@ -367,7 +367,7 @@ export default function HomeScreen({ navigation }: Props) {
         <AppIcon name="chevronRight" size={18} color="#94A3B8" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.intelRowCard} activeOpacity={0.7} onPress={() => navigation.navigate('ScamPassport', { entity: user?.vpa || 'demo@sentinelpay' })}>
+      <TouchableOpacity style={styles.intelRowCard} activeOpacity={0.7} onPress={() => navigation.navigate('ScamPassport', { entityId: user?.vpa || 'demo@sentinelpay' })}>
         <View style={[styles.intelIconCircle, { backgroundColor: '#FFFBEB' }]}>
           <AppIcon name="search" size={22} color="#D97706" />
         </View>
@@ -378,7 +378,7 @@ export default function HomeScreen({ navigation }: Props) {
         <AppIcon name="chevronRight" size={18} color="#94A3B8" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.intelRowCard} activeOpacity={0.7} onPress={() => navigation.navigate('ReportScam')}>
+      <TouchableOpacity style={styles.intelRowCard} activeOpacity={0.7} onPress={() => navigation.navigate('ReportScam', undefined)}>
         <View style={[styles.intelIconCircle, { backgroundColor: '#FEF2F2' }]}>
           <AppIcon name="report" size={22} color="#EF4444" />
         </View>

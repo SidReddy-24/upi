@@ -7,7 +7,7 @@ export type RootStackParamList = {
   TransactionDetail: { txnId: string };
   ReceiveMoney: undefined;
   ScanQR: undefined;
-  ReportScam: { entityType?: string; entityValue?: string; evidence?: string };
+  ReportScam: { entityType?: string; entityValue?: string; evidence?: string } | undefined;
   ScamPassport: { entityId?: string };
   ScamAssistant: undefined;
   ScamHeatMap: undefined;
@@ -87,6 +87,11 @@ export interface TransactionRequest {
   location: LocationInfo;
   network: NetworkInfo;
   metadata: { org_id: string; channel: string };
+  otp_in_last_60s?: boolean;
+  is_call_active?: boolean;
+  sms_fraud_score?: number;
+  device_id?: string;
+  app_version?: string;
 }
 
 export interface FraudSignals {
@@ -112,6 +117,7 @@ export interface FraudScore {
   signals: FraudSignals;
   explanation: FraudExplanation;
   latency_ms: number;
+  cooldown_seconds?: number;
 }
 
 // ─── Notifications (Phase 9) ──────────────────────────────────────────────────

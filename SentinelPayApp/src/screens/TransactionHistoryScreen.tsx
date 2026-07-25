@@ -6,7 +6,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, StatusBar,
+  StyleSheet, RefreshControl, StatusBar, SafeAreaView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,6 +14,8 @@ import { RootStackParamList, WalletTransaction } from '../types';
 import { getTransactions, getUser, syncCloudTransactions } from '../utils/walletDb';
 import { parseSafeDate } from '../utils/parsers';
 import RiskBadge from '../components/RiskBadge';
+import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'TransactionHistory'> };
 
@@ -31,10 +33,10 @@ function formatAmount(n: number) {
 
 function statusColor(status: string) {
   switch (status) {
-    case 'APPROVED': return '#2D6A4F';
-    case 'REJECTED': return '#E63946';
-    case 'REVIEW':   return '#F4A261';
-    default:         return '#64748b';
+    case 'APPROVED': return C.green;
+    case 'REJECTED': return C.red;
+    case 'REVIEW':   return C.amber;
+    default:         return C.textSecondary;
   }
 }
 
@@ -63,29 +65,28 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
 
   const renderItem = ({ item }: { item: WalletTransaction }) => (
     <TouchableOpacity
-      style={styles.row}
+      style={DS.rowCard}
+      activeOpacity={0.7}
       onPress={() => navigation.navigate('TransactionDetail', { txnId: item.id })}>
       {/* left icon */}
-      <View style={[styles.icon, { backgroundColor: item.type === 'DEBIT' ? '#FEE2E2' : '#D1FAE5' }]}>
-        <Text style={[styles.iconText, { color: item.type === 'DEBIT' ? '#E63946' : '#2D6A4F' }]}>
-          {item.type === 'DEBIT' ? '↑' : '↓'}
-        </Text>
+      <View style={[DS.iconMd, { backgroundColor: item.type === 'DEBIT' ? C.redBg : C.greenBg }]}>
+        <AppIcon name={item.type === 'DEBIT' ? 'send' : 'receive'} size={20} color={item.type === 'DEBIT' ? C.red : C.green} />
       </View>
 
       {/* middle info */}
-      <View style={styles.info}>
-        <Text style={styles.vpa} numberOfLines={1}>
+      <View style={{ flex: 1, paddingRight: S.xs }}>
+        <Text style={DS.cardTitle} numberOfLines={1}>
           {item.type === 'DEBIT' ? `To: ${item.receiver_vpa}` : `From: ${item.sender_vpa}`}
         </Text>
-        <Text style={styles.time}>{formatTime(item.created_at)}</Text>
-        <Text style={[styles.statusLabel, { color: statusColor(item.status) }]}>
+        <Text style={DS.cardSub}>{formatTime(item.created_at)}</Text>
+        <Text style={{ fontSize: T.xs, fontWeight: T.bold, color: statusColor(item.status), marginTop: 2 }}>
           {item.status}
         </Text>
       </View>
 
       {/* right amount + badge */}
-      <View style={styles.right}>
-        <Text style={[styles.amount, { color: item.type === 'DEBIT' ? '#E63946' : '#2D6A4F' }]}>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={{ fontSize: T.md, fontWeight: T.extrabold, color: item.type === 'DEBIT' ? C.red : C.green }}>
           {item.type === 'DEBIT' ? '-' : '+'}{formatAmount(item.amount)}
         </Text>
         {item.decision && item.risk_score != null && (
@@ -98,94 +99,64 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
   );
 
   const ListEmpty = () => (
-    <View style={styles.empty}>
-      <Text style={styles.emptyIcon}>📋</Text>
-      <Text style={styles.emptyTitle}>No transactions yet</Text>
-      <Text style={styles.emptySub}>Your payment history will appear here</Text>
+    <View style={DS.emptyCard}>
+      <AppIcon name="history" size={40} color={C.textTertiary} />
+      <Text style={DS.emptyTitle}>No Transactions Yet</Text>
+      <Text style={DS.emptySub}>Your real-time payment history will appear here.</Text>
     </View>
   );
 
   const ListHeader = () =>
     txns.length > 0 ? (
-      <View style={styles.statsBar}>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>{txns.length}</Text>
-          <Text style={styles.statLabel}>Total</Text>
+      <View style={DS.statsRow}>
+        <View style={DS.statCard}>
+          <Text style={DS.statNum}>{txns.length}</Text>
+          <Text style={DS.statLabel}>Total</Text>
         </View>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>
+        <View style={DS.statCard}>
+          <Text style={[DS.statNum, { color: C.green }]}>
             {txns.filter(t => t.decision === 'APPROVE').length}
           </Text>
-          <Text style={[styles.statLabel, { color: '#2D6A4F' }]}>Approved</Text>
+          <Text style={DS.statLabel}>Approved</Text>
         </View>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>
+        <View style={DS.statCard}>
+          <Text style={[DS.statNum, { color: C.amber }]}>
             {txns.filter(t => t.decision === 'REVIEW').length}
           </Text>
-          <Text style={[styles.statLabel, { color: '#F4A261' }]}>Reviewed</Text>
+          <Text style={DS.statLabel}>Reviewed</Text>
         </View>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>
+        <View style={DS.statCard}>
+          <Text style={[DS.statNum, { color: C.red }]}>
             {txns.filter(t => t.decision === 'REJECT').length}
           </Text>
-          <Text style={[styles.statLabel, { color: '#E63946' }]}>Blocked</Text>
+          <Text style={DS.statLabel}>Blocked</Text>
         </View>
       </View>
     ) : null;
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F0" />
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      {/* Standard Child Screen Header */}
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
+        </TouchableOpacity>
+        <Text style={DS.pageTitle}>Transaction History</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       <FlatList
         data={txns}
         keyExtractor={item => item.id}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={DS.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} />
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FAF7F0' },
-  list: { padding: 16, paddingBottom: 32 },
-
-  statsBar: {
-    flexDirection: 'row', justifyContent: 'space-around',
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
-    marginBottom: 16, shadowColor: '#1A1A2E', shadowOpacity: 0.06,
-    shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#E8C4B8',
-  },
-  stat: { alignItems: 'center' },
-  statNum: { fontSize: 22, fontWeight: '800', color: '#1A1A2E' },
-  statLabel: { fontSize: 12, color: '#64748b', fontWeight: '600', marginTop: 2 },
-
-  row: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
-    marginBottom: 10, shadowColor: '#1A1A2E', shadowOpacity: 0.04,
-    shadowRadius: 4, elevation: 1, borderWidth: 1, borderColor: '#E8C4B8',
-  },
-  icon: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2,
-  },
-  iconText: { fontSize: 20, fontWeight: '700' },
-  info: { flex: 1, paddingRight: 8 },
-  vpa: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
-  time: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  statusLabel: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  right: { alignItems: 'flex-end' },
-  amount: { fontSize: 16, fontWeight: '700' },
-
-  empty: { alignItems: 'center', paddingTop: 80 },
-  emptyIcon: { fontSize: 52, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A2E' },
-  emptySub: { fontSize: 14, color: '#9ca3af', marginTop: 4 },
-});
-

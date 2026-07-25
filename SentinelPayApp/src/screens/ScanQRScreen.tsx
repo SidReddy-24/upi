@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, Linking, NativeModules, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, Alert, Linking, NativeModules, ActivityIndicator, SafeAreaView, StatusBar,
 } from 'react-native';
 import {
   Camera, useCodeScanner, useCameraDevice, useCameraPermission,
@@ -13,25 +13,17 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { getUser } from '../utils/walletDb';
+import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ScanQR'> };
 
 const { QrDecoderModule } = NativeModules;
 
-/**
- * Robustly parse a UPI QR payload into VPA + Amount + Name.
- * Supports:
- * - Standard UPI scheme: upi://pay?pa=...&pn=...&am=...
- * - Custom URL or query params: pa=...&am=...
- * - JSON payload: {"vpa":"...", "amount":500, "name":"..."}
- * - Raw VPA string: e.g. 9876543210@sentinelpay
- * - Raw mobile number: e.g. 9876543210
- */
 export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: string } | null {
   try {
     if (!raw || typeof raw !== 'string') return null;
 
-    // 1. Sanitize raw input: trim, remove BOM/control chars, decode HTML entities
     let cleaned = raw
       .trim()
       .replace(/[\uFEFF\u200B\u0000-\u001F]/g, '')
@@ -39,7 +31,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
 
     console.log('[ScanQR] Parsing QR raw data:', cleaned);
 
-    // 2. Try JSON format
     if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
       try {
         const obj = JSON.parse(cleaned);
@@ -61,7 +52,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
       }
     }
 
-    // 3. Extract PA (Payee Address / VPA) using regex matching (pa=..., vpa=...)
     let extractedVpa: string | null = null;
     const paMatch = cleaned.match(/(?:[?&]|^)(?:pa|vpa)=([^&]+)/i);
 
@@ -73,7 +63,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
       }
     }
 
-    // 4. Extract Amount (am=..., amount=...)
     let extractedAmount: number | undefined = undefined;
     const amMatch = cleaned.match(/(?:[?&]|^)(?:am|amount)=([^&]+)/i);
 
@@ -85,11 +74,10 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
           extractedAmount = num;
         }
       } catch {
-        // Ignore amount parse error
+        // Ignore
       }
     }
 
-    // 5. Extract Payee Name (pn=..., name=...)
     let extractedName: string | undefined = undefined;
     const pnMatch = cleaned.match(/(?:[?&]|^)(?:pn|name)=([^&]+)/i);
 
@@ -101,7 +89,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
       }
     }
 
-    // If VPA was found via query parameter
     if (extractedVpa && extractedVpa.includes('@')) {
       return {
         vpa: extractedVpa.toLowerCase(),
@@ -110,7 +97,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
       };
     }
 
-    // 6. Fail-safe Direct VPA extraction anywhere in string (regex: username@handle)
     const directVpaMatch = cleaned.match(/[a-zA-Z0-9.\-_%+]+@[a-zA-Z0-9.\-_]+/);
     if (directVpaMatch) {
       return {
@@ -120,7 +106,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
       };
     }
 
-    // 7. Direct 10-digit mobile number format
     const cleanPhone = cleaned.replace(/\D/g, '');
     if (cleanPhone.length === 10) {
       return {
@@ -130,7 +115,6 @@ export function parseUpiQr(raw: string): { vpa: string; amount?: number; name?: 
       };
     }
 
-    console.log('[ScanQR] No valid VPA recognized in:', cleaned);
     return null;
   } catch (error) {
     console.error('[ScanQR] Parse error:', error);
@@ -150,11 +134,9 @@ export default function ScanQRScreen({ navigation }: Props) {
 
   const handleScanSuccess = useCallback((raw: string) => {
     setScanned(true);
-    console.log('[ScanQR] Decoded string:', raw);
 
     const parsed = parseUpiQr(raw);
     if (parsed) {
-      console.log('[ScanQR] Successfully parsed UPI QR:', parsed);
       getUser().then(currentUser => {
         if (currentUser && currentUser.vpa.toLowerCase() === parsed.vpa.toLowerCase()) {
           Alert.alert(
@@ -173,7 +155,6 @@ export default function ScanQRScreen({ navigation }: Props) {
         }
       });
     } else {
-      console.log('[ScanQR] Failed to parse as valid UPI QR');
       Alert.alert(
         'Invalid QR Code',
         `This QR code doesn't contain a valid UPI VPA or payment link.\n\nScanned Data:\n${raw.slice(0, 100)}${raw.length > 100 ? '...' : ''}`,
@@ -208,7 +189,6 @@ export default function ScanQRScreen({ navigation }: Props) {
       }
 
       const imageUri = result.assets[0].uri;
-      console.log('[ScanQR] Selected gallery image URI:', imageUri);
 
       if (QrDecoderModule && QrDecoderModule.decodeQrFromImage) {
         try {
@@ -238,25 +218,34 @@ export default function ScanQRScreen({ navigation }: Props) {
 
   if (!hasPermission) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.permText}>Camera permission required</Text>
-        <TouchableOpacity style={styles.permBtn} onPress={() => Linking.openSettings()}>
-          <Text style={styles.permBtnText}>Open Settings</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={DS.safeArea}>
+        <View style={DS.emptyCard}>
+          <AppIcon name="scan" size={40} color={C.textTertiary} />
+          <Text style={DS.emptyTitle}>Camera Permission Required</Text>
+          <Text style={[DS.emptySub, { marginBottom: S.md }]}>Please allow camera access to scan UPI QR codes.</Text>
+          <TouchableOpacity style={[DS.btn, DS.btnPrimary]} onPress={() => Linking.openSettings()}>
+            <Text style={DS.btnText}>Open Settings</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!device) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.permText}>No camera found on this device</Text>
-      </View>
+      <SafeAreaView style={DS.safeArea}>
+        <View style={DS.emptyCard}>
+          <AppIcon name="alert" size={40} color={C.red} />
+          <Text style={DS.emptyTitle}>No Camera Device Found</Text>
+          <Text style={DS.emptySub}>Camera module is unavailable on this device hardware.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
     <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
@@ -266,6 +255,15 @@ export default function ScanQRScreen({ navigation }: Props) {
 
       {/* Viewfinder overlay */}
       <View style={styles.overlay}>
+        {/* Top bar with back button */}
+        <SafeAreaView style={styles.topHeader}>
+          <TouchableOpacity style={[DS.headerIconBtn, { backgroundColor: 'rgba(0,0,0,0.5)', borderColor: 'rgba(255,255,255,0.2)' }]} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <AppIcon name="chevronLeft" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={{ fontSize: T.lg, fontWeight: T.bold, color: '#FFFFFF' }}>Scan UPI QR</Text>
+          <View style={{ width: 36 }} />
+        </SafeAreaView>
+
         <View style={styles.topOverlay} />
         <View style={styles.middleRow}>
           <View style={styles.sideOverlay} />
@@ -278,24 +276,22 @@ export default function ScanQRScreen({ navigation }: Props) {
           <View style={styles.sideOverlay} />
         </View>
         <View style={styles.bottomOverlay}>
-          <Text style={styles.scanHint}>Point camera at a UPI QR code</Text>
+          <Text style={styles.scanHint}>Align QR Code inside viewfinder</Text>
           
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.galleryBtn}
+              style={[DS.btn, DS.btnPrimary, { backgroundColor: C.dark }]}
               disabled={loadingImage}
-              onPress={handleUploadFromGallery}>
+              onPress={handleUploadFromGallery}
+              activeOpacity={0.7}>
               {loadingImage ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={C.textInverse} size="small" />
               ) : (
-                <Text style={styles.galleryBtnText}>🖼️ Upload from Gallery</Text>
+                <>
+                  <AppIcon name="scan" size={18} color={C.textInverse} />
+                  <Text style={DS.btnText}>Upload Gallery QR</Text>
+                </>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => navigation.goBack()}>
-              <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -310,27 +306,20 @@ const CORNER = 24;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  permText: { fontSize: 16, color: '#374151', textAlign: 'center', marginBottom: 16 },
-  permBtn: { backgroundColor: '#6366f1', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24 },
-  permBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
   overlay: { ...StyleSheet.absoluteFillObject },
-  topOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  topHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: S.base, paddingTop: S.md, zIndex: 10,
+  },
+  topOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)' },
   middleRow: { flexDirection: 'row', height: VIEWFINDER },
-  sideOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sideOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)' },
   viewfinder: { width: VIEWFINDER, height: VIEWFINDER },
-  bottomOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', paddingTop: 20 },
-  scanHint: { color: '#fff', fontSize: 15, fontWeight: '500', marginBottom: 20 },
-  
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  galleryBtn: { backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18 },
-  galleryBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  cancelBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
-  cancelText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  bottomOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', alignItems: 'center', paddingTop: 20 },
+  scanHint: { color: C.textInverse, fontSize: T.sm, fontWeight: T.bold, marginBottom: 20 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: S.base },
 
-  // Corner brackets
-  corner: { position: 'absolute', width: CORNER, height: CORNER, borderColor: '#6366f1' },
+  corner: { position: 'absolute', width: CORNER, height: CORNER, borderColor: C.green },
   topLeft: { top: 0, left: 0, borderTopWidth: BORDER, borderLeftWidth: BORDER },
   topRight: { top: 0, right: 0, borderTopWidth: BORDER, borderRightWidth: BORDER },
   bottomLeft: { bottom: 0, left: 0, borderBottomWidth: BORDER, borderLeftWidth: BORDER },

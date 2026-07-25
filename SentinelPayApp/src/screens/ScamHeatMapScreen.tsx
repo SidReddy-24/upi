@@ -1,13 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, SafeAreaView, StatusBar } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types';
 import fraudShieldApi from '../services/fraudShieldApi';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'ScamHeatMap'>;
+};
+
 const MAP_HEIGHT = 320;
 
-// Coordinates for Indian scam hotspot cities
 const CITY_COORDS: Record<string, [number, number]> = {
   Mewat: [28.1000, 77.0000],
   Jamtara: [23.9628, 86.8025],
@@ -19,7 +24,7 @@ const CITY_COORDS: Record<string, [number, number]> = {
   Delhi: [28.6139, 77.2090],
 };
 
-export default function ScamHeatMapScreen() {
+export default function ScamHeatMapScreen({ navigation }: Props) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -52,15 +57,16 @@ export default function ScamHeatMapScreen() {
 
   if (loading || !data) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2D6A4F" />
-      </View>
+      <SafeAreaView style={DS.safeArea}>
+        <View style={[DS.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color={C.green} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const selectedHotspot = data.hotspots.find((h: any) => h.city === selectedCity) || data.hotspots[0];
 
-  // Leaflet HTML String with OpenStreetMap tiles and interactive heat markers
   const generateLeafletHtml = () => {
     const hotspotsJson = JSON.stringify(
       data.hotspots.map((item: any) => ({
@@ -77,22 +83,22 @@ export default function ScamHeatMapScreen() {
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>
-          body { margin: 0; padding: 0; background: #1A1A2E; }
-          #map { width: 100%; height: 100vh; background: #1A1A2E; }
-          .leaflet-container { background: #1A1A2E !important; }
+          body { margin: 0; padding: 0; background: #0F172A; }
+          #map { width: 100%; height: 100vh; background: #0F172A; }
+          .leaflet-container { background: #0F172A !important; }
           .leaflet-popup-content-wrapper {
-            background: #1A1A2E;
-            color: #FAF7F0;
+            background: #0F172A;
+            color: #F8FAFC;
             border-radius: 12px;
-            border: 1px solid #E8C4B8;
+            border: 1px solid #334155;
             font-family: system-ui, -apple-system, sans-serif;
           }
-          .leaflet-popup-tip { background: #1A1A2E; }
-          .popup-title { font-weight: 800; font-size: 14px; margin-bottom: 4px; color: #FAF7F0; }
-          .popup-desc { font-size: 11px; color: #E8C4B8; margin-top: 2px; }
+          .leaflet-popup-tip { background: #0F172A; }
+          .popup-title { font-weight: 800; font-size: 14px; margin-bottom: 4px; color: #F8FAFC; }
+          .popup-desc { font-size: 11px; color: #94A3B8; margin-top: 2px; }
           .popup-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; color: #fff; margin-top: 4px; }
-          .badge-crit { background: #E63946; }
-          .badge-high { background: #F4A261; }
+          .badge-crit { background: #EF4444; }
+          .badge-high { background: #F59E0B; }
         </style>
       </head>
       <body>
@@ -109,10 +115,9 @@ export default function ScamHeatMapScreen() {
 
           hotspots.forEach(item => {
             const isCrit = item.risk_level === 'CRITICAL';
-            const color = isCrit ? '#E63946' : '#F4A261';
-            const fillColor = isCrit ? '#E63946' : '#F4A261';
+            const color = isCrit ? '#EF4444' : '#F59E0B';
+            const fillColor = isCrit ? '#EF4444' : '#F59E0B';
 
-            // Outer pulse circle
             L.circleMarker(item.coords, {
               radius: isCrit ? 22 : 16,
               color: color,
@@ -121,10 +126,9 @@ export default function ScamHeatMapScreen() {
               weight: 1
             }).addTo(map);
 
-            // Core circle marker
             const marker = L.circleMarker(item.coords, {
               radius: isCrit ? 12 : 8,
-              color: '#FAF7F0',
+              color: '#FFFFFF',
               fillColor: fillColor,
               fillOpacity: 0.85,
               weight: 2
@@ -161,134 +165,87 @@ export default function ScamHeatMapScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>🗺️ National Scam Threat Map</Text>
-        <Text style={styles.subtitle}>Leaflet OpenStreetMap · Real-time cyber fraud hotspot intelligence</Text>
-      </View>
-
-      {data.national_fraud_wave_alert && (
-        <View style={styles.waveBanner}>
-          <Text style={styles.waveTitle}>⚡ ACTIVE FRAUD WAVE ALERT</Text>
-          <Text style={styles.waveDesc}>
-            Spike detected in "Digital Arrest" & "Telegram Investment" scams originating from major hotspots.
-          </Text>
-        </View>
-      )}
-
-      {/* ── Leaflet OpenStreetMap View ── */}
-      <View style={styles.mapCard}>
-        <View style={styles.mapCardHeader}>
-          <AppIcon name="heatmap" size={18} color="#FAF7F0" />
-          <Text style={styles.mapCardTitle}>Live OpenStreetMap Cyber Threat Grid</Text>
-        </View>
-        <View style={styles.webViewWrapper}>
-          <WebView
-            ref={webViewRef}
-            originWhitelist={['*']}
-            source={{ html: generateLeafletHtml() }}
-            style={styles.webView}
-            onMessage={handleMessage}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-          />
-        </View>
-      </View>
-
-      {/* ── Selected Hotspot Card ── */}
-      {selectedHotspot && (
-        <View style={styles.intelCard}>
-          <Text style={styles.intelHeader}>🎯 Selected Hotspot: {selectedHotspot.city}, {selectedHotspot.state}</Text>
-          <View style={styles.intelRow}>
-            <Text style={styles.intelLabel}>Risk Level:</Text>
-            <View style={[styles.badge, selectedHotspot.risk_level === 'CRITICAL' ? styles.badgeCrit : styles.badgeHigh]}>
-              <Text style={styles.badgeText}>{selectedHotspot.risk_level}</Text>
-            </View>
-          </View>
-          <View style={styles.intelRow}>
-            <Text style={styles.intelLabel}>Dominant Vector:</Text>
-            <Text style={styles.intelVal}>{selectedHotspot.top_scam_type}</Text>
-          </View>
-          <View style={styles.intelRow}>
-            <Text style={styles.intelLabel}>Active Police Reports:</Text>
-            <Text style={styles.intelVal}>{selectedHotspot.active_cases} cases</Text>
-          </View>
-          <View style={styles.intelRow}>
-            <Text style={styles.intelLabel}>7-Day Surge Trend:</Text>
-            <Text style={[styles.intelVal, selectedHotspot.fraud_trend_pct > 0 ? styles.textDanger : styles.textSafe]}>
-              {selectedHotspot.fraud_trend_pct > 0 ? `+${selectedHotspot.fraud_trend_pct}%` : `${selectedHotspot.fraud_trend_pct}%`}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* ── Hotspot List ── */}
-      <Text style={styles.sectionTitle}>🔥 All Tracked Hotspots ({data.total_active_hotspots})</Text>
-
-      {data.hotspots.map((item: any) => (
-        <TouchableOpacity
-          key={item.city}
-          style={[styles.card, item.city === selectedCity && styles.cardSelected]}
-          onPress={() => setSelectedCity(item.city)}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={styles.cityName}>{item.city}</Text>
-              <Text style={styles.stateName}>{item.state}</Text>
-            </View>
-            <View style={[styles.badge, item.risk_level === 'CRITICAL' ? styles.badgeCrit : styles.badgeHigh]}>
-              <Text style={styles.badgeText}>{item.risk_level}</Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>Top Scam Type:</Text>
-            <Text style={styles.val}>{item.top_scam_type}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Active Cases:</Text>
-            <Text style={styles.val}>{item.active_cases} cases</Text>
-          </View>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
         </TouchableOpacity>
-      ))}
+        <Text style={DS.pageTitle}>Scam Threat HeatMap</Text>
+        <View style={{ width: 36 }} />
+      </View>
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+      <ScrollView contentContainerStyle={DS.scrollContent}>
+        {data.national_fraud_wave_alert && (
+          <View style={[DS.infoCard, { backgroundColor: C.redBg, marginBottom: S.md }]}>
+            <AppIcon name="alert" size={18} color={C.red} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: T.xs, fontWeight: T.bold, color: C.red }}>ACTIVE FRAUD WAVE ALERT</Text>
+              <Text style={{ fontSize: T.xs, color: C.red }}>Spike in Digital Arrest & Telegram job scams detected.</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Leaflet OpenStreetMap View */}
+        <View style={DS.cardLg}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: S.sm }}>
+            <AppIcon name="heatmap" size={18} color={C.textPrimary} />
+            <Text style={DS.cardTitle}>Live OpenStreetMap Cyber Threat Grid</Text>
+          </View>
+          <View style={{ width: '100%', height: MAP_HEIGHT, borderRadius: R.md, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
+            <WebView
+              ref={webViewRef}
+              originWhitelist={['*']}
+              source={{ html: generateLeafletHtml() }}
+              style={{ width: '100%', height: MAP_HEIGHT, backgroundColor: C.dark }}
+              onMessage={handleMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+            />
+          </View>
+        </View>
+
+        {/* Selected Hotspot Card */}
+        {selectedHotspot && (
+          <View style={DS.card}>
+            <Text style={DS.cardTitle}>🎯 Selected: {selectedHotspot.city}, {selectedHotspot.state}</Text>
+            <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginTop: S.sm }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={DS.label}>DOMINANT VECTOR</Text>
+                <Text style={DS.cardTitle}>{selectedHotspot.top_scam_type}</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={DS.label}>ACTIVE CASES</Text>
+                <Text style={{ fontSize: T.md, fontWeight: T.extrabold, color: C.red }}>{selectedHotspot.active_cases}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Hotspot List */}
+        <Text style={DS.sectionTitle}>🔥 All Hotspots ({data.total_active_hotspots})</Text>
+
+        {data.hotspots.map((item: any) => (
+          <TouchableOpacity
+            key={item.city}
+            style={[DS.rowCard, item.city === selectedCity && { borderColor: C.dark, borderWidth: 2 }]}
+            onPress={() => setSelectedCity(item.city)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: S.xs }}>
+                <Text style={DS.cardTitle}>{item.city}, {item.state}</Text>
+                <View style={[DS.pillBadge, { backgroundColor: item.risk_level === 'CRITICAL' ? C.redBg : C.amberBg }]}>
+                  <Text style={{ fontSize: T.caption, fontWeight: T.bold, color: item.risk_level === 'CRITICAL' ? C.red : C.amber }}>
+                    {item.risk_level}
+                  </Text>
+                </View>
+              </View>
+              <Text style={DS.cardSub}>Vector: {item.top_scam_type} • {item.active_cases} cases</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F3EA', padding: 16 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F3EA' },
-  header: { marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: '900', color: '#181818', marginBottom: 4 },
-  subtitle: { fontSize: 13, color: '#666666' },
-  waveBanner: { backgroundColor: 'rgba(192, 57, 43, 0.1)', borderLeftWidth: 4, borderLeftColor: '#C0392B', padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: '#C0392B' },
-  waveTitle: { fontSize: 13, fontWeight: '900', color: '#C0392B', marginBottom: 4 },
-  waveDesc: { fontSize: 12, color: '#C0392B', lineHeight: 16, fontWeight: '600' },
-  mapCard: { backgroundColor: '#EFE7DA', borderRadius: 22, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#DCD1BF' },
-  mapCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#EFE7DA' },
-  mapCardTitle: { color: '#181818', fontSize: 13, fontWeight: '800' },
-  webViewWrapper: { width: '100%', height: MAP_HEIGHT, overflow: 'hidden' },
-  webView: { width: '100%', height: MAP_HEIGHT, backgroundColor: '#181818' },
-  intelCard: { backgroundColor: '#E5DCCB', borderRadius: 18, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#DCD1BF' },
-  intelHeader: { fontSize: 15, fontWeight: '900', color: '#181818', marginBottom: 10 },
-  intelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
-  intelLabel: { fontSize: 13, color: '#666666', fontWeight: '600' },
-  intelVal: { fontSize: 13, fontWeight: '800', color: '#181818' },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#181818', marginBottom: 12 },
-  card: { backgroundColor: '#EFE7DA', borderRadius: 18, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#DCD1BF' },
-  cardSelected: { borderColor: '#2E8B57', borderWidth: 2, backgroundColor: '#E5DCCB' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  cityName: { fontSize: 18, fontWeight: '900', color: '#181818' },
-  stateName: { fontSize: 12, color: '#666666' },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeCrit: { backgroundColor: '#C0392B' },
-  badgeHigh: { backgroundColor: '#F59E0B' },
-  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  label: { fontSize: 13, color: '#666666' },
-  val: { fontSize: 13, fontWeight: '800', color: '#181818' },
-  textDanger: { color: '#C0392B' },
-  textSafe: { color: '#2E8B57' },
-});

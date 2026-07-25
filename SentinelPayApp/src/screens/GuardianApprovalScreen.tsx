@@ -9,14 +9,17 @@ import {
   Alert,
   Modal,
   TextInput,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import guardianService, { PendingRequest } from '../services/guardianService';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
 export default function GuardianApprovalScreen() {
@@ -32,7 +35,6 @@ export default function GuardianApprovalScreen() {
   useEffect(() => {
     fetchRequests();
     
-    // Subscribe to real-time WebSocket updates
     const unsubscribe = guardianService.subscribe((event) => {
       if (event.type === 'APPROVAL_REQUEST') {
         fetchRequests();
@@ -86,103 +88,106 @@ export default function GuardianApprovalScreen() {
     const minsLeft = Math.max(0, Math.round((expiresDate.getTime() - Date.now()) / 60000));
     
     const isHighRisk = item.fraud_score > 0.7;
-    const scoreColor = isHighRisk ? '#EF4444' : '#F59E0B';
+    const scoreColor = isHighRisk ? C.red : C.amber;
 
     return (
-      <View style={styles.reqCard}>
-        <View style={styles.cardHeader}>
-          <View style={styles.avatarRow}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarLetter}>{(item.requester_name || 'U')[0].toUpperCase()}</Text>
+      <View style={DS.rowCard}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: S.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
+              <View style={[DS.iconSm, { backgroundColor: C.dark }]}>
+                <Text style={{ color: C.textInverse, fontWeight: T.bold }}>{(item.requester_name || 'U')[0].toUpperCase()}</Text>
+              </View>
+              <View>
+                <Text style={DS.cardTitle}>{item.requester_name || 'Sentinel User'}</Text>
+                <Text style={DS.cardSub}>+{item.requester_phone}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.wardName}>{item.requester_name || 'Sentinel User'}</Text>
-              <Text style={styles.wardPhone}>+{item.requester_phone}</Text>
-            </View>
-          </View>
 
-          <View style={[styles.scoreContainer, { backgroundColor: isHighRisk ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)' }]}>
-            <Text style={styles.scoreLabel}>AI RISK</Text>
-            <Text style={[styles.scoreValue, { color: scoreColor }]}>{(item.fraud_score * 100).toFixed(0)}%</Text>
-          </View>
-        </View>
-
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>PAYMENT AMOUNT</Text>
-            <Text style={styles.detailAmount}>₹{item.amount.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>RECIPIENT VPA</Text>
-            <Text style={styles.detailVal} numberOfLines={1} ellipsizeMode="middle">{item.recipient_vpa}</Text>
-          </View>
-        </View>
-
-        {item.risk_signals && item.risk_signals.length > 0 && (
-          <View style={styles.signalsContainer}>
-            <View style={styles.signalTitleRow}>
-              <AppIcon name="alert" size={12} color="#EF4444" />
-              <Text style={styles.signalsLabel}>DETECTED RISK SIGNALS:</Text>
-            </View>
-            <View style={styles.signalsList}>
-              {item.risk_signals.map((sig, idx) => (
-                <View key={idx} style={styles.signalBadge}>
-                  <Text style={styles.signalBadgeText}>{sig.replace(/_/g, ' ')}</Text>
-                </View>
-              ))}
+            <View style={[DS.pillBadge, { backgroundColor: isHighRisk ? C.redBg : C.amberBg }]}>
+              <Text style={{ fontSize: T.caption, fontWeight: T.bold, color: scoreColor }}>
+                AI RISK: {Math.round(item.fraud_score * 100)}%
+              </Text>
             </View>
           </View>
-        )}
 
-        <View style={styles.expiryRow}>
-          <AppIcon name="clock" size={14} color="#F59E0B" />
-          <Text style={styles.expiryText}>
-            {' '}Expires in: <Text style={styles.expiryTime}>{minsLeft} mins</Text>
-          </Text>
-        </View>
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginBottom: S.xs }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.label}>AMOUNT</Text>
+              <Text style={{ fontSize: T.md, fontWeight: T.extrabold, color: C.green }}>₹{item.amount.toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.label}>RECIPIENT VPA</Text>
+              <Text style={DS.cardTitle} numberOfLines={1}>{item.recipient_vpa}</Text>
+            </View>
+          </View>
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.btn, styles.rejectBtn]}
-            onPress={() => handleOpenRespond(item, 'REJECTED')}
-          >
-            <Text style={styles.rejectBtnText}>Reject Payment</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.approveBtn]}
-            onPress={() => handleOpenRespond(item, 'APPROVED')}
-          >
-            <Text style={styles.approveBtnText}>Approve & Sign</Text>
-          </TouchableOpacity>
+          {item.risk_signals && item.risk_signals.length > 0 && (
+            <View style={[DS.infoCard, { backgroundColor: C.redBg, marginBottom: S.xs, flexDirection: 'column', alignItems: 'flex-start' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: 4 }}>
+                <AppIcon name="alert" size={14} color={C.red} />
+                <Text style={{ fontSize: T.xs, fontWeight: T.extrabold, color: C.red }}>DETECTED RISK SIGNALS:</Text>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                {item.risk_signals.map((sig, idx) => (
+                  <View key={idx} style={[DS.pillBadge, { backgroundColor: C.surface }]}>
+                    <Text style={{ fontSize: T.caption, color: C.red, fontWeight: T.bold }}>{sig.replace(/_/g, ' ')}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: S.sm }}>
+            <AppIcon name="clock" size={14} color={C.amber} />
+            <Text style={{ fontSize: T.xs, color: C.textSecondary }}>
+              Expires in: <Text style={{ fontWeight: T.bold, color: C.amber }}>{minsLeft} mins</Text>
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: S.sm }}>
+            <TouchableOpacity
+              style={[DS.btn, DS.btnDanger, { flex: 1 }]}
+              onPress={() => handleOpenRespond(item, 'REJECTED')}
+              activeOpacity={0.7}
+            >
+              <Text style={DS.btnText}>Reject</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[DS.btn, DS.btnSuccess, { flex: 1 }]}
+              onPress={() => handleOpenRespond(item, 'APPROVED')}
+              activeOpacity={0.7}
+            >
+              <Text style={DS.btnText}>Approve & Sign</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Pending Approvals</Text>
-        <Text style={styles.subtitle}>
-          Review and authorize high-risk transaction requests submitted by your protected wards.
-        </Text>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <Text style={DS.pageTitle}>Pending Approvals</Text>
       </View>
 
       {loading && requests.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#10B981" />
+        <View style={[DS.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color={C.green} />
         </View>
       ) : (
         <FlatList
           data={requests}
           keyExtractor={(item) => item.id}
           renderItem={renderRequestItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={DS.scrollContent}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <AppIcon name="checkCircle" size={40} color="#10B981" />
-              <Text style={styles.emptyTitle}>All Clear!</Text>
-              <Text style={styles.emptyText}>No pending transactions require your guardian authorization.</Text>
+            <View style={DS.emptyCard}>
+              <AppIcon name="checkCircle" size={40} color={C.green} />
+              <Text style={DS.emptyTitle}>All Clear!</Text>
+              <Text style={DS.emptySub}>No pending transactions require your guardian authorization.</Text>
             </View>
           }
           refreshing={loading}
@@ -197,349 +202,54 @@ export default function GuardianApprovalScreen() {
         animationType="fade"
         onRequestClose={() => setSelectedRequest(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
+        <View style={DS.modalCenter}>
+          <View style={DS.modalCard}>
+            <Text style={DS.cardTitle}>
               Confirm {decision === 'APPROVED' ? 'Approval' : 'Rejection'}
             </Text>
             
-            <Text style={styles.modalSubtitle}>
+            <Text style={[DS.cardSub, { marginVertical: S.md }]}>
               Are you sure you want to {decision === 'APPROVED' ? 'approve' : 'reject'} this payment of{' '}
-              <Text style={styles.bold}>₹{selectedRequest?.amount.toLocaleString('en-IN')}</Text> initiated by{' '}
+              <Text style={{ color: C.textPrimary, fontWeight: T.bold }}>₹{selectedRequest?.amount.toLocaleString('en-IN')}</Text> initiated by{' '}
               {selectedRequest?.requester_name || 'Sentinel User'}?
             </Text>
 
-            <Text style={styles.inputLabel}>OPTIONAL NOTE / EXPLANATION</Text>
+            <Text style={DS.inputLabel}>OPTIONAL NOTE / EXPLANATION</Text>
             <TextInput
-              style={styles.modalInput}
+              style={DS.inputStandalone}
               placeholder="e.g. Verified over phone call."
-              placeholderTextColor="#64748B"
+              placeholderTextColor={C.textTertiary}
               value={note}
               onChangeText={setNote}
-              multiline
             />
 
-            <View style={styles.modalActions}>
+            <View style={{ flexDirection: 'row', gap: S.sm, marginTop: S.md }}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.cancelBtn]}
+                style={[DS.btn, DS.btnOutline, { flex: 1 }]}
                 onPress={() => setSelectedRequest(null)}
                 disabled={respondLoading}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={DS.btnTextDark}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.modalBtn,
-                  decision === 'APPROVED' ? styles.confirmApproveBtn : styles.confirmRejectBtn,
+                  DS.btn,
+                  decision === 'APPROVED' ? DS.btnSuccess : DS.btnDanger,
+                  { flex: 1 }
                 ]}
                 onPress={handleRespond}
                 disabled={respondLoading}
               >
                 {respondLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={C.textInverse} size="small" />
                 ) : (
-                  <Text style={styles.modalBtnText}>Submit Decision</Text>
+                  <Text style={DS.btnText}>Submit</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F7F3EA',
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#EFE7DA',
-    borderBottomWidth: 1,
-    borderBottomColor: '#DCD1BF',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#181818',
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#666666',
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  list: {
-    padding: 18,
-  },
-  reqCard: {
-    backgroundColor: '#EFE7DA',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: '#DCD1BF',
-    shadowColor: '#181818',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#DCD1BF',
-    paddingBottom: 12,
-    marginBottom: 14,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2E8B57',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarLetter: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  wardName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#181818',
-  },
-  wardPhone: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 2,
-  },
-  scoreContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  scoreLabel: {
-    fontSize: 9,
-    color: '#666666',
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  scoreValue: {
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: 1,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  detailItem: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 10,
-    color: '#666666',
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  detailAmount: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#2E8B57',
-    marginTop: 3,
-  },
-  detailVal: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#181818',
-    marginTop: 3,
-  },
-  signalsContainer: {
-    backgroundColor: '#F7F3EA',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#DCD1BF',
-  },
-  signalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 6,
-  },
-  signalsLabel: {
-    fontSize: 10,
-    color: '#C0392B',
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  signalsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  signalBadge: {
-    backgroundColor: 'rgba(192, 57, 43, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  signalBadgeText: {
-    color: '#C0392B',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  expiryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  expiryText: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  expiryTime: {
-    fontWeight: '800',
-    color: '#F59E0B',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  btn: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rejectBtn: {
-    backgroundColor: 'rgba(192, 57, 43, 0.12)',
-    borderWidth: 1,
-    borderColor: '#C0392B',
-  },
-  rejectBtnText: {
-    color: '#C0392B',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  approveBtn: {
-    backgroundColor: '#2E8B57',
-  },
-  approveBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyTitle: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  emptyText: {
-    color: '#64748B',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    padding: 22,
-  },
-  modalContent: {
-    backgroundColor: '#161F30',
-    borderRadius: 20,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  bold: {
-    color: '#F8FAFC',
-    fontWeight: 'bold',
-  },
-  inputLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748B',
-    marginBottom: 6,
-    letterSpacing: 0.5,
-  },
-  modalInput: {
-    backgroundColor: '#0B0F17',
-    borderRadius: 10,
-    padding: 12,
-    color: '#F8FAFC',
-    height: 70,
-    textAlignVertical: 'top',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    fontSize: 13,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  modalBtn: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  cancelBtn: {
-    backgroundColor: '#1E293B',
-  },
-  cancelBtnText: {
-    color: '#94A3B8',
-    fontWeight: '700',
-  },
-  confirmApproveBtn: {
-    backgroundColor: '#10B981',
-  },
-  confirmRejectBtn: {
-    backgroundColor: '#EF4444',
-  },
-  modalBtnText: {
-    color: '#FFF',
-    fontWeight: '700',
-  },
-});

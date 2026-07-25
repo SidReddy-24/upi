@@ -13,10 +13,14 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import unifiedAuthService from '../services/unifiedAuthService';
+import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PinSetup'>;
 
@@ -26,9 +30,6 @@ export default function PinSetupScreen({ navigation }: Props): React.JSX.Element
   const [step, setStep] = useState<'enter' | 'confirm'>('enter');
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Validate PIN format
-   */
   const validatePin = (pinValue: string): { valid: boolean; error?: string } => {
     if (pinValue.length < 4 || pinValue.length > 6) {
       return { valid: false, error: 'PIN must be 4-6 digits' };
@@ -39,9 +40,6 @@ export default function PinSetupScreen({ navigation }: Props): React.JSX.Element
     return { valid: true };
   };
 
-  /**
-   * Handle PIN entry
-   */
   const handlePinEnter = () => {
     const validation = validatePin(pin);
     if (!validation.valid) {
@@ -52,9 +50,6 @@ export default function PinSetupScreen({ navigation }: Props): React.JSX.Element
     setStep('confirm');
   };
 
-  /**
-   * Handle PIN confirmation and save
-   */
   const handlePinConfirm = async () => {
     if (pin !== confirmPin) {
       Alert.alert('PIN Mismatch', 'PINs do not match. Please try again.');
@@ -67,7 +62,6 @@ export default function PinSetupScreen({ navigation }: Props): React.JSX.Element
       const result = await unifiedAuthService.setupPin(pin);
       
       if (result.success) {
-        // Check if biometric is available and ask user
         const biometricAvailable = await unifiedAuthService.isBiometricAvailable();
         
         if (biometricAvailable) {
@@ -87,7 +81,6 @@ export default function PinSetupScreen({ navigation }: Props): React.JSX.Element
             ]
           );
         } else {
-          // No biometric available, go to home
           Alert.alert('PIN Setup Complete', 'Your PIN has been set successfully!', [
             { text: 'Continue', onPress: () => navigation.replace('Home') },
           ]);
@@ -103,221 +96,120 @@ export default function PinSetupScreen({ navigation }: Props): React.JSX.Element
     }
   };
 
-  /**
-   * Go back to PIN entry
-   */
   const handleBack = () => {
     setStep('enter');
     setConfirmPin('');
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.logo}>🔐</Text>
-          <Text style={styles.title}>
-            {step === 'enter' ? 'Create Your PIN' : 'Confirm Your PIN'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {step === 'enter'
-              ? 'Enter a 4-6 digit PIN for secure access'
-              : 'Re-enter your PIN to confirm'}
-          </Text>
-        </View>
-
-        {/* PIN Entry */}
-        {step === 'enter' && (
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Enter PIN</Text>
-              <TextInput
-                style={styles.pinInput}
-                placeholder="••••"
-                keyboardType="number-pad"
-                secureTextEntry
-                value={pin}
-                onChangeText={setPin}
-                maxLength={6}
-                autoFocus
-              />
-              <Text style={styles.hint}>4-6 digits</Text>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <KeyboardAvoidingView
+        style={DS.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.content}>
+          <View style={DS.authBrand}>
+            <View style={DS.authBrandIcon}>
+              <AppIcon name="key" size={28} color="#FFFFFF" />
             </View>
-
-            <TouchableOpacity
-              style={[styles.button, (!pin || loading) && styles.buttonDisabled]}
-              onPress={handlePinEnter}
-              disabled={!pin || loading}>
-              <Text style={styles.buttonText}>Continue</Text>
-            </TouchableOpacity>
+            <Text style={DS.authBrandTitle}>
+              {step === 'enter' ? 'Create Your PIN' : 'Confirm Your PIN'}
+            </Text>
+            <Text style={DS.authBrandSub}>
+              {step === 'enter' ? 'ENTER 4-6 DIGITS FOR SECURE ACCESS' : 'RE-ENTER PIN TO VERIFY'}
+            </Text>
           </View>
-        )}
 
-        {/* PIN Confirmation */}
-        {step === 'confirm' && (
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Confirm PIN</Text>
-              <TextInput
-                style={styles.pinInput}
-                placeholder="••••"
-                keyboardType="number-pad"
-                secureTextEntry
-                value={confirmPin}
-                onChangeText={setConfirmPin}
-                maxLength={6}
-                autoFocus
-              />
+          {step === 'enter' && (
+            <View style={DS.cardLg}>
+              <View style={{ alignItems: 'center', marginBottom: S.lg }}>
+                <TextInput
+                  style={[DS.inputStandalone, styles.pinInput]}
+                  placeholder="••••"
+                  placeholderTextColor={C.textTertiary}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  value={pin}
+                  onChangeText={setPin}
+                  maxLength={6}
+                  autoFocus
+                />
+                <Text style={{ fontSize: T.xs, color: C.textTertiary, marginTop: S.xs }}>4-6 numeric digits</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[DS.btn, DS.btnPrimary, (!pin || loading) && DS.btnDisabled]}
+                onPress={handlePinEnter}
+                disabled={!pin || loading}
+                activeOpacity={0.7}>
+                <Text style={DS.btnText}>Continue</Text>
+              </TouchableOpacity>
             </View>
+          )}
 
-            <TouchableOpacity
-              style={[styles.button, (!confirmPin || loading) && styles.buttonDisabled]}
-              onPress={handlePinConfirm}
-              disabled={!confirmPin || loading}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Confirm PIN</Text>
-              )}
-            </TouchableOpacity>
+          {step === 'confirm' && (
+            <View style={DS.cardLg}>
+              <View style={{ alignItems: 'center', marginBottom: S.lg }}>
+                <TextInput
+                  style={[DS.inputStandalone, styles.pinInput]}
+                  placeholder="••••"
+                  placeholderTextColor={C.textTertiary}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  value={confirmPin}
+                  onChangeText={setConfirmPin}
+                  maxLength={6}
+                  autoFocus
+                />
+              </View>
 
-            <TouchableOpacity style={styles.secondaryButton} onPress={handleBack}>
-              <Text style={styles.secondaryButtonText}>← Change PIN</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[DS.btn, DS.btnPrimary, (!confirmPin || loading) && DS.btnDisabled]}
+                onPress={handlePinConfirm}
+                disabled={!confirmPin || loading}
+                activeOpacity={0.7}>
+                {loading ? (
+                  <ActivityIndicator color={C.textInverse} />
+                ) : (
+                  <Text style={DS.btnText}>Confirm PIN</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[DS.btn, DS.btnOutline, { marginTop: S.md }]} onPress={handleBack}>
+                <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
+                <Text style={DS.btnTextDark}>Change PIN</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={[DS.infoCard, { backgroundColor: C.greenBg, marginTop: S.base }]}>
+            <AppIcon name="lock" size={20} color={C.green} />
+            <Text style={{ flex: 1, fontSize: T.xs, color: C.green, fontWeight: T.semibold }}>
+              Your PIN is encrypted and stored locally in device hardware vault.
+            </Text>
           </View>
-        )}
 
-        {/* Security Info */}
-        <View style={styles.securityInfo}>
-          <Text style={styles.securityIcon}>🔒</Text>
-          <Text style={styles.securityText}>
-            Your PIN is stored securely and never leaves your device
-          </Text>
+          <TouchableOpacity
+            style={{ marginTop: S.lg, alignItems: 'center' }}
+            onPress={() => navigation.navigate('AuthModeSelector')}>
+            <Text style={DS.seeAll}>← Back to Login Options</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Back to Mode Selector */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('AuthModeSelector')}>
-          <Text style={styles.backButtonText}>← Back to Login Options</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: S.base,
     justifyContent: 'center',
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  form: {
-    width: '100%',
-  },
-  inputContainer: {
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 16,
-  },
   pinInput: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 16,
-    padding: 20,
-    fontSize: 32,
-    color: '#1f2937',
+    fontSize: T.xxl,
     letterSpacing: 12,
     textAlign: 'center',
     width: 200,
-    fontWeight: 'bold',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 8,
-  },
-  button: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6366f1',
-  },
-  securityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ecfdf5',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 24,
-  },
-  securityIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  securityText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#065f46',
-    lineHeight: 18,
-  },
-  backButton: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
   },
 });

@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, SafeAreaView, StatusBar } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getUser, resetWallet } from '../utils/walletDb';
 import { WalletUser, RootStackParamList } from '../types';
 import { authService } from '../services/authService';
 import unifiedAuthService from '../services/unifiedAuthService';
 import { getSettings, updateSettings, UserSettings } from '../utils/settingsDb';
-
-
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Profile'>;
@@ -19,7 +18,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const [secureMode, setSecureMode] = useState(false);
   const [familyGuard, setFamilyGuard] = useState(true);
 
-  // Phase 9: Settings state for Safety Hold Timer
+  // Settings state for Safety Hold Timer
   const [settings, setSettings] = useState<UserSettings | null>(null);
 
   useEffect(() => {
@@ -93,196 +92,173 @@ export default function ProfileScreen({ navigation }: Props) {
   if (!user) return null;
 
   return (
-    <ScrollView style={styles.container}>
-      {/* 1. USER PROFILE HEADER */}
-      <View style={styles.profileHeader}>
-        <View style={styles.avatarBox}>
-          <AppIcon name="profile" size={36} color="#FAF7F0" />
-        </View>
-        <Text style={styles.userName}>{user.name}</Text>
-
-        <View style={styles.idPillContainer}>
-          <View style={styles.idPill}>
-            <Text style={styles.idPillTag}>PRIMARY KEY (PHONE)</Text>
-            <Text style={styles.idPillValue}>{user.phone || user.id}</Text>
-          </View>
-          {user.dob ? (
-            <View style={styles.idPill}>
-              <Text style={styles.idPillTag}>DATE OF BIRTH</Text>
-              <Text style={styles.idPillValue}>{user.dob}</Text>
-            </View>
-          ) : null}
-          <View style={styles.idPill}>
-            <Text style={styles.idPillTag}>UPI VPA ID</Text>
-            <Text style={styles.idPillValue}>{user.vpa}</Text>
-          </View>
-        </View>
-
-        <View style={styles.simulatedPill}>
-          <Text style={styles.simulatedText}>SIMULATED SPC ACCOUNT</Text>
-        </View>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <Text style={DS.pageTitle}>Profile & Preferences</Text>
       </View>
 
-      {/* 2. PAYMENT SAFETY DELAY & COOLDOWN TIMER */}
-      <View style={styles.section}>
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>⏱️ Payment Delay & Safety Hold Timer</Text>
-          <View style={styles.featuredBadge}>
-            <Text style={styles.featuredBadgeText}>FEATURED</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionSubtitle}>
-          After entering your UPI PIN, a safety delay countdown runs before money leaves your account. This gives you time to cancel if you are being coerced or scammed.
-        </Text>
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Enable Safety Delay Timer</Text>
-            <Text style={styles.toggleDesc}>
-              {settings?.holdEnabled ? 'Active — Payment will hold before finalizing' : 'Disabled — Instant payment execution'}
-            </Text>
-          </View>
-          <Switch
-            value={settings?.holdEnabled ?? false}
-            onValueChange={handleToggleHold}
-            trackColor={{ true: '#6366f1', false: '#cbd5e1' }}
-          />
-        </View>
-
-        {settings?.holdEnabled && (
-          <View style={styles.subSettingsContainer}>
-            <Text style={styles.subSettingsLabel}>Timer Duration (Seconds):</Text>
-            <View style={styles.chipRow}>
-              {[10, 15, 30, 60].map(dur => {
-                const isActive = settings.holdDuration === dur;
-                return (
-                  <TouchableOpacity
-                    key={dur}
-                    style={[styles.chipBtn, isActive && styles.chipBtnActive]}
-                    onPress={() => handleSelectDuration(dur)}
-                  >
-                    <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                      {dur}s
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+      <ScrollView contentContainerStyle={DS.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* 1. USER PROFILE HERO CARD */}
+        <View style={DS.cardLg}>
+          <View style={{ alignItems: 'center', marginBottom: S.md }}>
+            <View style={[DS.iconLg, { backgroundColor: C.dark, marginBottom: S.xs }]}>
+              <AppIcon name="profile" size={32} color={C.textInverse} />
             </View>
-
-            <Text style={[styles.subSettingsLabel, { marginTop: 14 }]}>Trigger Delay For Payments:</Text>
-            <View style={styles.chipRow}>
-              {[
-                { label: 'All (₹0+)', val: 0 },
-                { label: '> ₹1,000', val: 1000 },
-                { label: '> ₹5,000', val: 5000 },
-                { label: '> ₹10,000', val: 10000 },
-              ].map(item => {
-                const isActive = settings.holdThresholdAmount === item.val;
-                return (
-                  <TouchableOpacity
-                    key={item.val}
-                    style={[styles.chipBtn, isActive && styles.chipBtnActive]}
-                    onPress={() => handleSelectThreshold(item.val)}
-                  >
-                    <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <Text style={{ fontSize: T.xl, fontWeight: T.black, color: C.textPrimary }}>{user.name}</Text>
+            <View style={[DS.pillBadge, { backgroundColor: C.greenBg, marginTop: S.xs }]}>
+              <Text style={{ fontSize: T.caption, fontWeight: T.bold, color: C.green }}>VERIFIED SENTINEL ACCOUNT</Text>
             </View>
           </View>
-        )}
-      </View>
 
-      {/* 3. GUARDIAN & BIOMETRIC PROTECTION */}
-      <View style={styles.section}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <AppIcon name="shield" size={18} color="#10B981" />
-          <Text style={styles.sectionTitle}>Security & Family Protection</Text>
-        </View>
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Secure Mode</Text>
-            <Text style={styles.toggleDesc}>Mandatory biometrics & block transfer to new VPAs</Text>
+          <View style={{ gap: S.xs }}>
+            <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt }]}>
+              <Text style={DS.label}>PHONE NUMBER</Text>
+              <Text style={DS.cardTitle}>{user.phone || user.id}</Text>
+            </View>
+
+            {user.dob ? (
+              <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt }]}>
+                <Text style={DS.label}>DATE OF BIRTH</Text>
+                <Text style={DS.cardTitle}>{user.dob}</Text>
+              </View>
+            ) : null}
+
+            <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt }]}>
+              <Text style={DS.label}>UPI VPA ADDRESS</Text>
+              <Text style={DS.cardTitle}>{user.vpa}</Text>
+            </View>
           </View>
-          <Switch value={secureMode} onValueChange={setSecureMode} trackColor={{ true: '#6366f1' }} />
         </View>
 
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Family Guard Protection</Text>
-            <Text style={styles.toggleDesc}>Require Guardian approval for transfers over ₹10,000</Text>
+        {/* 2. PAYMENT SAFETY DELAY & COOLDOWN TIMER */}
+        <View style={DS.card}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: S.xs }}>
+            <Text style={DS.cardTitle}>⏱️ Payment Delay & Safety Hold</Text>
+            <View style={[DS.pillBadge, { backgroundColor: C.blueBg }]}>
+              <Text style={{ fontSize: T.caption, fontWeight: T.bold, color: C.blue }}>FEATURED</Text>
+            </View>
           </View>
-          <Switch value={familyGuard} onValueChange={setFamilyGuard} trackColor={{ true: '#6366f1' }} />
+
+          <Text style={[DS.cardSub, { marginBottom: S.md }]}>
+            After entering your UPI PIN, a safety delay countdown runs before money leaves your account. This gives you time to cancel if you are being coerced or scammed.
+          </Text>
+
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginBottom: S.sm }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Enable Safety Delay Timer</Text>
+              <Text style={DS.cardSub}>
+                {settings?.holdEnabled ? 'Active — Payment will hold before finalizing' : 'Disabled — Instant payment execution'}
+              </Text>
+            </View>
+            <Switch
+              value={settings?.holdEnabled ?? false}
+              onValueChange={handleToggleHold}
+              trackColor={{ true: C.green, false: C.border }}
+            />
+          </View>
+
+          {settings?.holdEnabled && (
+            <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, flexDirection: 'column', alignItems: 'stretch', gap: S.sm }]}>
+              <Text style={DS.label}>TIMER DURATION (SECONDS)</Text>
+              <View style={{ flexDirection: 'row', gap: S.xs }}>
+                {[10, 15, 30, 60].map(dur => {
+                  const isActive = settings.holdDuration === dur;
+                  return (
+                    <TouchableOpacity
+                      key={dur}
+                      style={[DS.chip, isActive && { backgroundColor: C.dark }]}
+                      onPress={() => handleSelectDuration(dur)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[DS.chipText, isActive && { color: C.textInverse }]}>
+                        {dur}s
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={[DS.label, { marginTop: S.xs }]}>TRIGGER DELAY FOR PAYMENTS</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: S.xs }}>
+                {[
+                  { label: 'All (₹0+)', val: 0 },
+                  { label: '> ₹1,000', val: 1000 },
+                  { label: '> ₹5,000', val: 5000 },
+                  { label: '> ₹10,000', val: 10000 },
+                ].map(item => {
+                  const isActive = settings.holdThresholdAmount === item.val;
+                  return (
+                    <TouchableOpacity
+                      key={item.val}
+                      style={[DS.chip, isActive && { backgroundColor: C.dark }]}
+                      onPress={() => handleSelectThreshold(item.val)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[DS.chipText, isActive && { color: C.textInverse }]}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </View>
-      </View>
 
-      {/* 4. LINKED BANK ACCOUNTS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🏦 Linked Bank Accounts (Mock)</Text>
-        <View style={styles.bankRow}>
-          <Text style={styles.bankName}>🏦 HDFC Bank •••• 4821</Text>
-          <Text style={styles.primaryBadge}>PRIMARY</Text>
+        {/* 3. SECURITY & FAMILY GUARD */}
+        <View style={DS.card}>
+          <Text style={DS.sectionTitle}>Security & Protection</Text>
+
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginBottom: S.xs }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Secure Mode</Text>
+              <Text style={DS.cardSub}>Mandatory biometrics & block transfer to new VPAs</Text>
+            </View>
+            <Switch value={secureMode} onValueChange={setSecureMode} trackColor={{ true: C.green }} />
+          </View>
+
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Family Guard Protection</Text>
+              <Text style={DS.cardSub}>Require Guardian approval for transfers over ₹10,000</Text>
+            </View>
+            <Switch value={familyGuard} onValueChange={setFamilyGuard} trackColor={{ true: C.green }} />
+          </View>
         </View>
-        <View style={styles.bankRow}>
-          <Text style={styles.bankName}>🏦 ICICI Bank •••• 9102</Text>
+
+        {/* 4. LINKED BANK ACCOUNTS */}
+        <View style={DS.card}>
+          <Text style={DS.sectionTitle}>Linked Bank Accounts (Mock)</Text>
+          <View style={[DS.rowCard, { marginBottom: S.xs }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>HDFC Bank •••• 4821</Text>
+              <Text style={DS.cardSub}>Savings Account</Text>
+            </View>
+            <View style={[DS.pillBadge, { backgroundColor: C.greenBg }]}>
+              <Text style={{ fontSize: T.caption, fontWeight: T.bold, color: C.green }}>PRIMARY</Text>
+            </View>
+          </View>
+          <View style={DS.rowCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>ICICI Bank •••• 9102</Text>
+              <Text style={DS.cardSub}>Secondary Account</Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* 5. WALLET & SESSION ACTIONS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚙️ Account & Session Management</Text>
-        <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-          <Text style={styles.resetBtnText}>🔄 Reset Demo Wallet to ₹1,00,000 SPC</Text>
-        </TouchableOpacity>
+        {/* 5. ACCOUNT ACTIONS */}
+        <View style={DS.card}>
+          <Text style={DS.sectionTitle}>Account & Session</Text>
+          <TouchableOpacity style={[DS.btn, DS.btnOutline, { marginBottom: S.sm }]} onPress={handleReset} activeOpacity={0.7}>
+            <Text style={DS.btnTextDark}>Reset Demo Wallet to ₹1,00,000 SPC</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.resetBtn, styles.logoutBtn]} onPress={handleLogout}>
-          <Text style={styles.logoutBtnText}>🚪 Sign Out / Logout</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+          <TouchableOpacity style={[DS.btn, DS.btnDanger]} onPress={handleLogout} activeOpacity={0.7}>
+            <Text style={DS.btnText}>Sign Out / Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F3EA', padding: 16 },
-  profileHeader: { alignItems: 'center', backgroundColor: '#EFE7DA', borderRadius: 22, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: '#DCD1BF' },
-  avatarBox: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(46, 139, 87, 0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#2E8B57' },
-  avatarText: { fontSize: 32 },
-  userName: { fontSize: 20, fontWeight: '900', color: '#181818', marginBottom: 6 },
-  userVpa: { fontSize: 14, color: '#666666', marginTop: 2 },
-  idPillContainer: { width: '100%', marginTop: 10, gap: 8 },
-  idPill: { backgroundColor: '#F7F3EA', borderRadius: 12, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#DCD1BF' },
-  idPillTag: { fontSize: 10, fontWeight: '800', color: '#666666', letterSpacing: 0.5, marginBottom: 2 },
-  idPillValue: { fontSize: 14, fontWeight: '900', color: '#181818' },
-  simulatedPill: { marginTop: 12, backgroundColor: '#E5DCCB', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#DCD1BF' },
-  simulatedText: { fontSize: 11, fontWeight: '800', color: '#236847' },
-  section: { backgroundColor: '#EFE7DA', borderRadius: 20, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#DCD1BF' },
-  sectionTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#181818' },
-  featuredBadge: { backgroundColor: 'rgba(46, 139, 87, 0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  featuredBadgeText: { fontSize: 9, fontWeight: '900', color: '#236847' },
-  sectionSubtitle: { fontSize: 12, color: '#666666', lineHeight: 17, marginBottom: 12 },
-  bankRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#DCD1BF' },
-  bankName: { fontSize: 14, fontWeight: '700', color: '#181818' },
-  primaryBadge: { fontSize: 10, fontWeight: '800', color: '#2E8B57', backgroundColor: 'rgba(46, 139, 87, 0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#DCD1BF' },
-  toggleTitle: { fontSize: 14, fontWeight: '800', color: '#181818' },
-  toggleDesc: { fontSize: 12, color: '#666666', marginTop: 2 },
-  subSettingsContainer: { marginTop: 12, backgroundColor: '#F7F3EA', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#DCD1BF' },
-  subSettingsLabel: { fontSize: 12, fontWeight: '800', color: '#181818', marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chipBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: '#E5DCCB', borderWidth: 1, borderColor: '#DCD1BF' },
-  chipBtnActive: { backgroundColor: '#2E8B57', borderColor: '#2E8B57' },
-  chipText: { fontSize: 12, fontWeight: '700', color: '#181818' },
-  chipTextActive: { color: '#FFFFFF' },
-  resetBtn: { backgroundColor: 'rgba(192, 57, 43, 0.1)', borderWidth: 1, borderColor: '#C0392B', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  resetBtnText: { color: '#C0392B', fontSize: 14, fontWeight: '800' },
-  logoutBtn: { backgroundColor: '#E5DCCB', borderColor: '#DCD1BF', marginTop: 12 },
-  logoutBtnText: { color: '#181818', fontSize: 14, fontWeight: '800' },
-});
-

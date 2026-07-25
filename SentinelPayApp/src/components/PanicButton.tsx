@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet, Alert, Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppIcon from './AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 export const PANIC_FROZEN_KEY = 'sentinelpay_wallet_frozen';
 
@@ -38,33 +39,33 @@ export default function PanicButton() {
         style={[styles.panicFab, isFrozen && styles.frozenFab]}
         activeOpacity={0.8}
         onPress={() => (isFrozen ? handleUnfreeze() : setModalVisible(true))}>
-        <AppIcon name={isFrozen ? 'lock' : 'siren'} size={24} color="#FFFFFF" />
+        <AppIcon name={isFrozen ? 'lock' : 'siren'} size={24} color={C.textInverse} />
       </TouchableOpacity>
 
       <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalTitleRow}>
-              <AppIcon name="siren" size={22} color="#DC2626" />
-              <Text style={styles.modalTitle}>Emergency Panic Button</Text>
+        <View style={DS.modalCenter}>
+          <View style={DS.modalCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: S.sm }}>
+              <AppIcon name="siren" size={22} color={C.red} />
+              <Text style={[DS.cardTitle, { color: C.red }]}>Emergency Panic Button</Text>
             </View>
-            <Text style={styles.modalDesc}>
+            <Text style={[DS.cardSub, { marginBottom: S.sm }]}>
               Are you currently being coerced or scammed? Activating Emergency Panic will:
             </Text>
-            <Text style={styles.bullet}>• Freeze all outbound UPI payments instantly</Text>
-            <Text style={styles.bullet}>• Lock SentinelPay wallet transfers</Text>
-            <Text style={styles.bullet}>• Generate downloadable Incident Report</Text>
+            <Text style={[DS.cardSub, { color: C.textPrimary, fontWeight: T.bold, marginBottom: 4 }]}>• Freeze all outbound UPI payments instantly</Text>
+            <Text style={[DS.cardSub, { color: C.textPrimary, fontWeight: T.bold, marginBottom: 4 }]}>• Lock SentinelPay wallet transfers</Text>
+            <Text style={[DS.cardSub, { color: C.textPrimary, fontWeight: T.bold, marginBottom: 4 }]}>• Generate downloadable Incident Report</Text>
 
-            <View style={styles.btnRow}>
+            <View style={{ flexDirection: 'row', gap: S.sm, marginTop: S.lg }}>
               <TouchableOpacity
-                style={styles.cancelBtn}
+                style={[DS.btn, DS.btnOutline, { flex: 1 }]}
                 onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={DS.btnTextDark}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmPanicBtn}
+                style={[DS.btn, DS.btnDanger, { flex: 1 }]}
                 onPress={handlePanicAction}>
-                <Text style={styles.confirmPanicText}>FREEZE NOW</Text>
+                <Text style={DS.btnText}>FREEZE NOW</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -79,79 +80,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 88,
     right: 16,
-    backgroundColor: '#DC2626',
+    backgroundColor: C.red,
     width: 52,
     height: 52,
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 8,
-    shadowColor: '#0F172A',
+    shadowColor: C.dark,
     shadowOpacity: 0.25,
     shadowRadius: 8,
     zIndex: 999,
   },
   frozenFab: {
-    backgroundColor: '#16a34a',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-  },
-  modalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#dc2626',
-  },
-  modalDesc: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 12,
-  },
-  bullet: {
-    fontSize: 13,
-    color: '#4b5563',
-    marginBottom: 6,
-    fontWeight: '600',
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-  confirmPanicBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: '#dc2626',
-    alignItems: 'center',
-  },
-  confirmPanicText: {
-    color: '#fff',
-    fontWeight: '800',
+    backgroundColor: C.green,
   },
 });

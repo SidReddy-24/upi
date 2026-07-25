@@ -10,12 +10,15 @@ import {
   ScrollView,
   Modal,
   RefreshControl,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import guardianService, { GuardianRelationship, WardRelationship, PendingRequest } from '../services/guardianService';
 import { getSettings, updateSettings } from '../utils/settingsDb';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'GuardianManagement'>;
@@ -311,22 +314,30 @@ export default function GuardianManagementScreen({ navigation }: Props) {
   const activeWardCount = wards.filter(w => w.status === 'ACTIVE').length;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
+        </TouchableOpacity>
+        <Text style={DS.pageTitle}>Guardian Management</Text>
+        <View style={{ width: 36 }} />
+      </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchRelationships} tintColor="#10B981" />
+          <RefreshControl refreshing={loading} onRefresh={fetchRelationships} tintColor={C.green} />
         }
       >
         {/* ─── 1. HERO SAFETY DASHBOARD ─── */}
         <View style={styles.heroCard}>
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroBadge}>
-              <AppIcon name="shield" size={12} color="#10B981" />
+              <AppIcon name="shield" size={12} color={C.green} />
               <Text style={styles.heroBadgeText}>ACTIVE SAFETY NET</Text>
             </View>
             <TouchableOpacity onPress={fetchRelationships} style={styles.refreshBtnIcon}>
-              <AppIcon name="refresh" size={16} color="#94A3B8" />
+              <AppIcon name="refresh" size={16} color={C.textTertiary} />
             </TouchableOpacity>
           </View>
 
@@ -971,29 +982,29 @@ export default function GuardianManagementScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F3EA',
+    backgroundColor: C.bg,
   },
   scrollContainer: {
-    padding: 18,
-    paddingBottom: 40,
+    padding: S.base,
+    paddingBottom: 100,
   },
 
   /* HERO DASHBOARD */
   heroCard: {
-    backgroundColor: '#EFE7DA',
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: C.surface,
+    borderRadius: R.card,
+    padding: S.lg,
+    marginBottom: S.lg,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
-    shadowColor: '#181818',
+    borderColor: C.border,
+    shadowColor: C.dark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -1003,88 +1014,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: S.md,
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(46, 139, 87, 0.12)',
+    backgroundColor: C.greenBg,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: R.xs,
     gap: 6,
   },
   heroBadgeText: {
-    color: '#236847',
-    fontSize: 11,
-    fontWeight: '800',
+    color: C.green,
+    fontSize: T.xs,
+    fontWeight: T.extrabold,
     letterSpacing: 0.5,
   },
   refreshBtnIcon: {
     padding: 4,
   },
   heroTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#181818',
+    fontSize: T.xxl,
+    fontWeight: T.black,
+    color: C.textPrimary,
   },
   heroSubtitle: {
-    fontSize: 13,
-    color: '#666666',
+    fontSize: T.sm,
+    color: C.textSecondary,
     marginTop: 6,
     lineHeight: 18,
   },
   metricsGrid: {
     flexDirection: 'row',
-    backgroundColor: '#F7F3EA',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    marginTop: 16,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.md,
+    paddingVertical: S.md,
+    paddingHorizontal: S.sm,
+    marginTop: S.base,
     justifyContent: 'space-around',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   metricBox: {
     alignItems: 'center',
     flex: 1,
   },
   metricVal: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#2E8B57',
+    fontSize: T.xl,
+    fontWeight: T.black,
+    color: C.green,
   },
   metricLabel: {
-    fontSize: 11,
-    color: '#666666',
+    fontSize: T.xs,
+    color: C.textSecondary,
     marginTop: 2,
-    fontWeight: '600',
+    fontWeight: T.semibold,
   },
   metricDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#DCD1BF',
+    backgroundColor: C.border,
   },
 
   /* SEGMENTED TAB SELECTOR */
   segmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EFE7DA',
-    borderRadius: 14,
+    backgroundColor: C.surface,
+    borderRadius: R.lg,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: S.lg,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   segmentBtn: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: S.sm,
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: R.md,
   },
   segmentBtnActive: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: C.dark,
   },
   tabIconRow: {
     flexDirection: 'row',
@@ -1092,13 +1103,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   segmentText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#666666',
+    fontSize: T.sm,
+    fontWeight: T.bold,
+    color: C.textSecondary,
   },
   segmentTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+    color: C.textInverse,
   },
   tabBadgeRow: {
     flexDirection: 'row',
@@ -1106,32 +1116,32 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tabCountPill: {
-    backgroundColor: '#C0392B',
+    backgroundColor: C.red,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
     marginLeft: 2,
   },
   tabCountText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '800',
+    color: C.textInverse,
+    fontSize: T.caption,
+    fontWeight: T.extrabold,
   },
 
   /* CARDS */
   card: {
-    backgroundColor: '#EFE7DA',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 18,
+    backgroundColor: C.surface,
+    borderRadius: R.xl,
+    padding: S.base,
+    marginBottom: S.base,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: S.sm,
   },
   cardTitleRow: {
     flexDirection: 'row',
@@ -1140,14 +1150,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#181818',
+    fontSize: T.lg,
+    fontWeight: T.extrabold,
+    color: C.textPrimary,
   },
   cardDescription: {
-    fontSize: 13,
-    color: '#666666',
-    marginBottom: 14,
+    fontSize: T.sm,
+    color: C.textSecondary,
+    marginBottom: S.base,
     lineHeight: 18,
   },
   fullScreenLinkRow: {
@@ -1155,37 +1165,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fullScreenLink: {
-    color: '#2E8B57',
-    fontSize: 13,
-    fontWeight: '700',
+    color: C.blue,
+    fontSize: T.sm,
+    fontWeight: T.bold,
   },
 
   /* PRESETS & INPUTS */
   presetRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: S.base,
   },
   presetChip: {
     flex: 1,
-    backgroundColor: '#F7F3EA',
-    paddingVertical: 8,
-    borderRadius: 10,
+    backgroundColor: C.surfaceAlt,
+    paddingVertical: S.sm,
+    borderRadius: R.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   presetChipActive: {
-    backgroundColor: 'rgba(46, 139, 87, 0.15)',
-    borderColor: '#2E8B57',
+    backgroundColor: C.greenBg,
+    borderColor: C.green,
   },
   presetChipText: {
-    color: '#666666',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.textSecondary,
+    fontSize: T.sm,
+    fontWeight: T.bold,
   },
   presetChipTextActive: {
-    color: '#236847',
+    color: C.green,
   },
 
   inputRow: {
@@ -1193,59 +1203,103 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   currencyPrefix: {
-    backgroundColor: '#E5DCCB',
+    backgroundColor: C.surfaceAlt,
     height: 48,
     paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
+    borderTopLeftRadius: R.md,
+    borderBottomLeftRadius: R.md,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
+  },
+  currencyPrefixText: {
+    color: C.textPrimary,
+    fontSize: T.md,
+    fontWeight: T.extrabold,
   },
   currencyText: {
-    color: '#2E8B57',
-    fontSize: 18,
-    fontWeight: '800',
+    color: C.textPrimary,
+    fontSize: T.md,
+    fontWeight: T.extrabold,
   },
-  input: {
+  limitInput: {
     flex: 1,
     height: 48,
-    backgroundColor: '#F7F3EA',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    color: '#181818',
-    fontSize: 14,
+    backgroundColor: C.surface,
+    borderTopRightRadius: R.md,
+    borderBottomRightRadius: R.md,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderLeftWidth: 0,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    fontSize: T.body,
+    fontWeight: T.bold,
+    color: C.textPrimary,
   },
-  inviteButton: {
-    backgroundColor: '#2E8B57',
+  saveLimitBtn: {
+    backgroundColor: C.dark,
+    paddingHorizontal: S.base,
     height: 48,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: R.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
-  },
-  inviteButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
+    marginLeft: 8,
   },
   saveLimitButton: {
-    backgroundColor: '#236847',
+    backgroundColor: C.dark,
+    paddingHorizontal: S.base,
     height: 48,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: R.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
+    marginLeft: 8,
+  },
+  saveLimitBtnText: {
+    color: C.textInverse,
+    fontSize: T.sm,
+    fontWeight: T.extrabold,
   },
   saveLimitButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
+    color: C.textInverse,
+    fontSize: T.sm,
+    fontWeight: T.extrabold,
+  },
+  inviteButton: {
+    backgroundColor: C.dark,
+    borderRadius: R.md,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: S.base,
+  },
+  inviteButtonText: {
+    color: C.textInverse,
+    fontSize: T.body,
+    fontWeight: T.extrabold,
+  },
+  input: {
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: T.body,
+    color: C.textPrimary,
+  },
+  button: {
+    backgroundColor: C.dark,
+    borderRadius: R.md,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: S.base,
+  },
+  buttonText: {
+    color: C.textInverse,
+    fontSize: T.body,
+    fontWeight: T.extrabold,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -1255,35 +1309,35 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: S.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#DCD1BF',
+    borderBottomColor: C.border,
   },
   avatarCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2E8B57',
+    backgroundColor: C.dark,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: S.md,
   },
   avatarLetter: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '800',
+    color: C.textInverse,
+    fontSize: T.md,
+    fontWeight: T.extrabold,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#181818',
+    fontSize: T.body,
+    fontWeight: T.bold,
+    color: C.textPrimary,
   },
   itemSub: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: T.xs,
+    color: C.textSecondary,
     marginTop: 2,
   },
   itemActions: {
@@ -1295,18 +1349,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activePill: {
-    backgroundColor: 'rgba(46, 139, 87, 0.15)',
+    backgroundColor: C.greenBg,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   activePillText: {
-    color: '#236847',
-    fontSize: 11,
-    fontWeight: '800',
+    color: C.green,
+    fontSize: T.xs,
+    fontWeight: T.extrabold,
   },
   enterCodePill: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: C.dark,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
@@ -1314,26 +1368,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   enterCodePillText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
+    color: C.textInverse,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   pillText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
+    color: C.textInverse,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   acceptBtn: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: C.green,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     marginRight: 8,
   },
   acceptBtnText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.textInverse,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   removeBtn: {
     padding: 6,
@@ -1343,64 +1397,64 @@ const styles = StyleSheet.create({
   /* EMPTY STATES */
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: S.xl,
   },
   emptyTitle: {
-    color: '#181818',
-    fontSize: 15,
-    fontWeight: '700',
+    color: C.textPrimary,
+    fontSize: T.md,
+    fontWeight: T.bold,
     marginTop: 10,
     marginBottom: 4,
   },
   emptyText: {
-    color: '#666666',
-    fontSize: 13,
+    color: C.textSecondary,
+    fontSize: T.sm,
     textAlign: 'center',
     lineHeight: 18,
   },
 
   /* OTP FEED */
   otpFeedItem: {
-    backgroundColor: '#F7F3EA',
-    borderRadius: 10,
-    padding: 12,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.md,
+    padding: S.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   otpFeedUser: {
-    color: '#666666',
-    fontSize: 12,
+    color: C.textSecondary,
+    fontSize: T.xs,
   },
   otpFeedCode: {
-    color: '#2E8B57',
-    fontSize: 16,
-    fontWeight: '900',
+    color: C.green,
+    fontSize: T.lg,
+    fontWeight: T.black,
     marginTop: 2,
   },
   verifyDirectBtn: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: C.green,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   verifyDirectBtnText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.textInverse,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
 
   /* APPROVAL CARDS IN TAB */
   reqCardInner: {
-    backgroundColor: '#F7F3EA',
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.md,
+    padding: S.md,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   reqHeaderRow: {
     flexDirection: 'row',
@@ -1409,13 +1463,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   reqWardName: {
-    color: '#181818',
-    fontSize: 14,
-    fontWeight: '700',
+    color: C.textPrimary,
+    fontSize: T.body,
+    fontWeight: T.bold,
   },
   reqWardSub: {
-    color: '#666666',
-    fontSize: 12,
+    color: C.textSecondary,
+    fontSize: T.xs,
   },
   riskChip: {
     paddingHorizontal: 8,
@@ -1423,8 +1477,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   riskChipText: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: T.xs,
+    fontWeight: T.extrabold,
   },
   reqBodyRow: {
     flexDirection: 'row',
@@ -1433,14 +1487,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   reqLabel: {
-    color: '#666666',
-    fontSize: 10,
-    fontWeight: '700',
+    color: C.textSecondary,
+    fontSize: T.caption,
+    fontWeight: T.bold,
   },
   reqAmount: {
-    color: '#2E8B57',
-    fontSize: 16,
-    fontWeight: '900',
+    color: C.green,
+    fontSize: T.lg,
+    fontWeight: T.black,
     marginTop: 2,
   },
   timerRow: {
@@ -1449,9 +1503,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   reqTime: {
-    color: '#F59E0B',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.amber,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   reqActionsRow: {
     flexDirection: 'row',
@@ -1464,38 +1518,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rejectActionBtn: {
-    backgroundColor: 'rgba(192, 57, 43, 0.15)',
+    backgroundColor: C.redBg,
   },
   rejectActionText: {
-    color: '#C0392B',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.red,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   approveActionBtn: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: C.green,
   },
   approveActionText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '800',
+    color: C.textInverse,
+    fontSize: T.xs,
+    fontWeight: T.extrabold,
   },
 
   /* MODAL */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15,23,42,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: S.base,
   },
   modalContent: {
-    backgroundColor: '#EFE7DA',
-    borderRadius: 20,
-    padding: 22,
+    backgroundColor: C.surface,
+    borderRadius: R.card,
+    padding: S.xl,
     width: '100%',
     maxWidth: 380,
     borderWidth: 1,
-    borderColor: '#DCD1BF',
+    borderColor: C.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1504,58 +1558,58 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#181818',
+    fontSize: T.xl,
+    fontWeight: T.black,
+    color: C.textPrimary,
   },
   modalCloseIcon: {
-    color: '#666666',
-    fontSize: 18,
-    fontWeight: '700',
+    color: C.textTertiary,
+    fontSize: T.lg,
+    fontWeight: T.bold,
   },
   modalSubtitle: {
-    fontSize: 13,
-    color: '#666666',
+    fontSize: T.sm,
+    color: C.textSecondary,
     lineHeight: 18,
-    marginBottom: 20,
+    marginBottom: S.lg,
   },
   otpInput: {
-    backgroundColor: '#F7F3EA',
-    borderRadius: 12,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.md,
     borderWidth: 2,
-    borderColor: '#2E8B57',
-    height: 54,
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#2E8B57',
+    borderColor: C.green,
+    height: 52,
+    fontSize: T.xxl,
+    fontWeight: T.black,
+    color: C.green,
     textAlign: 'center',
     letterSpacing: 8,
-    marginBottom: 20,
+    marginBottom: S.lg,
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   modalCancelBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: S.base,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: R.md,
     marginRight: 8,
   },
   modalCancelBtnText: {
-    color: '#666666',
-    fontWeight: '600',
-    fontSize: 14,
+    color: C.textSecondary,
+    fontWeight: T.bold,
+    fontSize: T.body,
   },
   modalSubmitBtn: {
-    backgroundColor: '#2E8B57',
-    paddingHorizontal: 18,
+    backgroundColor: C.dark,
+    paddingHorizontal: S.lg,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: R.md,
   },
   modalSubmitBtnText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 14,
+    color: C.textInverse,
+    fontWeight: T.bold,
+    fontSize: T.body,
   },
 });

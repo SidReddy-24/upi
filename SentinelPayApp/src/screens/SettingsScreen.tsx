@@ -4,12 +4,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, Alert, TextInput,
+  Switch, Alert, TextInput, SafeAreaView, StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { getSettings, updateSettings, UserSettings } from '../utils/settingsDb';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Settings'>;
@@ -79,233 +80,129 @@ export default function SettingsScreen({ navigation }: Props) {
   if (!settings) return null;
 
   return (
-    <ScrollView style={styles.container}>
-      
-      {/* Transaction Hold Period */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <AppIcon name="history" size={20} color="#2D6A4F" />
-          <Text style={styles.sectionTitle}>Transaction Hold Period</Text>
-        </View>
-        <Text style={styles.sectionDesc}>
-          Pause transactions for review after entering payment details. You can confirm or cancel during the hold period.
-        </Text>
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Enable Transaction Hold</Text>
-            <Text style={styles.toggleDesc}>
-              {settings.holdEnabled ? 'Active' : 'Disabled'}
-            </Text>
-          </View>
-          <Switch
-            value={settings.holdEnabled}
-            onValueChange={toggleHoldEnabled}
-            trackColor={{ false: '#E8C4B8', true: '#2D6A4F' }}
-            thumbColor="#FAF7F0"
-          />
-        </View>
-
-        {settings.holdEnabled && (
-          <>
-            <View style={styles.inputRow}>
-              <Text style={styles.inputLabel}>Hold Duration (10 - 30 seconds):</Text>
-              <TextInput
-                style={styles.textInput}
-                keyboardType="numeric"
-                value={holdDurationStr}
-                onChangeText={setHoldDurationStr}
-                maxLength={2}
-              />
-            </View>
-
-            <View style={styles.inputRow}>
-              <Text style={styles.inputLabel}>Apply Hold for Payments Above (₹):</Text>
-              <TextInput
-                style={styles.textInput}
-                keyboardType="numeric"
-                value={holdThresholdStr}
-                onChangeText={setHoldThresholdStr}
-              />
-            </View>
-          </>
-        )}
-      </View>
-
-      {/* Guardian & Safety Net */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <AppIcon name="guardian" size={20} color="#2D6A4F" />
-          <Text style={styles.sectionTitle}>Guardian Safety Net</Text>
-        </View>
-        <Text style={styles.sectionDesc}>
-          Require trusted guardian verification for transactions exceeding your specified safety limit.
-        </Text>
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Enable Guardian Protection</Text>
-            <Text style={styles.toggleDesc}>
-              {settings.guardianEnabled ? 'Active' : 'Disabled'}
-            </Text>
-          </View>
-          <Switch
-            value={settings.guardianEnabled}
-            onValueChange={toggleGuardianEnabled}
-            trackColor={{ false: '#E8C4B8', true: '#2D6A4F' }}
-            thumbColor="#FAF7F0"
-          />
-        </View>
-
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate('GuardianManagement')}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <AppIcon name="guardian" size={18} color="#2D6A4F" />
-            <Text style={styles.navButtonText}>Manage Linked Guardians</Text>
-          </View>
-          <Text style={styles.navButtonArrow}>→</Text>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
         </TouchableOpacity>
+        <Text style={DS.pageTitle}>System Settings</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Notifications */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <AppIcon name="sms" size={20} color="#2D6A4F" />
-          <Text style={styles.sectionTitle}>Fraud Notifications</Text>
-        </View>
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Real-time SMS Scam Alerts</Text>
-            <Text style={styles.toggleDesc}>
-              Get immediate alerts when high-risk SMS messages are detected
-            </Text>
+      <ScrollView contentContainerStyle={DS.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Transaction Hold Period */}
+        <View style={DS.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: S.xs }}>
+            <AppIcon name="history" size={18} color={C.dark} />
+            <Text style={DS.cardTitle}>Transaction Hold Period</Text>
           </View>
-          <Switch
-            value={settings.smsNotificationsEnabled}
-            onValueChange={toggleSmsNotifications}
-            trackColor={{ false: '#E8C4B8', true: '#2D6A4F' }}
-            thumbColor="#FAF7F0"
-          />
+          <Text style={[DS.cardSub, { marginBottom: S.md }]}>
+            Pause transactions for review after entering payment details. You can confirm or cancel during the hold period.
+          </Text>
+
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginBottom: S.sm }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Enable Transaction Hold</Text>
+              <Text style={DS.cardSub}>
+                {settings.holdEnabled ? 'Active' : 'Disabled'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.holdEnabled}
+              onValueChange={toggleHoldEnabled}
+              trackColor={{ false: C.border, true: C.green }}
+            />
+          </View>
+
+          {settings.holdEnabled && (
+            <View style={{ gap: S.sm, marginTop: S.xs }}>
+              <View>
+                <Text style={DS.inputLabel}>HOLD DURATION (10 - 30 SECONDS)</Text>
+                <TextInput
+                  style={DS.inputStandalone}
+                  keyboardType="numeric"
+                  value={holdDurationStr}
+                  onChangeText={setHoldDurationStr}
+                  maxLength={2}
+                />
+              </View>
+
+              <View>
+                <Text style={DS.inputLabel}>APPLY HOLD FOR PAYMENTS ABOVE (₹)</Text>
+                <TextInput
+                  style={DS.inputStandalone}
+                  keyboardType="numeric"
+                  value={holdThresholdStr}
+                  onChangeText={setHoldThresholdStr}
+                />
+              </View>
+            </View>
+          )}
         </View>
-      </View>
 
-      {/* Save Button */}
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Preferences</Text>
-      </TouchableOpacity>
+        {/* Guardian & Safety Net */}
+        <View style={DS.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: S.xs }}>
+            <AppIcon name="guardian" size={18} color={C.green} />
+            <Text style={DS.cardTitle}>Guardian Safety Net</Text>
+          </View>
+          <Text style={[DS.cardSub, { marginBottom: S.md }]}>
+            Require trusted guardian verification for transactions exceeding your specified safety limit.
+          </Text>
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginBottom: S.sm }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Enable Guardian Protection</Text>
+              <Text style={DS.cardSub}>
+                {settings.guardianEnabled ? 'Active' : 'Disabled'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.guardianEnabled}
+              onValueChange={toggleGuardianEnabled}
+              trackColor={{ false: C.border, true: C.green }}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={DS.rowCard}
+            onPress={() => navigation.navigate('GuardianManagement')}
+            activeOpacity={0.7}
+          >
+            <AppIcon name="guardian" size={18} color={C.green} />
+            <Text style={[DS.cardTitle, { flex: 1 }]}>Manage Linked Guardians</Text>
+            <AppIcon name="chevronRight" size={16} color={C.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Notifications */}
+        <View style={DS.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.xs, marginBottom: S.xs }}>
+            <AppIcon name="sms" size={18} color={C.blue} />
+            <Text style={DS.cardTitle}>Fraud Notifications</Text>
+          </View>
+
+          <View style={[DS.infoCard, { backgroundColor: C.surfaceAlt }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Real-time SMS Scam Alerts</Text>
+              <Text style={DS.cardSub}>
+                Get immediate alerts when high-risk SMS messages are detected
+              </Text>
+            </View>
+            <Switch
+              value={settings.smsNotificationsEnabled}
+              onValueChange={toggleSmsNotifications}
+              trackColor={{ false: C.border, true: C.green }}
+            />
+          </View>
+        </View>
+
+        {/* Save Button */}
+        <TouchableOpacity style={[DS.btn, DS.btnPrimary, { marginTop: S.sm }]} onPress={handleSave} activeOpacity={0.7}>
+          <Text style={DS.btnText}>Save Preferences</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAF7F0',
-    padding: 16,
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E8C4B8',
-    elevation: 2,
-    shadowColor: '#1A1A2E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#1A1A2E',
-  },
-  sectionDesc: {
-    fontSize: 13,
-    color: '#64748b',
-    marginBottom: 14,
-    lineHeight: 18,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#FAF7F0',
-  },
-  toggleTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1A1A2E',
-  },
-  toggleDesc: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  inputRow: {
-    marginTop: 12,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1A1A2E',
-    marginBottom: 6,
-  },
-  textInput: {
-    backgroundColor: '#FAF7F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#E8C4B8',
-    fontSize: 14,
-    color: '#1A1A2E',
-    fontWeight: '700',
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FAF7F0',
-    padding: 14,
-    borderRadius: 14,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#E8C4B8',
-  },
-  navButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2D6A4F',
-  },
-  navButtonArrow: {
-    fontSize: 16,
-    color: '#2D6A4F',
-    fontWeight: '800',
-  },
-  saveButton: {
-    backgroundColor: '#2D6A4F',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  saveButtonText: {
-    color: '#FAF7F0',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-});

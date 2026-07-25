@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import AppIcon from './AppIcon';
 import { notificationService, NotificationItem } from '../services/notificationService';
+import { C, S, T, R, DS } from '../theme/ds';
 
 const { width } = Dimensions.get('window');
 
@@ -32,7 +33,6 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
     const unsubscribe = notificationService.subscribe((list) => {
       if (list.length > 0) {
         const latest = list[0];
-        // Track latest notification ID
         if (lastSeenIdRef.current === null) {
           lastSeenIdRef.current = latest.id;
           return;
@@ -54,7 +54,6 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
   const showBanner = (item: NotificationItem) => {
     setActiveItem(item);
 
-    // Haptic vibration feedback
     try {
       if (Platform.OS === 'android') {
         Vibration.vibrate([0, 120, 80, 180]);
@@ -65,7 +64,6 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
       // Ignore vibration error
     }
 
-    // Animate slide down with spring
     Animated.spring(slideAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -96,12 +94,12 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
   const isGuardian = activeItem.type === 'GUARDIAN_APPROVED' || activeItem.type === 'GUARDIAN_REJECTED';
 
   const accentColor = isPaymentReceived
-    ? '#2E8B57'
+    ? C.green
     : isSecurityAlert
-    ? '#DC2626'
+    ? C.red
     : isGuardian
-    ? '#D97706'
-    : '#2563EB';
+    ? C.amber
+    : C.blue;
 
   const iconEmoji = isPaymentReceived
     ? '💰'
@@ -110,9 +108,6 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
     : isGuardian
     ? '🛡️'
     : '🔔';
-
-  // Extract avatar initial or emoji
-  const avatarLetter = isPaymentReceived ? 'S' : isSecurityAlert ? '!' : '✓';
 
   return (
     <Animated.View
@@ -126,7 +121,7 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
       {/* Header Row: App name & timestamp */}
       <View style={styles.headerRow}>
         <View style={styles.appTitleContainer}>
-          <AppIcon name="shield" size={14} color="#2E8B57" />
+          <AppIcon name="shield" size={14} color={C.green} />
           <Text style={styles.appNameText}>SentinelPay</Text>
           <Text style={styles.bulletDot}>•</Text>
           <Text style={styles.timeText}>now</Text>
@@ -147,12 +142,10 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
           }
         }}
       >
-        {/* Circle Avatar Icon */}
         <View style={[styles.avatarCircle, { backgroundColor: `${accentColor}18`, borderColor: accentColor }]}>
           <Text style={styles.avatarEmoji}>{iconEmoji}</Text>
         </View>
 
-        {/* Text Details */}
         <View style={styles.textContainer}>
           <Text style={styles.titleText} numberOfLines={1}>
             {activeItem.title}
@@ -163,10 +156,10 @@ export default function HeadsUpNotificationBanner({ onPressNotification }: Props
         </View>
       </TouchableOpacity>
 
-      {/* Quick Action Chips Row (Android Style) */}
+      {/* Quick Action Chips Row */}
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[styles.actionChip, { backgroundColor: '#2E8B57' }]}
+          style={[styles.actionChip, { backgroundColor: C.dark }]}
           onPress={() => {
             hideBanner();
             if (onPressNotification && activeItem) {
@@ -213,12 +206,12 @@ const styles = StyleSheet.create({
     right: 12,
     zIndex: 999999,
     elevation: 999,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 14,
+    backgroundColor: C.surface,
+    borderRadius: R.xl,
+    padding: S.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
+    borderColor: C.border,
+    shadowColor: C.dark,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.14,
     shadowRadius: 14,
@@ -227,40 +220,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: S.xs,
   },
   appTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   appNameText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1A1A2E',
+    fontSize: T.xs,
+    fontWeight: T.bold,
+    color: C.textPrimary,
     marginLeft: 6,
   },
   bulletDot: {
-    fontSize: 12,
-    color: '#94A3B8',
+    fontSize: T.xs,
+    color: C.textTertiary,
     marginHorizontal: 6,
   },
   timeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: T.caption,
+    fontWeight: T.semibold,
+    color: C.textSecondary,
   },
   closeBtn: {
     padding: 2,
   },
   closeBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontSize: T.sm,
+    fontWeight: T.bold,
+    color: C.textTertiary,
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: S.sm,
   },
   avatarCircle: {
     width: 46,
@@ -268,7 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: S.md,
     borderWidth: 1.5,
   },
   avatarEmoji: {
@@ -278,14 +271,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1A1A2E',
+    fontSize: T.body,
+    fontWeight: T.extrabold,
+    color: C.textPrimary,
     marginBottom: 3,
   },
   bodyText: {
-    fontSize: 13,
-    color: '#475569',
+    fontSize: T.sm,
+    color: C.textSecondary,
     lineHeight: 18,
   },
   actionsRow: {
@@ -296,31 +289,31 @@ const styles = StyleSheet.create({
   actionChip: {
     paddingVertical: 7,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: R.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionChipPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.textInverse,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   actionChipSecondary: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: C.border,
   },
   actionChipSecondaryText: {
-    color: '#1A1A2E',
-    fontSize: 12,
-    fontWeight: '700',
+    color: C.textPrimary,
+    fontSize: T.xs,
+    fontWeight: T.bold,
   },
   actionChipGhost: {
     backgroundColor: 'transparent',
   },
   actionChipGhostText: {
-    color: '#64748B',
-    fontSize: 12,
-    fontWeight: '600',
+    color: C.textSecondary,
+    fontSize: T.xs,
+    fontWeight: T.semibold,
   },
 });

@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, SafeAreaView, StatusBar,
 } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types';
 import fraudShieldApi from '../services/fraudShieldApi';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
+
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'ScamAssistant'>;
+};
 
 const PRESETS = [
   "Someone from RBI called asking to verify account details immediately",
@@ -12,7 +19,7 @@ const PRESETS = [
   "Urgent: Electricity connection will be disconnected tonight",
 ];
 
-export default function ScamAssistantScreen() {
+export default function ScamAssistantScreen({ navigation }: Props) {
   const [input, setInput] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -57,105 +64,94 @@ export default function ScamAssistantScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <View style={styles.headerTitleRow}>
-          <View style={styles.iconCircle}>
-            <AppIcon name="assistant" size={22} color="#2D6A4F" />
-          </View>
-          <Text style={styles.title}>AI Scam Assistant</Text>
-        </View>
-        <Text style={styles.subtitle}>Ask "Is this safe?" — paste suspicious SMS, calls, or investment offers.</Text>
-      </View>
-
-      <View style={styles.card}>
-        <TextInput
-          style={styles.input}
-          placeholder="Paste SMS, message, or describe suspicious activity..."
-          placeholderTextColor="#94a3b8"
-          multiline
-          numberOfLines={3}
-          value={input}
-          onChangeText={setInput}
-        />
-
-        <TouchableOpacity
-          style={[styles.analyzeBtn, (!input.trim() || loading) && styles.btnDisabled]}
-          onPress={() => handleAnalyze()}
-          disabled={!input.trim() || loading}>
-          {loading ? (
-            <ActivityIndicator color="#FAF7F0" />
-          ) : (
-            <Text style={styles.analyzeBtnText}>Analyze with FraudShield AI →</Text>
-          )}
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
         </TouchableOpacity>
+        <Text style={DS.pageTitle}>AI Scam Assistant</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      <Text style={styles.presetLabel}>Quick Test Presets:</Text>
-      <View style={styles.presetContainer}>
-        {PRESETS.map((p, idx) => (
-          <TouchableOpacity
-            key={idx}
-            style={styles.presetChip}
-            onPress={() => {
-              setInput(p);
-              handleAnalyze(p);
-            }}>
-            <Text style={styles.presetText}>"{p}"</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {result && (
-        <View style={styles.resultCard}>
-          <View style={styles.resultHeader}>
-            <Text style={styles.catTitle}>{result.threat_category}</Text>
-            <View style={[styles.levelBadge, result.threat_level === 'CRITICAL' || result.threat_level === 'HIGH' ? styles.levelDanger : styles.levelSafe]}>
-              <Text style={styles.levelBadgeText}>{result.threat_level}</Text>
+      <ScrollView contentContainerStyle={DS.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={DS.cardLg}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.md, marginBottom: S.md }}>
+            <View style={[DS.iconMd, { backgroundColor: C.violetBg }]}>
+              <AppIcon name="assistant" size={22} color={C.violet} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Ask AI "Is this safe?"</Text>
+              <Text style={DS.cardSub}>Paste suspicious SMS, call notes, or job offers</Text>
             </View>
           </View>
 
-          <Text style={styles.explanationText}>{result.nl_explanation}</Text>
+          <TextInput
+            style={[DS.inputStandalone, { height: 90, textAlignVertical: 'top', paddingTop: S.md }]}
+            placeholder="Paste SMS, message, or describe suspicious activity..."
+            placeholderTextColor={C.textTertiary}
+            multiline
+            numberOfLines={3}
+            value={input}
+            onChangeText={setInput}
+          />
 
-          {result.recommended_actions?.map((act: string, idx: number) => (
-            <View key={idx} style={styles.actionRow}>
-              <Text style={styles.actionDot}>•</Text>
-              <Text style={styles.actionText}>{act}</Text>
-            </View>
+          <TouchableOpacity
+            style={[DS.btn, DS.btnPrimary, (!input.trim() || loading) && DS.btnDisabled, { marginTop: S.sm }]}
+            onPress={() => handleAnalyze()}
+            disabled={!input.trim() || loading}
+            activeOpacity={0.7}>
+            {loading ? (
+              <ActivityIndicator color={C.textInverse} />
+            ) : (
+              <>
+                <AppIcon name="cpu" size={18} color={C.textInverse} />
+                <Text style={DS.btnText}>Analyze with FraudShield AI</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={DS.sectionTitle}>Quick Test Presets</Text>
+        <View style={{ gap: S.xs, marginBottom: S.lg }}>
+          {PRESETS.map((p, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={DS.rowCard}
+              onPress={() => {
+                setInput(p);
+                handleAnalyze(p);
+              }}
+              activeOpacity={0.7}>
+              <AppIcon name="search" size={16} color={C.blue} />
+              <Text style={[DS.cardSub, { color: C.textPrimary, flex: 1, fontWeight: T.bold }]}>"{p}"</Text>
+            </TouchableOpacity>
           ))}
         </View>
-      )}
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        {result && (
+          <View style={DS.cardLg}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: S.md }}>
+              <Text style={DS.cardTitle}>{result.threat_category}</Text>
+              <View style={[DS.pillBadge, { backgroundColor: result.threat_level === 'CRITICAL' || result.threat_level === 'HIGH' ? C.redBg : C.greenBg }]}>
+                <Text style={{ fontSize: T.caption, fontWeight: T.bold, color: result.threat_level === 'CRITICAL' || result.threat_level === 'HIGH' ? C.red : C.green }}>
+                  {result.threat_level}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[DS.cardSub, { fontSize: T.body, color: C.textPrimary, marginBottom: S.md }]}>
+              {result.nl_explanation}
+            </Text>
+
+            {result.recommended_actions?.map((act: string, idx: number) => (
+              <View key={idx} style={[DS.infoCard, { backgroundColor: C.surfaceAlt, marginBottom: S.xs }]}>
+                <Text style={{ fontSize: T.body, color: C.textPrimary, flex: 1 }}>{act}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F3EA', padding: 16 },
-  header: { marginBottom: 16 },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  iconCircle: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#EFE7DA', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DCD1BF' },
-  title: { fontSize: 24, fontWeight: '900', color: '#181818' },
-  subtitle: { fontSize: 13, color: '#666666', lineHeight: 18 },
-  card: { backgroundColor: '#EFE7DA', borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#DCD1BF', elevation: 2, shadowColor: '#181818', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 },
-  input: { backgroundColor: '#F7F3EA', borderRadius: 14, padding: 14, fontSize: 14, color: '#181818', height: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#DCD1BF' },
-  analyzeBtn: { backgroundColor: '#2E8B57', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  btnDisabled: { opacity: 0.6 },
-  analyzeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
-  presetLabel: { fontSize: 13, fontWeight: '800', color: '#181818', marginBottom: 8 },
-  presetContainer: { gap: 8, marginBottom: 20 },
-  presetChip: { backgroundColor: '#EFE7DA', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#DCD1BF' },
-  presetText: { fontSize: 13, color: '#2E8B57', fontWeight: '700' },
-  resultCard: { backgroundColor: '#EFE7DA', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#DCD1BF', marginBottom: 30, elevation: 2 },
-  resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  catTitle: { fontSize: 17, fontWeight: '900', color: '#181818' },
-  levelBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  levelDanger: { backgroundColor: '#C0392B' },
-  levelSafe: { backgroundColor: '#2E8B57' },
-  levelBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-  explanationText: { fontSize: 14, color: '#181818', lineHeight: 20, marginBottom: 14 },
-  actionRow: { flexDirection: 'row', gap: 6, marginBottom: 6 },
-  actionDot: { color: '#2E8B57', fontWeight: '900' },
-  actionText: { fontSize: 13, color: '#666666', fontWeight: '600', flex: 1 },
-});

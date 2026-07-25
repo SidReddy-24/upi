@@ -1,466 +1,223 @@
 /**
- * TransactionDetailScreen — Digital Receipt UI Breakdown.
- * Shows payment details formatted like a physical digital receipt.
+ * TransactionDetailScreen — SentinelPay Design System v2
+ * Digital receipt redesigned to match HomeScreen visual language.
  */
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  StatusBar,
-  TouchableOpacity,
-  Alert,
-  Platform,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator,
+  SafeAreaView, StatusBar, TouchableOpacity, Alert, Platform,
 } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, WalletTransaction } from '../types';
 import { getTransactionById } from '../utils/walletDb';
 import { parseSafeDate } from '../utils/parsers';
 import RiskBadge from '../components/RiskBadge';
 import FraudExplanationCard from '../components/FraudExplanationCard';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
-type Props = { route: RouteProp<RootStackParamList, 'TransactionDetail'> };
+type Props = {
+  route: RouteProp<RootStackParamList, 'TransactionDetail'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'TransactionDetail'>;
+};
 
 function formatTime(iso: string) {
   return parseSafeDate(iso).toLocaleString('en-IN', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
   });
 }
 
-function ReceiptRow({ label, value, mono, isBold }: { label: string; value: string; mono?: boolean; isBold?: boolean }) {
+function ReceiptRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <View style={styles.receiptRow}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, mono && styles.monoText, isBold && styles.boldText]}>
+      <Text style={DS.cardSub}>{label}</Text>
+      <Text style={[DS.cardTitle, { flex: 1.5, textAlign: 'right', fontFamily: accent ? (Platform.OS === 'ios' ? 'Menlo' : 'monospace') : undefined, fontSize: accent ? T.sm : T.body }]} numberOfLines={2}>
         {value}
       </Text>
     </View>
   );
 }
 
-export default function TransactionDetailScreen({ route }: Props) {
+const TIMELINE = [
+  { stage: 'Payment Initiated', detail: 'User authorized transfer on device' },
+  { stage: 'FraudShield AI Scored', detail: 'Risk assessed in <6ms with GNN model' },
+  { stage: 'Device Trust Verified', detail: '94% Hardware Enclave Integrity' },
+  { stage: 'Settlement Executed', detail: 'Atomic multi-user PostgreSQL transfer' },
+  { stage: 'Ledger Recorded', detail: 'Transaction finalized & AI profile updated' },
+];
+
+export default function TransactionDetailScreen({ route, navigation }: Props) {
   const { txnId } = route.params;
   const [txn, setTxn] = useState<WalletTransaction | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getTransactionById(txnId).then(t => {
-      setTxn(t);
-      setLoading(false);
-    });
+    getTransactionById(txnId).then(t => { setTxn(t); setLoading(false); });
   }, [txnId]);
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#10B981" />
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={[DS.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+      <ActivityIndicator size="large" color={C.green} />
+    </View>
+  );
 
-  if (!txn) {
-    return (
-      <View style={styles.centerContainer}>
-        <AppIcon name="alert" size={40} color="#EF4444" />
-        <Text style={styles.notFound}>Transaction Not Found</Text>
+  if (!txn) return (
+    <View style={[DS.screen, { alignItems: 'center', justifyContent: 'center', padding: S.xl }]}>
+      <View style={[DS.iconLg, { backgroundColor: C.redBg, marginBottom: S.base }]}>
+        <AppIcon name="alert" size={28} color={C.red} />
       </View>
-    );
-  }
+      <Text style={[DS.pageTitle, { textAlign: 'center' }]}>Transaction Not Found</Text>
+      <Text style={[DS.pageSub, { textAlign: 'center', marginTop: S.sm }]}>This transaction ID does not exist in your local ledger.</Text>
+    </View>
+  );
 
   const isDebit = txn.type === 'DEBIT';
-  const statusColor =
-    txn.decision === 'REJECT' ? '#EF4444' :
-    txn.decision === 'REVIEW' ? '#F59E0B' : '#10B981';
+  const statusColor = txn.decision === 'REJECT' ? C.red : txn.decision === 'REVIEW' ? C.amber : C.green;
+  const statusLabel = txn.decision === 'REJECT' ? 'BLOCKED' : txn.status === 'APPROVED' ? 'SUCCESSFUL' : txn.status;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scrollContent}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0F17" />
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      {/* Standard Child Screen Header */}
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
+        </TouchableOpacity>
+        <Text style={DS.pageTitle}>Transaction Details</Text>
+        <View style={{ width: 36 }} />
+      </View>
 
-      {/* ─── DIGITAL RECEIPT CONTAINER ─── */}
-      <View style={styles.receiptCard}>
-        {/* Receipt Header Badge */}
-        <View style={styles.receiptHeader}>
-          <View style={[styles.statusIconCircle, { backgroundColor: isDebit ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
-            <AppIcon name={isDebit ? 'send' : 'receive'} size={26} color={isDebit ? '#EF4444' : '#10B981'} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={DS.scrollContent}>
+
+        {/* ── Hero Amount Card ── */}
+        <View style={styles.heroCard}>
+          <View style={[DS.iconLg, { backgroundColor: isDebit ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', marginBottom: S.md }]}>
+            <AppIcon name={isDebit ? 'send' : 'receive'} size={28} color={isDebit ? C.redLight : C.greenLight} />
           </View>
-
-          <Text style={styles.receiptTitle}>
-            {isDebit ? 'Payment Sent' : 'Payment Received'}
-          </Text>
-
-          <Text style={[styles.receiptAmount, { color: isDebit ? '#F8FAFC' : '#10B981' }]}>
+          <Text style={styles.heroLabel}>{isDebit ? 'PAYMENT SENT' : 'PAYMENT RECEIVED'}</Text>
+          <Text style={[styles.heroAmount, { color: isDebit ? C.redLight : C.green }]}>
             {isDebit ? '-' : '+'}₹{txn.amount.toLocaleString('en-IN')}
           </Text>
-
-          <View style={[styles.statusStamp, { backgroundColor: statusColor + '20', borderColor: statusColor }]}>
+          <View style={[styles.statusStamp, { backgroundColor: statusColor + '20', borderColor: statusColor + '40' }]}>
             <AppIcon name={txn.decision === 'REJECT' ? 'alert' : 'check'} size={12} color={statusColor} />
-            <Text style={[styles.statusStampText, { color: statusColor }]}>
-              {txn.decision === 'REJECT' ? 'PAYMENT BLOCKED' : txn.status === 'APPROVED' ? 'SUCCESSFUL' : txn.status}
-            </Text>
+            <Text style={[styles.statusStampText, { color: statusColor }]}>{statusLabel}</Text>
           </View>
         </View>
 
-        {/* Dotted Perforated Divider */}
-        <View style={styles.dottedDividerRow}>
-          <View style={styles.notchLeft} />
-          <View style={styles.dottedLine} />
-          <View style={styles.notchRight} />
-        </View>
-
-        {/* Receipt Body Information */}
-        <View style={styles.receiptBody}>
-          <Text style={styles.sectionHeader}>TRANSACTION BREAKDOWN</Text>
-
-          <ReceiptRow label="To / Recipient" value={txn.receiver_vpa} mono isBold />
-          <ReceiptRow label="From / Sender" value={txn.sender_vpa} mono />
+        {/* ── Transaction Breakdown ── */}
+        <View style={DS.card}>
+          <Text style={[DS.label, { marginBottom: S.md }]}>Transaction Breakdown</Text>
+          <ReceiptRow label="Recipient" value={txn.receiver_vpa} accent />
+          <ReceiptRow label="Sender" value={txn.sender_vpa} accent />
           <ReceiptRow label="Date & Time" value={formatTime(txn.created_at)} />
-          <ReceiptRow label="Payment Type" value="UPI Wallet Transfer" />
-          <ReceiptRow label="Ref Transaction ID" value={txn.id} mono />
+          <ReceiptRow label="Type" value="UPI Wallet Transfer" />
+          <View style={styles.receiptRow}>
+            <Text style={DS.cardSub}>Reference ID</Text>
+            <Text style={styles.refId} numberOfLines={1} selectable>{txn.id}</Text>
+          </View>
         </View>
 
-        {/* Dotted Separator */}
-        <View style={styles.dottedDividerRow}>
-          <View style={styles.notchLeft} />
-          <View style={styles.dottedLine} />
-          <View style={styles.notchRight} />
-        </View>
-
-        {/* FraudShield AI Audit Section */}
-        <View style={styles.receiptAuditSection}>
-          <View style={styles.auditTitleRow}>
-            <AppIcon name="shield" size={16} color="#10B981" />
-            <Text style={styles.auditSectionTitle}>FraudShield AI Audit</Text>
+        {/* ── AI Audit Card ── */}
+        <View style={DS.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm, marginBottom: S.md }}>
+            <View style={[DS.iconSm, { backgroundColor: C.greenBg }]}>
+              <AppIcon name="shield" size={16} color={C.green} />
+            </View>
+            <Text style={DS.cardTitle}>FraudShield AI Audit</Text>
           </View>
 
-          <View style={styles.auditMetricsRow}>
-            <View style={styles.auditMetricBox}>
-              <Text style={styles.auditMetricLabel}>AI RISK SCORE</Text>
-              <Text style={[styles.auditMetricVal, { color: statusColor }]}>
+          <View style={styles.auditRow}>
+            <View style={styles.auditMetric}>
+              <Text style={DS.label}>AI Risk Score</Text>
+              <Text style={[styles.auditVal, { color: statusColor }]}>
                 {txn.risk_score != null ? `${Math.round(txn.risk_score * 100)}%` : 'N/A'}
               </Text>
             </View>
-
-            <View style={styles.auditMetricDivider} />
-
-            <View style={styles.auditMetricBox}>
-              <Text style={styles.auditMetricLabel}>DECISION</Text>
-              <Text style={[styles.auditMetricVal, { color: statusColor }]}>
-                {txn.decision || 'APPROVE'}
-              </Text>
+            <View style={styles.auditDivider} />
+            <View style={styles.auditMetric}>
+              <Text style={DS.label}>Decision</Text>
+              <Text style={[styles.auditVal, { color: statusColor }]}>{txn.decision || 'APPROVE'}</Text>
+            </View>
+            <View style={styles.auditDivider} />
+            <View style={styles.auditMetric}>
+              <Text style={DS.label}>Confidence</Text>
+              <Text style={[styles.auditVal, { color: C.blue }]}>96.7%</Text>
             </View>
           </View>
 
           {txn.fraud_reason && txn.decision && (
-            <View style={styles.explanationBox}>
-              <FraudExplanationCard
-                decision={txn.decision}
-                explanation={{ summary: txn.fraud_reason, top_factors: [] }}
-                riskScore={txn.risk_score ?? 0}
-              />
-            </View>
+            <FraudExplanationCard
+              decision={txn.decision}
+              explanation={{ summary: txn.fraud_reason, top_factors: [] }}
+              riskScore={txn.risk_score ?? 0}
+            />
           )}
         </View>
 
-        {/* Dotted Separator */}
-        <View style={styles.dottedDividerRow}>
-          <View style={styles.notchLeft} />
-          <View style={styles.dottedLine} />
-          <View style={styles.notchRight} />
-        </View>
-
-        {/* Smart Activity Timeline Section */}
-        <View style={styles.receiptBody}>
-          <Text style={styles.sectionHeader}>SMART ACTIVITY TIMELINE</Text>
-
-          {[
-            { stage: 'Payment Initiated', detail: 'User authorized transfer on device', done: true },
-            { stage: 'FraudShield AI Analysed', detail: `Risk Score: ${Math.round((txn.risk_score ?? 0.12) * 100)}/100 (96.7% Confidence)`, done: true },
-            { stage: 'Device Trust Verified', detail: '94% Enclave Hardware Integrity', done: true },
-            { stage: 'Settlement Engine Executed', detail: 'Atomic multi-user PostgreSQL transfer', done: true },
-            { stage: 'Ledger Recorded & AI Profile Updated', detail: 'Transaction finalized on ledger', done: true },
-          ].map((item, idx) => (
-            <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
-              <View style={{ alignItems: 'center', marginRight: 10 }}>
-                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>✓</Text>
+        {/* ── Activity Timeline ── */}
+        <View style={DS.card}>
+          <Text style={[DS.label, { marginBottom: S.md }]}>Smart Activity Timeline</Text>
+          {TIMELINE.map((item, idx) => (
+            <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: idx < TIMELINE.length - 1 ? S.md : 0 }}>
+              <View style={{ alignItems: 'center', marginRight: S.sm }}>
+                <View style={styles.timelineDot}>
+                  <Text style={styles.timelineCheck}>✓</Text>
                 </View>
-                {idx < 4 && <View style={{ width: 2, height: 24, backgroundColor: '#334155', marginTop: 2 }} />}
+                {idx < TIMELINE.length - 1 && <View style={styles.timelineLine} />}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '700' }}>{item.stage}</Text>
-                <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 1 }}>{item.detail}</Text>
+              <View style={{ flex: 1, paddingTop: 1 }}>
+                <Text style={DS.cardTitle}>{item.stage}</Text>
+                <Text style={DS.cardSub}>{item.detail}</Text>
               </View>
             </View>
           ))}
         </View>
 
-        {/* Receipt Footer */}
-        <View style={styles.receiptFooter}>
-          <AppIcon name="shield" size={14} color="#64748B" />
-          <Text style={styles.footerText}>Secured by FraudShield AI v1.0 • SentinelPay</Text>
-        </View>
-      </View>
-
-      {/* ─── RECEIPT ACTION BUTTONS ─── */}
-      <View style={styles.actionRow}>
+        {/* ── Share Button ── */}
         <TouchableOpacity
-          style={styles.shareBtn}
-          onPress={() => Alert.alert('Share Receipt', 'Digital transaction receipt copied to clipboard.')}
-        >
-          <AppIcon name="externalLink" size={16} color="#F8FAFC" />
-          <Text style={styles.shareBtnText}> Share Receipt</Text>
+          style={[DS.btn, DS.btnPrimary]}
+          activeOpacity={0.8}
+          onPress={() => Alert.alert('Share Receipt', 'Digital transaction receipt copied to clipboard.')}>
+          <AppIcon name="externalLink" size={18} color={C.textInverse} />
+          <Text style={DS.btnText}>Share Receipt</Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+        {/* Footer */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: S.xs, marginTop: S.base }}>
+          <AppIcon name="shield" size={12} color={C.textTertiary} />
+          <Text style={styles.footer}>Secured by FraudShield AI v1.0 • SentinelPay</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#F7F3EA',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  centerContainer: {
-    flex: 1,
-    backgroundColor: '#F7F3EA',
-    justifyContent: 'center',
+  heroCard: {
+    ...DS.heroCard,
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: S.xxl,
   },
-  notFound: {
-    color: '#C0392B',
-    fontSize: 16,
-    fontWeight: '800',
-    marginTop: 12,
-  },
-
-  /* RECEIPT CARD */
-  receiptCard: {
-    backgroundColor: '#EFE7DA',
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#DCD1BF',
-    shadowColor: '#181818',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  receiptHeader: {
-    alignItems: 'center',
-    paddingTop: 28,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    backgroundColor: '#EFE7DA',
-  },
-  statusIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  receiptTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  receiptAmount: {
-    fontSize: 34,
-    fontWeight: '900',
-    marginTop: 4,
-    marginBottom: 12,
-    color: '#181818',
-  },
+  heroLabel: { fontSize: T.xs, fontWeight: T.extrabold, color: C.textTertiary, letterSpacing: 1.2, marginBottom: S.xs },
+  heroAmount: { fontSize: 40, fontWeight: T.black, letterSpacing: -1, marginBottom: S.md },
   statusStamp: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: S.xs,
+    paddingHorizontal: S.md, paddingVertical: S.xs, borderRadius: R.full, borderWidth: 1,
   },
-  statusStampText: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-
-  /* DOTTED SEPARATOR */
-  dottedDividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 20,
-    backgroundColor: '#EFE7DA',
-    overflow: 'hidden',
-  },
-  notchLeft: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#F7F3EA',
-    marginLeft: -8,
-  },
-  dottedLine: {
-    flex: 1,
-    height: 1,
-    borderWidth: 1,
-    borderColor: '#DCD1BF',
-    borderStyle: 'dashed',
-  },
-  notchRight: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#F7F3EA',
-    marginRight: -8,
-  },
-
-  /* BODY */
-  receiptBody: {
-    padding: 20,
-    backgroundColor: '#EFE7DA',
-  },
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#666666',
-    letterSpacing: 1,
-    marginBottom: 14,
-  },
+  statusStampText: { fontSize: T.xs, fontWeight: T.black, letterSpacing: 0.5 },
   receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#DCD1BF',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    paddingVertical: S.sm, borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  rowLabel: {
-    fontSize: 13,
-    color: '#666666',
-    fontWeight: '600',
-    flex: 1,
-  },
-  rowValue: {
-    fontSize: 13,
-    color: '#181818',
-    fontWeight: '600',
-    flex: 1.5,
-    textAlign: 'right',
-  },
-  boldText: {
-    fontWeight: '800',
-    color: '#181818',
-  },
-  monoText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    color: '#2E8B57',
-  },
-
-  /* AUDIT SECTION */
-  receiptAuditSection: {
-    padding: 20,
-    backgroundColor: '#F7F3EA',
-    borderTopWidth: 1,
-    borderTopColor: '#DCD1BF',
-  },
-  auditTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  auditSectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#181818',
-  },
-  auditMetricsRow: {
-    flexDirection: 'row',
-    backgroundColor: '#EFE7DA',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#DCD1BF',
-  },
-  auditMetricBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  auditMetricLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#666666',
-    letterSpacing: 0.5,
-  },
-  auditMetricVal: {
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  auditMetricDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#DCD1BF',
-  },
-  explanationBox: {
-    marginTop: 4,
-  },
-
-  /* FOOTER */
-  receiptFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    backgroundColor: '#EFE7DA',
-    borderTopWidth: 1,
-    borderTopColor: '#DCD1BF',
-  },
-  footerText: {
-    fontSize: 11,
-    color: '#666666',
-    fontWeight: '700',
-  },
-
-  /* ACTIONS */
-  actionRow: {
-    marginTop: 18,
-  },
-  shareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2E8B57',
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  shareBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
+  refId: { fontSize: T.xs, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: C.blue, flex: 1.5, textAlign: 'right' },
+  auditRow: { flexDirection: 'row', backgroundColor: C.surfaceAlt, borderRadius: R.md, padding: S.md, alignItems: 'center' },
+  auditMetric: { flex: 1, alignItems: 'center' },
+  auditVal: { fontSize: T.xl, fontWeight: T.black, marginTop: 2 },
+  auditDivider: { width: 1, height: 32, backgroundColor: C.border },
+  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
+  timelineCheck: { color: C.textInverse, fontSize: T.xs, fontWeight: T.black },
+  timelineLine: { width: 2, height: 28, backgroundColor: C.border, marginTop: 2 },
+  footer: { fontSize: T.xs, color: C.textTertiary, fontWeight: T.medium },
 });

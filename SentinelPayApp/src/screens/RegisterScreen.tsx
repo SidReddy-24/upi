@@ -10,18 +10,21 @@ import {
   Platform,
   ScrollView,
   Alert,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
 import { authService } from '../services/authService';
+import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
 };
 
 export default function RegisterScreen({ navigation }: Props) {
-  // Stage 1: Details, Stage 2: OTP
   const [stage, setStage] = useState<1 | 2>(1);
   
   const [phone, setPhone] = useState('');
@@ -34,7 +37,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  const [timer, setTimer] = useState(300); // 5 minutes in seconds
+  const [timer, setTimer] = useState(300);
   const [demoOtp, setDemoOtp] = useState('');
 
   useEffect(() => {
@@ -113,10 +116,8 @@ export default function RegisterScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      // 1. Verify OTP first
       await authService.verifyOtp(phone.trim(), otpCode.trim(), 'REGISTRATION');
       
-      // 2. Perform actual registration
       const response = await authService.register(
         phone.trim(),
         password,
@@ -171,290 +172,225 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerContainer}>
-          <Text style={styles.logoEmoji}>🔐</Text>
-          <Text style={styles.title}>SentinelPay AI</Text>
-          <Text style={styles.subtitle}>Onboarding & Device Registration</Text>
-        </View>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={DS.screen}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+          <View style={DS.authBrand}>
+            <View style={DS.authBrandIcon}>
+              <AppIcon name="shield" size={28} color="#FFFFFF" />
+            </View>
+            <Text style={DS.authBrandTitle}>SentinelPay</Text>
+            <Text style={DS.authBrandSub}>ONBOARDING & DEVICE REGISTRATION</Text>
+          </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            {stage === 1 ? 'Create Account' : 'Verify Mobile Number'}
-          </Text>
+          <View style={DS.cardLg}>
+            <Text style={DS.cardTitle}>
+              {stage === 1 ? 'Create Account' : 'Verify Mobile Number'}
+            </Text>
+            <Text style={[DS.cardSub, { marginBottom: S.lg }]}>
+              {stage === 1 ? 'Join India\'s most secure AI cybersecurity wallet' : `Code sent to ${phone}`}
+            </Text>
 
-          {stage === 1 ? (
-            <View>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Rahul Sharma"
-                placeholderTextColor="#94a3b8"
-                value={name}
-                onChangeText={setName}
-                autoCorrect={false}
-              />
+            {stage === 1 ? (
+              <View>
+                <Text style={DS.inputLabel}>Full Name</Text>
+                <View style={DS.inputWrapper}>
+                  <AppIcon name="profile" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+                  <TextInput
+                    style={DS.input}
+                    placeholder="e.g. Rahul Sharma"
+                    placeholderTextColor={C.textTertiary}
+                    value={name}
+                    onChangeText={setName}
+                    autoCorrect={false}
+                  />
+                </View>
 
-              <Text style={styles.label}>Mobile Number</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 9999999901"
-                placeholderTextColor="#94a3b8"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                maxLength={10}
-                autoCorrect={false}
-              />
+                <Text style={DS.inputLabel}>Mobile Number</Text>
+                <View style={DS.inputWrapper}>
+                  <AppIcon name="phone" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+                  <TextInput
+                    style={DS.input}
+                    placeholder="e.g. 9999999901"
+                    placeholderTextColor={C.textTertiary}
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    autoCorrect={false}
+                  />
+                </View>
 
-              <Text style={styles.label}>Email Address (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. rahul@example.com"
-                placeholderTextColor="#94a3b8"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+                <Text style={DS.inputLabel}>Email Address (Optional)</Text>
+                <View style={DS.inputWrapper}>
+                  <AppIcon name="mail" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+                  <TextInput
+                    style={DS.input}
+                    placeholder="e.g. rahul@example.com"
+                    placeholderTextColor={C.textTertiary}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
 
-              <Text style={styles.label}>PIN / Password</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={[styles.input, styles.passwordInput]}
-                  placeholder="••••••••"
-                  placeholderTextColor="#94a3b8"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <Text style={DS.inputLabel}>PIN / Password</Text>
+                <View style={DS.inputWrapper}>
+                  <AppIcon name="lock" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+                  <TextInput
+                    style={DS.input}
+                    placeholder="••••••••"
+                    placeholderTextColor={C.textTertiary}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={{ padding: S.xs }}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <AppIcon name={showPassword ? "eyeOff" : "eye"} size={20} color={C.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.tipText}>
+                  🛡️ Min 8 chars, 1 uppercase, 1 lowercase, 1 digit.
+                </Text>
+
+                <Text style={DS.inputLabel}>Confirm PIN / Password</Text>
+                <View style={DS.inputWrapper}>
+                  <AppIcon name="lock" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+                  <TextInput
+                    style={DS.input}
+                    placeholder="••••••••"
+                    placeholderTextColor={C.textTertiary}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
                 <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowPassword(!showPassword)}
+                  style={[DS.btn, DS.btnPrimary, loading && DS.btnDisabled, { marginTop: S.sm }]}
+                  onPress={handleSendOtp}
+                  disabled={loading}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.eyeText}>{showPassword ? '👁️' : '🙈'}</Text>
+                  {loading ? (
+                    <ActivityIndicator color={C.textInverse} />
+                  ) : (
+                    <>
+                      <AppIcon name="send" size={18} color={C.textInverse} />
+                      <Text style={DS.btnText}>Register & Send OTP</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
-              <Text style={styles.tipText}>
-                ⚠️ Minimum 8 chars, 1 uppercase, 1 lowercase, 1 digit.
-              </Text>
-
-              <Text style={styles.label}>Confirm PIN / Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#94a3b8"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <TouchableOpacity
-                style={[styles.actionButton, loading && styles.buttonDisabled]}
-                onPress={handleSendOtp}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.actionButtonText}>Register & Send OTP</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View>
-              <Text style={styles.instructions}>
-                We sent a 6-digit OTP code to <Text style={styles.bold}>{phone}</Text>. Enter the code below to verify your device identity.
-              </Text>
-
-              {demoOtp ? (
-                <View style={styles.demoOtpBox}>
-                  <Text style={styles.demoOtpLabel}>🧪 SANDBOX OTP (DEMO KEY):</Text>
-                  <Text style={styles.demoOtpValue}>{demoOtp}</Text>
-                </View>
-              ) : null}
-
-              <Text style={styles.label}>OTP Verification Code</Text>
-              <TextInput
-                style={[styles.input, styles.otpInput]}
-                placeholder="123456"
-                placeholderTextColor="#94a3b8"
-                value={otpCode}
-                onChangeText={setOtpCode}
-                keyboardType="number-pad"
-                maxLength={6}
-                autoCorrect={false}
-              />
-
-              <View style={styles.timerContainer}>
-                <Text style={styles.timerText}>
-                  OTP expires in: <Text style={styles.timerValue}>{formatTimer()}</Text>
+            ) : (
+              <View>
+                <Text style={[DS.cardSub, { marginBottom: S.base }]}>
+                  Enter the 6-digit verification code below to confirm your phone identity.
                 </Text>
-                {timer === 0 && (
-                  <TouchableOpacity onPress={handleSendOtp} disabled={loading}>
-                    <Text style={styles.resendLink}>Resend OTP</Text>
-                  </TouchableOpacity>
-                )}
+
+                {demoOtp ? (
+                  <View style={[DS.infoCard, { backgroundColor: C.greenBg, marginBottom: S.lg }]}>
+                    <AppIcon name="info" size={18} color={C.green} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.green, fontSize: T.xs, fontWeight: T.bold }}>SANDBOX OTP (DEMO KEY):</Text>
+                      <Text style={{ color: C.textPrimary, fontSize: T.xl, fontWeight: T.black, letterSpacing: 4 }}>{demoOtp}</Text>
+                    </View>
+                  </View>
+                ) : null}
+
+                <Text style={DS.inputLabel}>OTP Verification Code</Text>
+                <TextInput
+                  style={[DS.inputStandalone, styles.otpInput]}
+                  placeholder="123456"
+                  placeholderTextColor={C.textTertiary}
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoCorrect={false}
+                />
+
+                <View style={styles.timerContainer}>
+                  <Text style={{ fontSize: T.sm, color: C.textSecondary }}>
+                    Expires in: <Text style={{ fontWeight: T.bold, color: C.red }}>{formatTimer()}</Text>
+                  </Text>
+                  {timer === 0 && (
+                    <TouchableOpacity onPress={handleSendOtp} disabled={loading}>
+                      <Text style={DS.seeAll}>Resend OTP</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[DS.btn, DS.btnPrimary, loading && DS.btnDisabled]}
+                  onPress={handleVerifyAndRegister}
+                  disabled={loading}
+                  activeOpacity={0.7}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={C.textInverse} />
+                  ) : (
+                    <>
+                      <AppIcon name="shieldCheck" size={18} color={C.textInverse} />
+                      <Text style={DS.btnText}>Verify & Complete Setup</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[DS.btn, DS.btnOutline, { marginTop: S.md }]}
+                  onPress={() => setStage(1)}
+                  disabled={loading}
+                  activeOpacity={0.7}
+                >
+                  <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
+                  <Text style={DS.btnTextDark}>Edit Details</Text>
+                </TouchableOpacity>
               </View>
+            )}
+          </View>
 
-              <TouchableOpacity
-                style={[styles.actionButton, loading && styles.buttonDisabled]}
-                onPress={handleVerifyAndRegister}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.actionButtonText}>Verify & Complete Setup</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => setStage(1)}
-                disabled={loading}
-              >
-                <Text style={styles.backButtonText}>← Edit Details</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.footerContainer}>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loading}>
-            <Text style={styles.footerText}>
-              Already have an account? <Text style={styles.footerLink}>Sign In</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.footerContainer}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loading}>
+              <Text style={styles.footerText}>
+                Already have an account? <Text style={styles.footerLink}>Sign In</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAF7F0',
-  },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoEmoji: {
-    fontSize: 54,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1A1A2E',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748B',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1A1A2E',
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-  },
-  passwordContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  passwordInput: {
-    paddingRight: 50,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 16,
-    top: 14,
-  },
-  eyeText: {
-    fontSize: 20,
+    paddingHorizontal: S.base,
+    paddingBottom: S.xxl,
   },
   tipText: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: -10,
-    marginBottom: 14,
-  },
-  actionButton: {
-    backgroundColor: '#2E8B57',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  instructions: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  bold: {
-    fontWeight: 'bold',
-    color: '#1A1A2E',
+    fontSize: T.xs,
+    color: C.textSecondary,
+    marginTop: -S.xs,
+    marginBottom: S.md,
   },
   otpInput: {
-    fontSize: 24,
+    fontSize: T.xxl,
     letterSpacing: 8,
     textAlign: 'center',
   },
@@ -462,62 +398,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
-  },
-  timerText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  timerValue: {
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  resendLink: {
-    color: '#2E8B57',
-    fontWeight: '800',
-  },
-  backButton: {
-    padding: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  backButtonText: {
-    color: '#64748B',
-    fontSize: 14,
-    fontWeight: '600',
+    marginBottom: S.lg,
   },
   footerContainer: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: S.base,
   },
   footerText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: T.body,
+    color: C.textSecondary,
   },
   footerLink: {
-    color: '#2E8B57',
-    fontWeight: '800',
-  },
-  demoOtpBox: {
-    backgroundColor: 'rgba(46, 139, 87, 0.1)',
-    borderWidth: 1,
-    borderColor: '#2E8B57',
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
-    marginVertical: 14,
-  },
-  demoOtpLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#2E8B57',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  demoOtpValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1A1A2E',
-    letterSpacing: 4,
+    color: C.blue,
+    fontWeight: T.bold,
   },
 });

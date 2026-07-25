@@ -63,13 +63,25 @@ NOTIFICATIONS_STORE = []
 
 def add_notification_item(title: str, body: str, type_str: str, txn_id: Optional[str] = None, user_key: Optional[str] = None):
     from datetime import datetime
+    canonical_key = (user_key or "").strip().lower()
+
+    # Idempotency guard: skip if same txn_id + type already exists for this user
+    if txn_id:
+        for existing in NOTIFICATIONS_STORE:
+            if (
+                existing.get("transaction_id") == txn_id
+                and existing.get("type") == type_str
+                and existing.get("user_key") == canonical_key
+            ):
+                return existing  # already recorded, do not duplicate
+
     item = {
         "id": f"NOTIF_{len(NOTIFICATIONS_STORE) + 1}_{secrets_rand_hex()}",
         "title": title,
         "body": body,
         "type": type_str,
         "transaction_id": txn_id,
-        "user_key": (user_key or "").lower(),
+        "user_key": canonical_key,
         "timestamp": datetime.utcnow().isoformat(),
         "read": False
     }

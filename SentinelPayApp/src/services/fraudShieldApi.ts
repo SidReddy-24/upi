@@ -16,6 +16,8 @@ export interface QRTrustResult {
   trust_score: number;
   is_blacklisted: boolean;
   flags: string[];
+  risk_flags?: string[];
+  confidence?: number;
   message: string;
   checked_sources: string[];
 }
@@ -64,6 +66,10 @@ const fraudShieldApi = {
   async getQrTrust(vpa: string): Promise<QRTrustResult> {
     const resp = await client.get<QRTrustResult>(`/qr/trust/${encodeURIComponent(vpa)}`);
     return resp.data;
+  },
+
+  async checkQRTrust(vpa: string): Promise<QRTrustResult> {
+    return this.getQrTrust(vpa);
   },
 
   /**

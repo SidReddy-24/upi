@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, SafeAreaView, StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import fraudShieldApi from '../services/fraudShieldApi';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ReportScam'>;
@@ -56,83 +57,71 @@ export default function ReportScamScreen({ navigation }: Props) {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.card}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <AppIcon name="report" size={20} color="#EF4444" />
-          <Text style={styles.headerTitle}>Report a Fraudster / Scam</Text>
-        </View>
-        <Text style={styles.headerSubtitle}>
-          Community reports immediately update AI Trust Scores across the SentinelPay network.
-        </Text>
-
-        <Text style={styles.label}>Target UPI ID / Phone Number / Entity ID</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. scammer@okhdfc or 9876543210"
-          placeholderTextColor="#9ca3af"
-          value={entityId}
-          onChangeText={setEntityId}
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.label}>Scam Category</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catRow}>
-          {CATEGORIES.map(cat => (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.catChip, category === cat && styles.catChipActive]}
-              onPress={() => setCategory(cat)}>
-              <Text style={[styles.catText, category === cat && styles.catTextActive]}>{cat}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={styles.label}>Description & Evidence Notes</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Describe how the scam occurred, promises made, or suspicious calls..."
-          placeholderTextColor="#9ca3af"
-          multiline
-          numberOfLines={4}
-          value={description}
-          onChangeText={setDescription}
-        />
-
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitBtnText}>Submit Community Report →</Text>
-          )}
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <View style={DS.headerBar}>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
         </TouchableOpacity>
+        <Text style={DS.pageTitle}>Report Fraudster</Text>
+        <View style={{ width: 36 }} />
       </View>
-    </ScrollView>
+
+      <ScrollView contentContainerStyle={DS.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={DS.cardLg}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.md, marginBottom: S.md }}>
+            <View style={[DS.iconMd, { backgroundColor: C.redBg }]}>
+              <AppIcon name="report" size={22} color={C.red} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={DS.cardTitle}>Community Report</Text>
+              <Text style={DS.cardSub}>Reports instantly update AI Trust Scores network-wide</Text>
+            </View>
+          </View>
+
+          <Text style={DS.inputLabel}>TARGET UPI ID / PHONE / ENTITY</Text>
+          <TextInput
+            style={DS.inputStandalone}
+            placeholder="e.g. scammer@okhdfc or 9876543210"
+            placeholderTextColor={C.textTertiary}
+            value={entityId}
+            onChangeText={setEntityId}
+            autoCapitalize="none"
+          />
+
+          <Text style={DS.inputLabel}>SCAM CATEGORY</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: S.md }}>
+            {CATEGORIES.map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={[DS.chip, category === cat && { backgroundColor: C.red }]}
+                onPress={() => setCategory(cat)}
+                activeOpacity={0.7}>
+                <Text style={[DS.chipText, category === cat && { color: C.textInverse }]}>{cat}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={DS.inputLabel}>DESCRIPTION & EVIDENCE NOTES</Text>
+          <TextInput
+            style={[DS.inputStandalone, { height: 100, textAlignVertical: 'top', paddingTop: S.md }]}
+            placeholder="Describe how the scam occurred, promises made, or suspicious calls..."
+            placeholderTextColor={C.textTertiary}
+            multiline
+            numberOfLines={4}
+            value={description}
+            onChangeText={setDescription}
+          />
+
+          <TouchableOpacity style={[DS.btn, DS.btnDanger, { marginTop: S.lg }]} onPress={handleSubmit} disabled={loading} activeOpacity={0.7}>
+            {loading ? (
+              <ActivityIndicator color={C.textInverse} />
+            ) : (
+              <Text style={DS.btnText}>Submit Community Report →</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, elevation: 2 },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 4 },
-  headerSubtitle: { fontSize: 13, color: '#6b7280', marginBottom: 20, lineHeight: 18 },
-  label: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6, marginTop: 12 },
-  input: {
-    borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827', backgroundColor: '#f9fafb',
-  },
-  textArea: { height: 100, textAlignVertical: 'top' },
-  catRow: { flexDirection: 'row', marginBottom: 8 },
-  catChip: {
-    paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20,
-    backgroundColor: '#f3f4f6', marginRight: 8, borderWidth: 1, borderColor: '#e5e7eb',
-  },
-  catChipActive: { backgroundColor: '#dc2626', borderColor: '#b91c1c' },
-  catText: { fontSize: 12, color: '#4b5563', fontWeight: '600' },
-  catTextActive: { color: '#fff' },
-  submitBtn: {
-    backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 15,
-    alignItems: 'center', marginTop: 24,
-  },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});

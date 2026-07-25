@@ -13,10 +13,14 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import unifiedAuthService from '../services/unifiedAuthService';
+import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PinLogin'>;
 
@@ -30,9 +34,6 @@ export default function PinLoginScreen({ navigation }: Props): React.JSX.Element
     checkBiometric();
   }, []);
 
-  /**
-   * Check if biometric is available and enabled
-   */
   const checkBiometric = async () => {
     const available = await unifiedAuthService.isBiometricAvailable();
     setBiometricAvailable(available);
@@ -41,16 +42,12 @@ export default function PinLoginScreen({ navigation }: Props): React.JSX.Element
       const user = await unifiedAuthService.getCurrentUser();
       setBiometricEnabled(user?.biometricEnabled || false);
 
-      // Auto-trigger biometric if enabled
       if (user?.biometricEnabled) {
         handleBiometricLogin();
       }
     }
   };
 
-  /**
-   * Handle biometric login
-   */
   const handleBiometricLogin = async () => {
     setLoading(true);
     try {
@@ -59,7 +56,6 @@ export default function PinLoginScreen({ navigation }: Props): React.JSX.Element
       if (result.success) {
         navigation.replace('Home');
       } else {
-        // Failed, let user enter PIN
         console.log('[PinLogin] Biometric failed, use PIN');
       }
     } catch (error) {
@@ -69,9 +65,6 @@ export default function PinLoginScreen({ navigation }: Props): React.JSX.Element
     }
   };
 
-  /**
-   * Handle PIN login
-   */
   const handlePinLogin = async () => {
     if (!pin || pin.length < 4) {
       Alert.alert('Invalid PIN', 'Please enter your PIN');
@@ -97,154 +90,82 @@ export default function PinLoginScreen({ navigation }: Props): React.JSX.Element
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.logo}>🔐</Text>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Enter your PIN to continue</Text>
-        </View>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <KeyboardAvoidingView
+        style={DS.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.content}>
+          <View style={DS.authBrand}>
+            <View style={DS.authBrandIcon}>
+              <AppIcon name="lock" size={28} color="#FFFFFF" />
+            </View>
+            <Text style={DS.authBrandTitle}>Welcome Back</Text>
+            <Text style={DS.authBrandSub}>ENTER PIN TO UNLOCK WALLET</Text>
+          </View>
 
-        {/* PIN Entry */}
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.pinInput}
-              placeholder="••••"
-              keyboardType="number-pad"
-              secureTextEntry
-              value={pin}
-              onChangeText={setPin}
-              maxLength={6}
-              autoFocus={!biometricEnabled}
-            />
+          <View style={DS.cardLg}>
+            <View style={{ alignItems: 'center', marginBottom: S.lg }}>
+              <TextInput
+                style={[DS.inputStandalone, styles.pinInput]}
+                placeholder="••••"
+                placeholderTextColor={C.textTertiary}
+                keyboardType="number-pad"
+                secureTextEntry
+                value={pin}
+                onChangeText={setPin}
+                maxLength={6}
+                autoFocus={!biometricEnabled}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[DS.btn, DS.btnPrimary, (!pin || loading) && DS.btnDisabled]}
+              onPress={handlePinLogin}
+              disabled={!pin || loading}
+              activeOpacity={0.7}>
+              {loading ? (
+                <ActivityIndicator color={C.textInverse} />
+              ) : (
+                <>
+                  <AppIcon name="lock" size={18} color={C.textInverse} />
+                  <Text style={DS.btnText}>Unlock Wallet</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {biometricAvailable && (
+              <TouchableOpacity
+                style={[DS.btn, DS.btnOutline, { marginTop: S.md }]}
+                onPress={handleBiometricLogin}
+                activeOpacity={0.7}>
+                <AppIcon name="fingerprint" size={20} color={C.green} />
+                <Text style={DS.btnTextDark}>Use Fingerprint / Face ID</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <TouchableOpacity
-            style={[styles.button, (!pin || loading) && styles.buttonDisabled]}
-            onPress={handlePinLogin}
-            disabled={!pin || loading}>
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Unlock</Text>
-            )}
+            style={{ marginTop: S.lg, alignItems: 'center' }}
+            onPress={() => navigation.navigate('AuthModeSelector')}>
+            <Text style={DS.seeAll}>← Use Different Login Method</Text>
           </TouchableOpacity>
-
-          {/* Biometric Option */}
-          {biometricAvailable && (
-            <TouchableOpacity
-              style={styles.biometricButton}
-              onPress={handleBiometricLogin}>
-              <Text style={styles.biometricIcon}>👆</Text>
-              <Text style={styles.biometricText}>Use Fingerprint/Face ID</Text>
-            </TouchableOpacity>
-          )}
         </View>
-
-        {/* Back to Mode Selector */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('AuthModeSelector')}>
-          <Text style={styles.backButtonText}>← Use Different Login Method</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: S.base,
     justifyContent: 'center',
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  form: {
-    width: '100%',
-  },
-  inputContainer: {
-    marginBottom: 32,
-    alignItems: 'center',
-  },
   pinInput: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 16,
-    padding: 20,
-    fontSize: 32,
-    color: '#1f2937',
+    fontSize: T.xxl,
     letterSpacing: 12,
     textAlign: 'center',
     width: 200,
-    fontWeight: 'bold',
-  },
-  button: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: '#6366f1',
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  biometricIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  biometricText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#6366f1',
-  },
-  backButton: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
   },
 });

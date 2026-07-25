@@ -51,12 +51,18 @@ export type IconName =
   | 'flag'
   | 'qrCode'
   | 'messageSquare'
-  | 'activity';
+  | 'activity'
+  | 'eye'
+  | 'eyeOff'
+  | 'fingerprint'
+  | 'close'
+  | 'link';
 
 interface AppIconProps {
   name: IconName;
   size?: number;
   color?: string;
+  style?: any;
 }
 
 export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconProps) {
@@ -291,6 +297,43 @@ export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconP
           <Path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
           <Polyline points="15 3 21 3 21 9" />
           <Line x1="10" y1="14" x2="21" y2="3" />
+        </Svg>
+      );
+    case 'eye':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <Circle cx="12" cy="12" r="3" />
+        </Svg>
+      );
+    case 'eyeOff':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+          <Line x1="1" y1="1" x2="23" y2="23" />
+        </Svg>
+      );
+    case 'fingerprint':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 018 4" />
+          <Path d="M5 19.5A9 9 0 0112 5c5 0 8 3.5 8 8.5" />
+          <Path d="M12 11a3 3 0 013 3v5" />
+          <Path d="M9 14v4" />
+        </Svg>
+      );
+    case 'close':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <Line x1="18" y1="6" x2="6" y2="18" />
+          <Line x1="6" y1="6" x2="18" y2="18" />
+        </Svg>
+      );
+    case 'link':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+          <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
         </Svg>
       );
     default:

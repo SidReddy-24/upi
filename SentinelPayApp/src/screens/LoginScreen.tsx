@@ -11,6 +11,8 @@ import {
   ScrollView,
   Alert,
   Modal,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +20,7 @@ import { RootStackParamList } from '../types';
 import { authService } from '../services/authService';
 import { formatApiError } from '../utils/errorUtils';
 import AppIcon from '../components/AppIcon';
+import { C, S, T, R, DS } from '../theme/ds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -30,7 +33,6 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
 
   // Forgot Password modal state
@@ -105,13 +107,11 @@ export default function LoginScreen({ navigation }: Props) {
 
   const checkBiometricsSupport = async () => {
     try {
-      // Check if user has previously set up biometric login preference
       const isEnabled = await AsyncStorage.getItem(BIOMETRIC_PREF_KEY);
       setBiometricsEnabled(isEnabled === 'true');
 
       const loggedIn = await authService.isLoggedIn();
       if (loggedIn) {
-        // Already logged in, check if we can autologin
         if (isEnabled === 'true') {
           handleBiometricLogin();
         } else {
@@ -128,7 +128,6 @@ export default function LoginScreen({ navigation }: Props) {
     if (success) {
       setLoading(true);
       try {
-        // Validate session is still active
         const profile = await authService.getMe();
         if (profile) {
           navigation.replace('Home');
@@ -155,7 +154,6 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       const response = await authService.login(identifier.trim(), password);
       if (response && response.access_token) {
-        // If biometric login is not set up, ask if they want to enable it
         const isBiometricSetup = await AsyncStorage.getItem(BIOMETRIC_PREF_KEY);
         if (isBiometricSetup === null) {
           Alert.alert(
@@ -192,319 +190,241 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerContainer}>
-          <AppIcon name="shield" size={54} color="#2E8B57" />
-          <Text style={styles.title}>SentinelPay AI</Text>
-          <Text style={styles.subtitle}>India's First AI-Native Secure Wallet</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sign In</Text>
-
-          <Text style={styles.label}>Mobile Number or VPA</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. 9876543210 or name@sentinelpay"
-            placeholderTextColor="#94A3B8"
-            value={identifier}
-            onChangeText={setIdentifier}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <Text style={styles.label}>PIN / Password</Text>
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="••••••••"
-              placeholderTextColor="#94A3B8"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Text style={styles.eyeText}>{showPassword ? '👁️' : '🙈'}</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={DS.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={DS.screen}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+          <View style={DS.authBrand}>
+            <View style={DS.authBrandIcon}>
+              <AppIcon name="shield" size={28} color="#FFFFFF" />
+            </View>
+            <Text style={DS.authBrandTitle}>SentinelPay</Text>
+            <Text style={DS.authBrandSub}>AI CYBERSECURITY WALLET</Text>
           </View>
 
-          <TouchableOpacity
-            style={{ alignSelf: 'flex-end', marginBottom: 16 }}
-            onPress={() => {
-              setForgotPhone(identifier);
-              setForgotStage(1);
-              setForgotOtp('');
-              setForgotNewPassword('');
-              setForgotConfirmPassword('');
-              setForgotModalVisible(true);
-            }}
-          >
-            <Text style={{ color: '#2E8B57', fontSize: 13, fontWeight: '700' }}>Forgot Password?</Text>
-          </TouchableOpacity>
+          <View style={DS.cardLg}>
+            <Text style={DS.cardTitle}>Sign In</Text>
+            <Text style={[DS.cardSub, { marginBottom: S.lg }]}>Enter your credentials to access your account</Text>
 
-          <TouchableOpacity
-            style={[styles.loginButton, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Secure Login</Text>
-            )}
-          </TouchableOpacity>
+            <Text style={DS.inputLabel}>Mobile Number or VPA</Text>
+            <View style={DS.inputWrapper}>
+              <AppIcon name="profile" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+              <TextInput
+                style={DS.input}
+                placeholder="e.g. 9876543210 or name@sentinelpay"
+                placeholderTextColor={C.textTertiary}
+                value={identifier}
+                onChangeText={setIdentifier}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
 
-          {biometricsEnabled && (
-            <TouchableOpacity
-              style={styles.biometricButton}
-              onPress={handleBiometricLogin}
-              disabled={loading}
-            >
-              <Text style={styles.biometricButtonText}>👉 Authenticate with Fingerprint</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.footerContainer}>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
-            <Text style={styles.footerText}>
-              New to SentinelPay? <Text style={styles.footerLink}>Create Secure Account</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {/* FORGOT PASSWORD MODAL */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={forgotModalVisible}
-        onRequestClose={() => setForgotModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0', elevation: 5 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ color: '#1A1A2E', fontSize: 18, fontWeight: '700' }}>Reset Password</Text>
-              <TouchableOpacity onPress={() => setForgotModalVisible(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 18, fontWeight: '700' }}>✕</Text>
+            <Text style={DS.inputLabel}>PIN / Password</Text>
+            <View style={DS.inputWrapper}>
+              <AppIcon name="lock" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+              <TextInput
+                style={DS.input}
+                placeholder="••••••••"
+                placeholderTextColor={C.textTertiary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={{ padding: S.xs }}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <AppIcon name={showPassword ? "eyeOff" : "eye"} size={20} color={C.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            {forgotStage === 1 ? (
-              <>
-                <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 14 }}>
-                  Enter your registered mobile phone number to receive a sandbox verification OTP code.
-                </Text>
-                <Text style={styles.label}>Registered Phone Number</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 9876543210"
-                  placeholderTextColor="#94A3B8"
-                  value={forgotPhone}
-                  onChangeText={setForgotPhone}
-                  keyboardType="phone-pad"
-                />
-                <TouchableOpacity
-                  style={[styles.loginButton, forgotLoading && styles.buttonDisabled, { marginTop: 12 }]}
-                  onPress={handleSendResetOtp}
-                  disabled={forgotLoading}
-                >
-                  {forgotLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.loginButtonText}>Send Reset OTP</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                {forgotDemoOtp ? (
-                  <View style={{ backgroundColor: 'rgba(46, 139, 87, 0.1)', borderWidth: 1, borderColor: '#2E8B57', borderRadius: 8, padding: 10, marginBottom: 12 }}>
-                    <Text style={{ color: '#2E8B57', fontSize: 11, fontWeight: '600' }}>📱 Sandbox OTP Code (Demo):</Text>
-                    <Text style={{ color: '#1A1A2E', fontSize: 18, fontWeight: '800', letterSpacing: 4 }}>{forgotDemoOtp}</Text>
-                  </View>
-                ) : null}
+            <TouchableOpacity
+              style={{ alignSelf: 'flex-end', marginBottom: S.lg }}
+              onPress={() => {
+                setForgotPhone(identifier);
+                setForgotStage(1);
+                setForgotOtp('');
+                setForgotNewPassword('');
+                setForgotConfirmPassword('');
+                setForgotModalVisible(true);
+              }}
+            >
+              <Text style={DS.seeAll}>Forgot Password?</Text>
+            </TouchableOpacity>
 
-                <Text style={styles.label}>6-Digit Verification OTP</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="123456"
-                  placeholderTextColor="#64748B"
-                  value={forgotOtp}
-                  onChangeText={setForgotOtp}
-                  keyboardType="numeric"
-                  maxLength={6}
-                />
+            <TouchableOpacity
+              style={[DS.btn, DS.btnPrimary, loading && DS.btnDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.7}
+            >
+              {loading ? (
+                <ActivityIndicator color={C.textInverse} />
+              ) : (
+                <>
+                  <AppIcon name="shieldCheck" size={18} color={C.textInverse} />
+                  <Text style={DS.btnText}>Secure Login</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-                <Text style={styles.label}>New Password (min 8 chars)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor="#64748B"
-                  value={forgotNewPassword}
-                  onChangeText={setForgotNewPassword}
-                  secureTextEntry
-                />
-
-                <Text style={styles.label}>Confirm New Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor="#64748B"
-                  value={forgotConfirmPassword}
-                  onChangeText={setForgotConfirmPassword}
-                  secureTextEntry
-                />
-
-                <TouchableOpacity
-                  style={[styles.loginButton, forgotLoading && styles.buttonDisabled, { marginTop: 12 }]}
-                  onPress={handleCompleteReset}
-                  disabled={forgotLoading}
-                >
-                  {forgotLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.loginButtonText}>Reset Password</Text>
-                  )}
-                </TouchableOpacity>
-              </>
+            {biometricsEnabled && (
+              <TouchableOpacity
+                style={[DS.btn, DS.btnOutline, { marginTop: S.md }]}
+                onPress={handleBiometricLogin}
+                disabled={loading}
+                activeOpacity={0.7}
+              >
+                <AppIcon name="fingerprint" size={20} color={C.green} />
+                <Text style={DS.btnTextDark}>Authenticate with Biometrics</Text>
+              </TouchableOpacity>
             )}
           </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+
+          <View style={styles.footerContainer}>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
+              <Text style={styles.footerText}>
+                New to SentinelPay? <Text style={styles.footerLink}>Create Secure Account</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* FORGOT PASSWORD MODAL */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={forgotModalVisible}
+          onRequestClose={() => setForgotModalVisible(false)}
+        >
+          <View style={DS.modalCenter}>
+            <View style={DS.modalCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: S.md }}>
+                <Text style={DS.cardTitle}>Reset Password</Text>
+                <TouchableOpacity onPress={() => setForgotModalVisible(false)}>
+                  <AppIcon name="close" size={20} color={C.textTertiary} />
+                </TouchableOpacity>
+              </View>
+
+              {forgotStage === 1 ? (
+                <>
+                  <Text style={[DS.cardSub, { marginBottom: S.base }]}>
+                    Enter your registered mobile phone number to receive a verification OTP code.
+                  </Text>
+                  <Text style={DS.inputLabel}>Registered Phone Number</Text>
+                  <View style={DS.inputWrapper}>
+                    <AppIcon name="phone" size={18} color={C.textTertiary} style={{ marginRight: S.sm }} />
+                    <TextInput
+                      style={DS.input}
+                      placeholder="e.g. 9876543210"
+                      placeholderTextColor={C.textTertiary}
+                      value={forgotPhone}
+                      onChangeText={setForgotPhone}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={[DS.btn, DS.btnPrimary, forgotLoading && DS.btnDisabled, { marginTop: S.sm }]}
+                    onPress={handleSendResetOtp}
+                    disabled={forgotLoading}
+                    activeOpacity={0.7}
+                  >
+                    {forgotLoading ? (
+                      <ActivityIndicator color={C.textInverse} />
+                    ) : (
+                      <Text style={DS.btnText}>Send Reset OTP</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {forgotDemoOtp ? (
+                    <View style={[DS.infoCard, { backgroundColor: C.greenBg, marginBottom: S.md }]}>
+                      <AppIcon name="info" size={18} color={C.green} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: C.green, fontSize: T.xs, fontWeight: T.bold }}>Sandbox OTP Code (Demo):</Text>
+                        <Text style={{ color: C.textPrimary, fontSize: T.xl, fontWeight: T.black, letterSpacing: 4 }}>{forgotDemoOtp}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <Text style={DS.inputLabel}>6-Digit Verification OTP</Text>
+                  <TextInput
+                    style={DS.inputStandalone}
+                    placeholder="123456"
+                    placeholderTextColor={C.textTertiary}
+                    value={forgotOtp}
+                    onChangeText={setForgotOtp}
+                    keyboardType="numeric"
+                    maxLength={6}
+                  />
+
+                  <Text style={DS.inputLabel}>New Password (min 8 chars)</Text>
+                  <TextInput
+                    style={DS.inputStandalone}
+                    placeholder="••••••••"
+                    placeholderTextColor={C.textTertiary}
+                    value={forgotNewPassword}
+                    onChangeText={setForgotNewPassword}
+                    secureTextEntry
+                  />
+
+                  <Text style={DS.inputLabel}>Confirm New Password</Text>
+                  <TextInput
+                    style={DS.inputStandalone}
+                    placeholder="••••••••"
+                    placeholderTextColor={C.textTertiary}
+                    value={forgotConfirmPassword}
+                    onChangeText={setForgotConfirmPassword}
+                    secureTextEntry
+                  />
+
+                  <TouchableOpacity
+                    style={[DS.btn, DS.btnPrimary, forgotLoading && DS.btnDisabled, { marginTop: S.sm }]}
+                    onPress={handleCompleteReset}
+                    disabled={forgotLoading}
+                    activeOpacity={0.7}
+                  >
+                    {forgotLoading ? (
+                      <ActivityIndicator color={C.textInverse} />
+                    ) : (
+                      <Text style={DS.btnText}>Reset Password</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAF7F0',
-  },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoEmoji: {
-    fontSize: 54,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1A1A2E',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748B',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1A1A2E',
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-  },
-  passwordContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  passwordInput: {
-    paddingRight: 50,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 16,
-    top: 14,
-  },
-  eyeText: {
-    fontSize: 20,
-  },
-  loginButton: {
-    backgroundColor: '#2E8B57',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  loginButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  biometricButton: {
-    borderWidth: 1.5,
-    borderColor: '#2E8B57',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  biometricButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#2E8B57',
+    paddingHorizontal: S.base,
+    paddingBottom: S.xxl,
   },
   footerContainer: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: S.base,
   },
   footerText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: T.body,
+    color: C.textSecondary,
   },
   footerLink: {
-    color: '#2E8B57',
-    fontWeight: '800',
+    color: C.blue,
+    fontWeight: T.bold,
   },
 });

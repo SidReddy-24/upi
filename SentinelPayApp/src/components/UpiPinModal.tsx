@@ -7,20 +7,26 @@ import {
 interface UpiPinModalProps {
   visible: boolean;
   amount: number;
-  receiverVpa: string;
+  receiverVpa?: string;
+  vpa?: string;
   bankName?: string;
   onSuccess: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  onClose?: () => void;
 }
 
 export default function UpiPinModal({
   visible,
   amount,
   receiverVpa,
+  vpa,
   bankName = 'HDFC Bank •••• 4821',
   onSuccess,
   onCancel,
+  onClose,
 }: UpiPinModalProps) {
+  const targetVpa = receiverVpa || vpa || 'merchant@upi';
+  const handleClose = onCancel || onClose || (() => {});
   const [pin, setPin] = useState<string>('');
   const [showPin, setShowPin] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -62,12 +68,12 @@ export default function UpiPinModal({
       visible={visible}
       animationType="slide"
       transparent={false}
-      onRequestClose={onCancel}
+      onRequestClose={handleClose}
     >
       <SafeAreaView style={styles.container}>
         {/* Top Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onCancel} style={styles.closeBtn}>
+          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
             <Text style={styles.closeBtnText}>✕</Text>
           </TouchableOpacity>
           <View style={styles.npciContainer}>
@@ -89,7 +95,7 @@ export default function UpiPinModal({
           <View style={styles.payeeRow}>
             <View>
               <Text style={styles.payeeLabel}>Paying to:</Text>
-              <Text style={styles.payeeVpa}>{receiverVpa}</Text>
+              <Text style={styles.payeeVpa}>{targetVpa}</Text>
             </View>
             <View style={styles.amountBox}>
               <Text style={styles.amountText}>₹{amount.toLocaleString('en-IN')}</Text>
