@@ -15,6 +15,7 @@ export type RootStackParamList = {
   Settings: undefined;
   GuardianManagement: undefined;
   GuardianApproval: undefined;
+  GuardianVerification: { relationshipId?: string; guardianName?: string; guardianPhone?: string } | undefined;
   Login: undefined;
   Register: undefined;
   SmsTracker: undefined;

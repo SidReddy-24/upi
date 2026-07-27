@@ -631,9 +631,11 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                         <TouchableOpacity
                           style={styles.enterCodePill}
                           onPress={() => {
-                            setVerifyingRelId(item.id);
-                            setOtpInput('');
-                            setOtpModalVisible(true);
+                            navigation.navigate('GuardianVerification', {
+                              relationshipId: item.id,
+                              guardianName: item.guardian_name,
+                              guardianPhone: item.guardian_phone || item.guardian_vpa,
+                            });
                           }}
                         >
                           <AppIcon name="key" size={12} color="#FFFFFF" />

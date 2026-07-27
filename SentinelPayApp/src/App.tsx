@@ -39,6 +39,7 @@ import PinLoginScreen from './screens/PinLoginScreen';
 import BiometricSetupScreen from './screens/BiometricSetupScreen';
 import GuardianManagementScreen from './screens/GuardianManagementScreen';
 import GuardianApprovalScreen from './screens/GuardianApprovalScreen';
+import GuardianVerificationScreen from './screens/GuardianVerificationScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import AiRiskHistoryScreen from './screens/AiRiskHistoryScreen';
 import DeviceTrustScreen from './screens/DeviceTrustScreen';
@@ -279,6 +280,11 @@ export default function App(): React.JSX.Element {
                 name="GuardianApproval"
                 component={GuardianApprovalScreen}
                 options={{ title: 'Pending Approvals' }}
+              />
+              <Stack.Screen
+                name="GuardianVerification"
+                component={GuardianVerificationScreen}
+                options={{ headerShown: false }}
               />
               <Stack.Screen
                 name="Notifications"
