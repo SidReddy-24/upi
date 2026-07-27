@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS guardian_relationships (
     guardian_vpa        VARCHAR(100),
     guardian_user_id    UUID REFERENCES auth_users(id) ON DELETE SET NULL,
     status              VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    verification_code   VARCHAR(6),
+    code_expires_at     TIMESTAMP WITH TIME ZONE,
     invited_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     accepted_at         TIMESTAMP WITH TIME ZONE,
     rejected_at         TIMESTAMP WITH TIME ZONE,
@@ -86,7 +88,7 @@ CREATE TABLE IF NOT EXISTS guardian_relationships (
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
-    CONSTRAINT chk_guardian_status CHECK (status IN ('PENDING', 'ACTIVE', 'REJECTED', 'REMOVED')),
+    CONSTRAINT chk_guardian_status CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'ACTIVE', 'REMOVED')),
     CONSTRAINT chk_guardian_contact CHECK (guardian_phone IS NOT NULL OR guardian_vpa IS NOT NULL),
     
     -- Ensure user cannot be their own guardian

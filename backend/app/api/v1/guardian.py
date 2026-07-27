@@ -111,6 +111,12 @@ class VerifyGuardianCodeRequest(BaseModel):
     code: str
 
 
+class RespondInvitationRequest(BaseModel):
+    relationship_id: str
+    decision: str = Field(..., pattern='^(APPROVE|REJECT)$')
+
+
+
 class SetGuardianLimitRequest(BaseModel):
     limit: float = Field(..., gt=0)
     ward_vpa: Optional[str] = None
@@ -236,49 +242,61 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
 async def list_guardians(current_user: dict = Depends(get_current_user)):
     """
     List all guardians protecting the user, and all wards they are protecting.
-    Requirements: 2.1
+    Automatically expires verification codes older than 5 minutes.
     """
     conn = get_db()
     try:
         with conn.cursor() as cursor:
+            # Auto-expire codes that passed 5-minute window
+            cursor.execute("""
+                UPDATE guardian_relationships
+                SET status = 'EXPIRED', verification_code = NULL, updated_at = NOW()
+                WHERE status IN ('PENDING', 'APPROVED')
+                  AND code_expires_at IS NOT NULL
+                  AND code_expires_at < NOW()
+            """)
+            conn.commit()
+
             # 1. Fetch guardians protecting current user
             cursor.execute("""
-                SELECT gr.id, gr.guardian_phone, gr.guardian_vpa, gr.status, gr.invited_at, gr.accepted_at,
+                SELECT gr.id, gr.guardian_phone, gr.guardian_vpa, gr.status, gr.invited_at, gr.accepted_at, gr.code_expires_at,
                        u.name as guardian_name
                 FROM guardian_relationships gr
                 LEFT JOIN auth_users u ON gr.guardian_user_id = u.id
-                WHERE gr.user_id = %s AND gr.status != 'REMOVED'
+                WHERE gr.user_id = %s AND gr.status NOT IN ('REMOVED', 'REJECTED')
+                ORDER BY gr.created_at DESC
             """, (current_user['user_id'],))
             my_guardians = cursor.fetchall()
 
             # 2. Fetch wards (users who current user is guardian of)
             cursor.execute("""
-                SELECT gr.id, gr.status, gr.invited_at, gr.accepted_at,
+                SELECT gr.id, gr.status, gr.verification_code, gr.code_expires_at, gr.invited_at, gr.accepted_at,
                        u.name as ward_name, u.phone as ward_phone, u.vpa as ward_vpa
                 FROM guardian_relationships gr
                 JOIN auth_users u ON gr.user_id = u.id
-                WHERE gr.guardian_user_id = %s AND gr.status != 'REMOVED'
+                WHERE gr.guardian_user_id = %s AND gr.status NOT IN ('REMOVED', 'REJECTED')
+                ORDER BY gr.created_at DESC
             """, (current_user['user_id'],))
             my_wards = cursor.fetchall()
 
-            # Format datetime columns to ISO string & inject verification_code for guardian to view
             for g in my_guardians:
                 g_id = str(g['id'])
                 g['id'] = g_id
-                g['invited_at'] = g['invited_at'].isoformat() if g['invited_at'] else None
-                g['accepted_at'] = g['accepted_at'].isoformat() if g['accepted_at'] else None
-                if g_id in GUARDIAN_VERIFICATION_CODES:
-                    g['verification_code'] = GUARDIAN_VERIFICATION_CODES[g_id].get("code")
-            
+                g['invited_at'] = g['invited_at'].isoformat() if g.get('invited_at') else None
+                g['accepted_at'] = g['accepted_at'].isoformat() if g.get('accepted_at') else None
+                g['code_expires_at'] = g['code_expires_at'].isoformat() if g.get('code_expires_at') else None
+
             for w in my_wards:
                 w_id = str(w['id'])
                 w['id'] = w_id
-                w['invited_at'] = w['invited_at'].isoformat() if w['invited_at'] else None
-                w['accepted_at'] = w['accepted_at'].isoformat() if w['accepted_at'] else None
-                if w_id in GUARDIAN_VERIFICATION_CODES:
+                w['invited_at'] = w['invited_at'].isoformat() if w.get('invited_at') else None
+                w['accepted_at'] = w['accepted_at'].isoformat() if w.get('accepted_at') else None
+                w['code_expires_at'] = w['code_expires_at'].isoformat() if w.get('code_expires_at') else None
+
+                # Fallback code from in-memory cache if DB column is null
+                if not w.get('verification_code') and w_id in GUARDIAN_VERIFICATION_CODES:
                     w['verification_code'] = GUARDIAN_VERIFICATION_CODES[w_id].get("code")
 
-                # Fetch persistent ward config from guardian_ward_config table
                 ward_user_id = None
                 ward_vpa = (w.get('ward_vpa') or "").strip().lower()
                 if ward_vpa:
@@ -312,7 +330,7 @@ async def list_guardians(current_user: dict = Depends(get_current_user)):
 async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get_current_user)):
     """
     Invite a new guardian by phone or VPA.
-    Requirements: 2.1, 2.15
+    Generates a secure 6-digit OTP verification code valid for 5 minutes stored in DB.
     """
     if not req.phone and not req.vpa:
         raise HTTPException(status_code=400, detail="Must provide phone or VPA")
@@ -320,11 +338,10 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
     conn = get_db()
     try:
         with conn.cursor() as cursor:
-            # Validate guardian exists in auth_users (Requirement 2.15)
             if req.vpa:
-                cursor.execute("SELECT id, name, phone, vpa FROM auth_users WHERE vpa = %s", (req.vpa,))
+                cursor.execute("SELECT id, name, phone, vpa FROM auth_users WHERE LOWER(vpa) = %s", (req.vpa.strip().lower(),))
             else:
-                cursor.execute("SELECT id, name, phone, vpa FROM auth_users WHERE phone = %s", (req.phone,))
+                cursor.execute("SELECT id, name, phone, vpa FROM auth_users WHERE phone = %s", (req.phone.strip(),))
             
             guardian_user = cursor.fetchone()
             if not guardian_user:
@@ -340,53 +357,7 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             if str(guardian_id) == str(current_user['user_id']):
                 raise HTTPException(status_code=400, detail="You cannot add yourself as a guardian")
 
-            # Check if relationship already exists
-            cursor.execute("""
-                SELECT id, status FROM guardian_relationships
-                WHERE user_id = %s AND guardian_user_id = %s
-            """, (current_user['user_id'], guardian_id))
-            existing = cursor.fetchone()
-
-            # Generate 6-digit OTP verification code
-            verification_code = f"{random.randint(100000, 999999)}"
-
-            if existing:
-                if existing['status'] == 'ACTIVE':
-                    raise HTTPException(status_code=409, detail="Guardian relationship is already ACTIVE")
-                else:
-                    rel_id = str(existing['id'])
-                    cursor.execute("""
-                        UPDATE guardian_relationships
-                        SET status = 'PENDING', invited_at = NOW(), accepted_at = NULL, rejected_at = NULL, removed_at = NULL, updated_at = NOW()
-                        WHERE id = %s
-                        RETURNING id
-                    """, (existing['id'],))
-                    conn.commit()
-                    
-                    GUARDIAN_VERIFICATION_CODES[rel_id] = {
-                        "code": verification_code,
-                        "guardian_phone": guardian_phone,
-                        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=15)
-                    }
-
-                    # Notify guardian via WebSocket with OTP Verification Code
-                    await manager.send_personal_message({
-                        "type": "GUARDIAN_VERIFICATION_CODE",
-                        "data": {
-                            "relationship_id": rel_id,
-                            "code": verification_code,
-                            "inviter_name": current_user.get("name") or current_user.get("phone") or "Sentinel User",
-                            "inviter_phone": current_user.get("phone")
-                        }
-                    }, str(guardian_id))
-                    
-                    return {
-                        "relationship_id": rel_id,
-                        "status": "PENDING_VERIFICATION",
-                        "message": "Verification code sent to guardian's device. Ask your guardian to share the code with you."
-                    }
-
-            # Enforce max 5 active guardians check
+            # Check max 5 active guardians limit
             cursor.execute("""
                 SELECT COUNT(*) as count FROM guardian_relationships
                 WHERE user_id = %s AND status = 'ACTIVE'
@@ -395,23 +366,65 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             if active_count >= 5:
                 raise HTTPException(status_code=400, detail="You already have the maximum limit of 5 active guardians")
 
-            # Create new invitation
+            # Check if relationship already exists
             cursor.execute("""
-                INSERT INTO guardian_relationships (user_id, guardian_phone, guardian_vpa, guardian_user_id, status)
-                VALUES (%s, %s, %s, %s, 'PENDING')
-                RETURNING id
-            """, (current_user['user_id'], guardian_phone, guardian_vpa, guardian_id))
-            new_rel = cursor.fetchone()
-            conn.commit()
+                SELECT id, status FROM guardian_relationships
+                WHERE user_id = %s AND guardian_user_id = %s
+            """, (current_user['user_id'], guardian_id))
+            existing = cursor.fetchone()
 
-            rel_id = str(new_rel['id'])
+            # Generate random 6-digit OTP verification code (expires in 5 mins)
+            verification_code = f"{random.randint(100000, 999999)}"
+            code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+            if existing:
+                if existing['status'] == 'ACTIVE':
+                    raise HTTPException(status_code=409, detail="Guardian relationship is already ACTIVE")
+                else:
+                    rel_id = str(existing['id'])
+                    cursor.execute("""
+                        UPDATE guardian_relationships
+                        SET status = 'PENDING',
+                            verification_code = %s,
+                            code_expires_at = %s,
+                            invited_at = NOW(),
+                            accepted_at = NULL,
+                            rejected_at = NULL,
+                            removed_at = NULL,
+                            updated_at = NOW()
+                        WHERE id = %s
+                    """, (verification_code, code_expires_at, existing['id']))
+                    conn.commit()
+            else:
+                cursor.execute("""
+                    INSERT INTO guardian_relationships (user_id, guardian_phone, guardian_vpa, guardian_user_id, status, verification_code, code_expires_at)
+                    VALUES (%s, %s, %s, %s, 'PENDING', %s, %s)
+                    RETURNING id
+                """, (current_user['user_id'], guardian_phone, guardian_vpa, guardian_id, verification_code, code_expires_at))
+                new_rel = cursor.fetchone()
+                conn.commit()
+                rel_id = str(new_rel['id'])
+
             GUARDIAN_VERIFICATION_CODES[rel_id] = {
                 "code": verification_code,
                 "guardian_phone": guardian_phone,
-                "expires_at": datetime.now(timezone.utc) + timedelta(minutes=15)
+                "expires_at": code_expires_at
             }
 
-            # Notify guardian via WebSocket with OTP Verification Code
+            # Push real-time WebSocket notification to Guardian device
+            await manager.send_personal_message({
+                "type": "GUARDIAN_INVITATION",
+                "data": {
+                    "relationship_id": rel_id,
+                    "code": verification_code,
+                    "expires_at": code_expires_at.isoformat(),
+                    "inviter_name": current_user.get("name") or current_user.get("phone") or "Sentinel User",
+                    "inviter_phone": current_user.get("phone"),
+                    "inviter_vpa": current_user.get("vpa")
+                }
+            }, str(guardian_id))
+
+            # Also push notification event to Ward device
             await manager.send_personal_message({
                 "type": "GUARDIAN_VERIFICATION_CODE",
                 "data": {
@@ -425,7 +438,9 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
             return {
                 "relationship_id": rel_id,
                 "status": "PENDING_VERIFICATION",
-                "message": "Verification code sent to guardian's device. Ask your guardian to share the code with you."
+                "verification_code": verification_code,
+                "expires_at": code_expires_at.isoformat(),
+                "message": "Guardian verification code generated."
             }
     except HTTPException:
         conn.rollback()
@@ -438,73 +453,161 @@ async def add_guardian(req: AddGuardianRequest, current_user: dict = Depends(get
         conn.close()
 
 
-@router.post("/verify-code")
-async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dict = Depends(get_current_user)):
+@router.post("/invitation/respond")
+async def respond_invitation(req: RespondInvitationRequest, current_user: dict = Depends(get_current_user)):
     """
-    Verify guardian code entered by user to activate relationship.
+    Guardian responds to a ward's pending invitation (APPROVE or REJECT).
+    - APPROVE: Marks status as APPROVED. Keeps the verification code active for Ward to enter.
+    - REJECT: Marks status as REJECTED, invalidates the verification code immediately.
     """
     rel_id = req.relationship_id.strip()
-    user_code = req.code.strip()
+    decision = req.decision.upper()
 
-    stored_data = GUARDIAN_VERIFICATION_CODES.get(rel_id)
-    if stored_data and stored_data.get("code") == user_code:
-        # Code matches! Mark relationship as ACTIVE
-        conn = get_db()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE guardian_relationships
-                    SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
-                    WHERE id::text = %s AND user_id = %s
-                    RETURNING user_id, guardian_user_id
-                """, (rel_id, current_user['user_id']))
-                res = cursor.fetchone()
-
-                if res and res.get('guardian_user_id'):
-                    _upsert_ward_config(cursor, str(res['user_id']), str(res['guardian_user_id']), 5000.0, 5)
-                    conn.commit()
-
-                    await manager.send_personal_message({
-                        "type": "GUARDIAN_LINKED",
-                        "data": {
-                            "relationship_id": rel_id,
-                            "ward_name": current_user.get("name") or current_user.get("phone") or "Sentinel User"
-                        }
-                    }, str(res['guardian_user_id']))
-                else:
-                    conn.commit()
-
-                GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
-                return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
-        except Exception as e:
-            logger.error(f"Failed to verify guardian code DB: {str(e)}")
-            GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
-            return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
-        finally:
-            conn.close()
-    
-    # Check PostgreSQL database with safe id::text casting
     conn = get_db()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                UPDATE guardian_relationships
-                SET status = 'ACTIVE', accepted_at = NOW(), updated_at = NOW()
-                WHERE id::text = %s AND user_id = %s
-                RETURNING user_id, guardian_user_id
+                SELECT gr.id, gr.user_id, gr.guardian_user_id, gr.status, gr.verification_code, gr.code_expires_at,
+                       u.name as ward_name, u.phone as ward_phone
+                FROM guardian_relationships gr
+                JOIN auth_users u ON gr.user_id = u.id
+                WHERE gr.id::text = %s AND gr.guardian_user_id = %s
             """, (rel_id, current_user['user_id']))
-            res = cursor.fetchone()
-            if res:
-                _upsert_ward_config(cursor, str(res['user_id']), str(res['guardian_user_id']), 5000.0, 5)
+            rel = cursor.fetchone()
+
+            if not rel:
+                raise HTTPException(status_code=404, detail="Guardian invitation request not found.")
+
+            ward_id = str(rel['user_id'])
+
+            if decision == 'REJECT':
+                cursor.execute("""
+                    UPDATE guardian_relationships
+                    SET status = 'REJECTED', rejected_at = NOW(), verification_code = NULL, code_expires_at = NULL, updated_at = NOW()
+                    WHERE id = %s
+                """, (rel['id'],))
                 conn.commit()
                 GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
-                return {"success": True, "status": "ACTIVE", "message": "Guardian verified and linked!"}
-            raise HTTPException(status_code=400, detail="Invalid verification code or relationship not found.")
+
+                # Notify Ward via WebSocket
+                await manager.send_personal_message({
+                    "type": "GUARDIAN_INVITATION_REJECTED",
+                    "data": {
+                        "relationship_id": rel_id,
+                        "guardian_name": current_user.get("name") or current_user.get("phone") or "Sentinel Guardian",
+                        "message": "Guardian rejected your invitation."
+                    }
+                }, ward_id)
+
+                return {"success": True, "status": "REJECTED", "message": "Invitation rejected."}
+
+            else:  # APPROVE
+                cursor.execute("""
+                    UPDATE guardian_relationships
+                    SET status = 'APPROVED', accepted_at = NOW(), updated_at = NOW()
+                    WHERE id = %s
+                """, (rel['id'],))
+                conn.commit()
+
+                # Notify Ward via WebSocket
+                await manager.send_personal_message({
+                    "type": "GUARDIAN_INVITATION_APPROVED",
+                    "data": {
+                        "relationship_id": rel_id,
+                        "guardian_name": current_user.get("name") or current_user.get("phone") or "Sentinel Guardian",
+                        "code": rel.get("verification_code"),
+                        "message": "Guardian approved your invitation! Enter the code displayed on Guardian's screen to complete setup."
+                    }
+                }, ward_id)
+
+                return {"success": True, "status": "APPROVED", "message": "Invitation approved. Code remains active for Ward verification."}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
-        logger.error(f"Verify code DB check failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid verification code. Please try again.")
+        conn.rollback()
+        logger.error(f"Failed to respond to invitation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to respond to invitation: {str(e)}")
     finally:
         conn.close()
+
+
+@router.post("/verify-code")
+async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Verify guardian code entered by Ward to activate relationship.
+    Validates server-side against DB record and 5-minute expiry window.
+    """
+    rel_id = req.relationship_id.strip()
+    user_code = req.code.strip()
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, user_id, guardian_user_id, status, verification_code, code_expires_at
+                FROM guardian_relationships
+                WHERE id::text = %s AND user_id = %s
+            """, (rel_id, current_user['user_id']))
+            rel = cursor.fetchone()
+
+            if not rel:
+                raise HTTPException(status_code=404, detail="Guardian relationship invitation not found.")
+
+            if rel['status'] == 'REJECTED':
+                raise HTTPException(status_code=400, detail="Guardian rejected this invitation.")
+
+            now_utc = datetime.now(timezone.utc)
+            if rel.get('code_expires_at') and rel['code_expires_at'] < now_utc:
+                cursor.execute("UPDATE guardian_relationships SET status = 'EXPIRED', verification_code = NULL WHERE id = %s", (rel['id'],))
+                conn.commit()
+                raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new invitation.")
+
+            # Validate code (DB record or in-memory fallback)
+            db_code = rel.get('verification_code')
+            mem_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
+            valid_code = db_code or mem_code
+
+            if not valid_code or valid_code != user_code:
+                raise HTTPException(status_code=400, detail="Invalid verification code. Please check with your guardian.")
+
+            # Code is valid! Mark ACTIVE
+            cursor.execute("""
+                UPDATE guardian_relationships
+                SET status = 'ACTIVE', accepted_at = NOW(), verification_code = NULL, code_expires_at = NULL, updated_at = NOW()
+                WHERE id = %s
+                RETURNING user_id, guardian_user_id
+            """, (rel['id'],))
+            updated = cursor.fetchone()
+
+            if updated and updated.get('guardian_user_id'):
+                _upsert_ward_config(cursor, str(updated['user_id']), str(updated['guardian_user_id']), 5000.0, 5)
+
+            conn.commit()
+            GUARDIAN_VERIFICATION_CODES.pop(rel_id, None)
+
+            # Notify Guardian via WebSocket
+            if updated and updated.get('guardian_user_id'):
+                await manager.send_personal_message({
+                    "type": "GUARDIAN_LINKED",
+                    "data": {
+                        "relationship_id": rel_id,
+                        "ward_name": current_user.get("name") or current_user.get("phone") or "Sentinel User",
+                        "ward_phone": current_user.get("phone")
+                    }
+                }, str(updated['guardian_user_id']))
+
+            return {"success": True, "status": "ACTIVE", "message": "Guardian successfully verified and linked!"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Failed to verify guardian code: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to verify code: {str(e)}")
+    finally:
+        conn.close()
+
 
 
 @router.post("/set-limit")

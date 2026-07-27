@@ -8,22 +8,24 @@ export interface GuardianRelationship {
   id: string;
   guardian_phone: string;
   guardian_vpa: string;
-  status: 'PENDING' | 'PENDING_VERIFICATION' | 'ACTIVE' | 'REMOVED';
+  status: 'PENDING' | 'PENDING_VERIFICATION' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'ACTIVE' | 'REMOVED';
   invited_at: string | null;
   accepted_at: string | null;
   guardian_name: string | null;
   verification_code?: string;
+  code_expires_at?: string | null;
 }
 
 export interface WardRelationship {
   id: string;
-  status: 'PENDING' | 'ACTIVE' | 'REMOVED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'ACTIVE' | 'REMOVED';
   invited_at: string | null;
   accepted_at: string | null;
   ward_name: string | null;
   ward_phone: string;
   ward_vpa: string;
   verification_code?: string;
+  code_expires_at?: string | null;
   cumulative_spent?: number;
   spending_limit?: number;
   remaining_limit?: number;
@@ -225,6 +227,23 @@ class GuardianService {
       return resp.data;
     } catch (e: any) {
       console.warn('[GuardianService] Remote addGuardian failed:', e?.response?.data || e);
+      if (e?.response?.data?.detail) {
+        throw new Error(e.response.data.detail);
+      }
+      throw e;
+    }
+  }
+
+  async respondInvitation(relationshipId: string, decision: 'APPROVE' | 'REJECT'): Promise<{ success: boolean; status: string; message?: string }> {
+    this._invalidateRelCache();
+    try {
+      const resp = await authClient.post('/guardian/invitation/respond', {
+        relationship_id: relationshipId,
+        decision,
+      });
+      return resp.data;
+    } catch (e: any) {
+      console.warn('[GuardianService] Remote respondInvitation failed:', e?.response?.data || e);
       if (e?.response?.data?.detail) {
         throw new Error(e.response.data.detail);
       }

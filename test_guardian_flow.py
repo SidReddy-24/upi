@@ -79,6 +79,7 @@ def test_phase1_guardian_linking_otp(setup_users):
     guardian = setup_users["guardian"]
 
     headers_ward = {"Authorization": f"Bearer {ward['token']}"}
+    headers_guardian = {"Authorization": f"Bearer {guardian['token']}"}
 
     # Step 1: Ward invites Guardian
     resp_invite = client.post("/api/v1/guardian/add", json={"phone": guardian["phone"]}, headers=headers_ward)
@@ -86,12 +87,22 @@ def test_phase1_guardian_linking_otp(setup_users):
     data_invite = resp_invite.json()
     assert "relationship_id" in data_invite
     rel_id = data_invite["relationship_id"]
-    # OTP is in-memory only (NOT in response) — guardian receives it via WebSocket
-    otp_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
-    assert otp_code is not None, "OTP code should be in GUARDIAN_VERIFICATION_CODES"
+    code = data_invite.get("verification_code") or GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
+    assert code is not None, "Verification code must be generated"
 
-    # Step 2: Ward enters OTP code to verify and link
-    resp_verify = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": otp_code}, headers=headers_ward)
+    # Step 2: Guardian sees verification code in list
+    resp_list_g = client.get("/api/v1/guardian/list", headers=headers_guardian)
+    assert resp_list_g.status_code == 200
+    my_wards = resp_list_g.json()["wards"]
+    assert any(w["id"] == rel_id and w["verification_code"] == code for w in my_wards)
+
+    # Step 3: Guardian approves invitation
+    resp_approve = client.post("/api/v1/guardian/invitation/respond", json={"relationship_id": rel_id, "decision": "APPROVE"}, headers=headers_guardian)
+    assert resp_approve.status_code == 200
+    assert resp_approve.json()["status"] == "APPROVED"
+
+    # Step 4: Ward enters 6-digit code to complete verification & link
+    resp_verify = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": code}, headers=headers_ward)
     assert resp_verify.status_code == 200, resp_verify.text
     assert resp_verify.json()["status"] == "ACTIVE"
 
@@ -100,6 +111,28 @@ def test_phase1_guardian_linking_otp(setup_users):
     assert resp_list.status_code == 200
     guardians = resp_list.json()["guardians"]
     assert any(g["id"] == rel_id and g["status"] == "ACTIVE" for g in guardians)
+
+def test_guardian_rejection_flow(setup_users):
+    ward = setup_users["ward"]
+    guardian = setup_users["guardian"]
+
+    headers_ward = {"Authorization": f"Bearer {ward['token']}"}
+    headers_guardian = {"Authorization": f"Bearer {guardian['token']}"}
+
+    # Ward invites Guardian
+    resp_invite = client.post("/api/v1/guardian/add", json={"phone": guardian["phone"]}, headers=headers_ward)
+    rel_id = resp_invite.json()["relationship_id"]
+    code = resp_invite.json().get("verification_code") or GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
+
+    # Guardian rejects invitation
+    resp_reject = client.post("/api/v1/guardian/invitation/respond", json={"relationship_id": rel_id, "decision": "REJECT"}, headers=headers_guardian)
+    assert resp_reject.status_code == 200
+    assert resp_reject.json()["status"] == "REJECTED"
+
+    # Ward attempts to verify code after rejection -> returns 400 Bad Request
+    resp_verify = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": code}, headers=headers_ward)
+    assert resp_verify.status_code == 400, resp_verify.text
+
 
 def test_phase2_config_and_permissions(setup_users):
     ward = setup_users["ward"]

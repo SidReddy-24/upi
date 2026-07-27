@@ -128,6 +128,28 @@ def init_db_tables(conn=None):
                     device_info JSONB
                 );
 
+                CREATE TABLE IF NOT EXISTS guardian_relationships (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+                    guardian_phone VARCHAR(15),
+                    guardian_vpa VARCHAR(100),
+                    guardian_user_id UUID REFERENCES auth_users(id) ON DELETE SET NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                    verification_code VARCHAR(6),
+                    code_expires_at TIMESTAMP WITH TIME ZONE,
+                    invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    accepted_at TIMESTAMP WITH TIME ZONE,
+                    rejected_at TIMESTAMP WITH TIME ZONE,
+                    removed_at TIMESTAMP WITH TIME ZONE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+
+                ALTER TABLE guardian_relationships ADD COLUMN IF NOT EXISTS verification_code VARCHAR(6);
+                ALTER TABLE guardian_relationships ADD COLUMN IF NOT EXISTS code_expires_at TIMESTAMP WITH TIME ZONE;
+                ALTER TABLE guardian_relationships ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP WITH TIME ZONE;
+                ALTER TABLE guardian_relationships ADD COLUMN IF NOT EXISTS removed_at TIMESTAMP WITH TIME ZONE;
+
                 CREATE TABLE IF NOT EXISTS guardian_ward_config (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     ward_user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,

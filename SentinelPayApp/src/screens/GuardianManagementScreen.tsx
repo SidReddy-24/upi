@@ -24,6 +24,45 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'GuardianManagement'>;
 };
 
+function CountdownTimer({ expiresAt }: { expiresAt?: string | null }) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    if (!expiresAt) {
+      setTimeLeft('5m 00s');
+      return;
+    }
+
+    const target = new Date(expiresAt).getTime();
+
+    const update = () => {
+      const diff = Math.max(0, Math.floor((target - Date.now()) / 1000));
+      if (diff <= 0) {
+        setTimeLeft('Expired');
+        return;
+      }
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      setTimeLeft(`${m}m ${s < 10 ? '0' : ''}${s}s`);
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  const isExpired = timeLeft === 'Expired';
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <AppIcon name="clock" size={12} color={isExpired ? '#EF4444' : '#F59E0B'} />
+      <Text style={{ fontSize: 11, fontWeight: '600', color: isExpired ? '#EF4444' : '#F59E0B' }}>
+        {isExpired ? 'Code Expired' : `Expires in ${timeLeft}`}
+      </Text>
+    </View>
+  );
+}
+
 export default function GuardianManagementScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<'guardians' | 'wards' | 'approvals'>('guardians');
 
@@ -117,16 +156,32 @@ export default function GuardianManagementScreen({ navigation }: Props) {
 
     // Subscribe to real-time guardian events
     const unsubscribe = guardianService.subscribe((event) => {
-      if (event.type === 'GUARDIAN_VERIFICATION_CODE') {
+      if (event.type === 'GUARDIAN_INVITATION' || event.type === 'GUARDIAN_VERIFICATION_CODE') {
         const { relationship_id, code, inviter_name, inviter_phone } = event.data;
-        setVerificationLogs((prev) => [
-          { id: relationship_id || String(Date.now()), code, inviter: inviter_name || 'Sentinel User', phone: inviter_phone },
-          ...prev,
-        ]);
+        if (code) {
+          setVerificationLogs((prev) => [
+            { id: relationship_id || String(Date.now()), code, inviter: inviter_name || 'Sentinel User', phone: inviter_phone },
+            ...prev,
+          ]);
+        }
         fetchRelationships();
         Alert.alert(
-          'Guardian Verification OTP Code',
-          `Verification code for ${inviter_name || 'User'} (${inviter_phone || ''}): ${code}\n\nShare this code with your ward to complete guardian setup.`
+          'New Guardian Verification Code 🛡️',
+          `Guardian request from ${inviter_name || 'User'} (${inviter_phone || ''}).\n\nVerification Code: ${code}\n\nShare this code with your ward to complete guardian setup.`
+        );
+      } else if (event.type === 'GUARDIAN_INVITATION_APPROVED') {
+        const { guardian_name } = event.data;
+        fetchRelationships();
+        Alert.alert(
+          'Guardian Approved Request ✅',
+          `${guardian_name || 'Guardian'} has approved your request!\n\nAsk your guardian for the 6-digit code shown on their screen, then tap Verify below.`
+        );
+      } else if (event.type === 'GUARDIAN_INVITATION_REJECTED') {
+        const { guardian_name } = event.data;
+        fetchRelationships();
+        Alert.alert(
+          'Guardian Invitation Rejected ❌',
+          `${guardian_name || 'Guardian'} declined your guardian invitation.`
         );
       } else if (event.type === 'GUARDIAN_LINKED' || event.type === 'GUARDIAN_INVITATION_ACCEPTED' || event.type === 'APPROVAL_REQUEST' || event.type === 'APPROVAL_RESPONSE') {
         fetchRelationships();
@@ -258,17 +313,29 @@ export default function GuardianManagementScreen({ navigation }: Props) {
     }
   };
 
-  const handleAcceptInvite = async (relationshipId: string) => {
+  const handleRespondInvitation = async (relationshipId: string, decision: 'APPROVE' | 'REJECT') => {
     try {
       setLoading(true);
-      await guardianService.acceptInvitation(relationshipId);
-      Alert.alert('Success', 'You are now an active guardian!');
+      const res = await guardianService.respondInvitation(relationshipId, decision);
+      if (decision === 'APPROVE') {
+        Alert.alert(
+          'Invitation Approved ✅',
+          'You have approved this ward request. The 6-digit verification code is displayed on your screen — share it with your ward so they can complete linking.'
+        );
+      } else {
+        Alert.alert('Invitation Rejected', 'The guardian request has been rejected and the verification code invalidated.');
+      }
       fetchRelationships();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to accept invitation.');
+      const msg = error.response?.data?.detail || error.message || 'Failed to respond to invitation.';
+      Alert.alert('Response Failed', msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAcceptInvite = async (relationshipId: string) => {
+    await handleRespondInvitation(relationshipId, 'APPROVE');
   };
 
   const handleRemoveRelationship = async (relationshipId: string, name: string, role: 'guardian' | 'ward') => {
@@ -627,20 +694,44 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                         <Text style={styles.itemSub}>{item.ward_vpa || item.ward_phone}</Text>
                       </View>
                       <View style={styles.itemActions}>
-                        {item.status === 'PENDING' ? (
-                          <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                            {item.verification_code && (
-                              <View style={styles.otpFeedItem}>
-                                <Text style={styles.otpFeedUser}>Code to share with ward:</Text>
-                                <Text style={styles.otpFeedCode}>{item.verification_code}</Text>
+                        {item.status === 'PENDING' || item.status === 'APPROVED' ? (
+                          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155', width: '100%' }}>
+                            <View style={{ backgroundColor: 'rgba(99, 102, 241, 0.12)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)', marginBottom: 10 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <Text style={{ color: '#818CF8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+                                  In-App Verification Code
+                                </Text>
+                                <CountdownTimer expiresAt={item.code_expires_at} />
                               </View>
-                            )}
-                            <TouchableOpacity
-                              style={styles.acceptBtn}
-                              onPress={() => handleAcceptInvite(item.id)}
-                            >
-                              <Text style={styles.acceptBtnText}>Accept & Link</Text>
-                            </TouchableOpacity>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900', letterSpacing: 4, fontFamily: 'monospace' }}>
+                                  {item.verification_code || '------'}
+                                </Text>
+                                <View style={{ backgroundColor: item.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                  <Text style={{ color: item.status === 'APPROVED' ? '#34D399' : '#A5B4FC', fontSize: 11, fontWeight: '600' }}>
+                                    {item.status === 'APPROVED' ? 'APPROVED' : 'PENDING'}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>
+                                Share this 6-digit code with {item.ward_name || 'your ward'} so they can complete linking on their device.
+                              </Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                              <TouchableOpacity
+                                style={{ flex: 1, backgroundColor: '#10B981', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                                onPress={() => handleRespondInvitation(item.id, 'APPROVE')}
+                              >
+                                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Approve</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={{ flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: '#EF4444', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                                onPress={() => handleRespondInvitation(item.id, 'REJECT')}
+                              >
+                                <Text style={{ color: '#F87171', fontWeight: '700', fontSize: 13 }}>Reject</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         ) : (
                           <View style={styles.row}>
