@@ -58,7 +58,10 @@ export type IconName =
   | 'eyeOff'
   | 'fingerprint'
   | 'close'
-  | 'link';
+  | 'link'
+  | 'home'
+  | 'menu'
+  | 'qr';
 
 interface AppIconProps {
   name: IconName;
@@ -348,6 +351,30 @@ export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconP
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
           <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+        </Svg>
+      );
+    case 'home':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z" />
+          <Path d="M9 21V12h6v9" />
+        </Svg>
+      );
+    case 'menu':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <Line x1="3" y1="6" x2="21" y2="6" />
+          <Line x1="3" y1="12" x2="21" y2="12" />
+          <Line x1="3" y1="18" x2="21" y2="18" />
+        </Svg>
+      );
+    case 'qr':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Rect x="3" y="3" width="7" height="7" rx="1" />
+          <Rect x="14" y="3" width="7" height="7" rx="1" />
+          <Rect x="3" y="14" width="7" height="7" rx="1" />
+          <Path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3v3M18 21v-3" />
         </Svg>
       );
     default:

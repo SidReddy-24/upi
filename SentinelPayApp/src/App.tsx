@@ -44,6 +44,9 @@ import NotificationsScreen from './screens/NotificationsScreen';
 import AiRiskHistoryScreen from './screens/AiRiskHistoryScreen';
 import DeviceTrustScreen from './screens/DeviceTrustScreen';
 import AdminAnalyticsDashboardScreen from './screens/AdminAnalyticsDashboardScreen';
+import PaymentsScreen from './screens/PaymentsScreen';
+import FraudShieldScreen from './screens/FraudShieldScreen';
+import MoreScreen from './screens/MoreScreen';
 import { authService } from './services/authService';
 import unifiedAuthService from './services/unifiedAuthService';
 import { notificationService } from './services/notificationService';
@@ -351,6 +354,21 @@ export default function App(): React.JSX.Element {
               <Stack.Screen
                 name="AdminAnalytics"
                 component={AdminAnalyticsDashboardScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Payments"
+                component={PaymentsScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="FraudShield"
+                component={FraudShieldScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="More"
+                component={MoreScreen}
                 options={{ headerShown: false }}
               />
 

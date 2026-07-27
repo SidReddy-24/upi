@@ -2,6 +2,9 @@
 export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
+  Payments: undefined;
+  FraudShield: undefined;
+  More: undefined;
   SendMoney: { prefillVpa?: string; prefillAmount?: number };
   TransactionHistory: undefined;
   TransactionDetail: { txnId: string };
