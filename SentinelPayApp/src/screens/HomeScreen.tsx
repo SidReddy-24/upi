@@ -15,6 +15,7 @@ import {
   StatusBar,
   Dimensions,
   SafeAreaView,
+  Animated,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';

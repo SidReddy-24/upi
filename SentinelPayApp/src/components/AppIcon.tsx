@@ -33,6 +33,8 @@ export type IconName =
   | 'award'
   | 'chevronRight'
   | 'chevronLeft'
+  | 'chevronUp'
+  | 'chevronDown'
   | 'siren'
   | 'info'
   | 'externalLink'
@@ -275,6 +277,18 @@ export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconP
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
           <Polyline points="15 18 9 12 15 6" />
+        </Svg>
+      );
+    case 'chevronUp':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <Polyline points="18 15 12 9 6 15" />
+        </Svg>
+      );
+    case 'chevronDown':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <Polyline points="6 9 12 15 18 9" />
         </Svg>
       );
     case 'siren':

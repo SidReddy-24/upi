@@ -646,7 +646,7 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                           onPress={() => {
                             navigation.navigate('GuardianVerification', {
                               relationshipId: item.id,
-                              guardianName: item.guardian_name,
+                              guardianName: item.guardian_name || undefined,
                               guardianPhone: item.guardian_phone || item.guardian_vpa,
                             });
                           }}

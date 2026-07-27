@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
   // 6 Individual OTP Boxes
   otpRowContainer: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: S.base,
   },
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.border,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     shadowColor: C.dark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     borderRadius: R.xl,
     paddingVertical: S.base,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginTop: S.lg,
     shadowColor: C.dark,
     shadowOffset: { width: 0, height: 4 },
@@ -559,6 +559,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
 });
