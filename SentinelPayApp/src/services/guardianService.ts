@@ -259,17 +259,12 @@ class GuardianService {
         code,
       });
       return resp.data;
-    } catch (e) {
-      console.warn('[GuardianService] Remote verifyGuardianCode failed, activating locally:', e);
-      const current = await this.listGuardians();
-      const g = current.guardians.find(item => item.id === relationshipId);
-      if (g) {
-        g.status = 'ACTIVE';
-        g.accepted_at = new Date().toISOString();
-        await AsyncStorage.setItem('sentinelpay_local_guardians', JSON.stringify(current));
-        return { success: true, status: 'ACTIVE', message: 'Guardian verified successfully' };
+    } catch (e: any) {
+      console.warn('[GuardianService] verifyGuardianCode failed:', e?.response?.data || e);
+      if (e?.response?.data?.detail) {
+        throw new Error(e.response.data.detail);
       }
-      return { success: true, status: 'ACTIVE', message: 'Guardian verified (simulation)' };
+      throw e;
     }
   }
 

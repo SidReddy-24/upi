@@ -541,6 +541,9 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
     rel_id = req.relationship_id.strip()
     user_code = req.code.strip()
 
+    if not user_code:
+        raise HTTPException(status_code=400, detail="Verification code is required.")
+
     conn = get_db()
     try:
         with conn.cursor() as cursor:
@@ -554,8 +557,14 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
             if not rel:
                 raise HTTPException(status_code=404, detail="Guardian relationship invitation not found.")
 
+            if rel['status'] == 'ACTIVE':
+                raise HTTPException(status_code=400, detail="Guardian relationship is already active or code has already been used.")
+
             if rel['status'] == 'REJECTED':
                 raise HTTPException(status_code=400, detail="Guardian rejected this invitation.")
+
+            if rel['status'] == 'EXPIRED':
+                raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new invitation.")
 
             now_utc = datetime.now(timezone.utc)
             if rel.get('code_expires_at') and rel['code_expires_at'] < now_utc:
@@ -566,12 +575,12 @@ async def verify_guardian_code(req: VerifyGuardianCodeRequest, current_user: dic
             # Validate code (DB record or in-memory fallback)
             db_code = rel.get('verification_code')
             mem_code = GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
-            valid_code = db_code or mem_code
+            valid_code = (db_code or mem_code or "").strip()
 
             if not valid_code or valid_code != user_code:
                 raise HTTPException(status_code=400, detail="Invalid verification code. Please check with your guardian.")
 
-            # Code is valid! Mark ACTIVE
+            # Code is valid! Mark ACTIVE & invalidate code (single-use only)
             cursor.execute("""
                 UPDATE guardian_relationships
                 SET status = 'ACTIVE', accepted_at = NOW(), verification_code = NULL, code_expires_at = NULL, updated_at = NOW()

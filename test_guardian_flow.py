@@ -133,6 +133,37 @@ def test_guardian_rejection_flow(setup_users):
     resp_verify = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": code}, headers=headers_ward)
     assert resp_verify.status_code == 400, resp_verify.text
 
+def test_invalid_and_wrong_codes_rejected(setup_users):
+    ward = setup_users["ward"]
+    guardian = setup_users["guardian"]
+
+    headers_ward = {"Authorization": f"Bearer {ward['token']}"}
+    headers_guardian = {"Authorization": f"Bearer {guardian['token']}"}
+
+    # Invite Guardian
+    resp_invite = client.post("/api/v1/guardian/add", json={"phone": guardian["phone"]}, headers=headers_ward)
+    rel_id = resp_invite.json()["relationship_id"]
+    correct_code = resp_invite.json().get("verification_code") or GUARDIAN_VERIFICATION_CODES.get(rel_id, {}).get("code")
+
+    # Test wrong codes: 111111, 123456, 999999, 000000, abcdef
+    wrong_codes = ["111111", "123456", "999999", "000000", "abcdef", "random"]
+    for wc in wrong_codes:
+        if wc == correct_code:
+            continue
+        resp = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": wc}, headers=headers_ward)
+        assert resp.status_code == 400, f"Expected 400 for wrong code '{wc}', got {resp.status_code}: {resp.text}"
+        assert "Invalid verification code" in resp.json()["detail"]
+
+    # Verify correct code succeeds
+    resp_valid = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": correct_code}, headers=headers_ward)
+    assert resp_valid.status_code == 200
+    assert resp_valid.json()["status"] == "ACTIVE"
+
+    # Test submitting the used code again -> fails with 400 Bad Request
+    resp_reuse = client.post("/api/v1/guardian/verify-code", json={"relationship_id": rel_id, "code": correct_code}, headers=headers_ward)
+    assert resp_reuse.status_code == 400, "Used code must be rejected"
+
+
 
 def test_phase2_config_and_permissions(setup_users):
     ward = setup_users["ward"]
