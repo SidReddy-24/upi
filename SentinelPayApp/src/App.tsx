@@ -321,7 +321,7 @@ export default function App(): React.JSX.Element {
               <Stack.Screen
                 name="GuardianManagement"
                 component={GuardianManagementScreen}
-                options={{ title: 'Manage Guardians' }}
+                options={{ headerShown: false }}
               />
               <Stack.Screen
                 name="GuardianApproval"

@@ -699,70 +699,76 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                 const timeoutMins = item.timeout_minutes || 5;
 
                 return (
-                  <View key={item.id} style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#1E293B', marginBottom: 12 }]}>
-                    <View style={styles.itemRow}>
-                      <View style={[styles.avatarCircle, { backgroundColor: '#3B82F6' }]}>
-                        <Text style={styles.avatarLetter}>{(item.ward_name || 'W')[0].toUpperCase()}</Text>
+                  <View key={item.id} style={[styles.card, { backgroundColor: '#0F172A', borderColor: '#1E293B', marginBottom: 12, padding: 16 }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                        <View style={[styles.avatarCircle, { backgroundColor: '#3B82F6', marginRight: 10 }]}>
+                          <Text style={styles.avatarLetter}>{(item.ward_name || 'W')[0].toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#F8FAFC', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                            {item.ward_name || 'Sentinel Ward'}
+                          </Text>
+                          <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                            {item.ward_vpa || item.ward_phone}
+                          </Text>
+                        </View>
                       </View>
-                      <View style={styles.itemInfo}>
-                        <Text style={styles.itemName}>{item.ward_name || 'Sentinel Ward'}</Text>
-                        <Text style={styles.itemSub}>{item.ward_vpa || item.ward_phone}</Text>
-                      </View>
-                      <View style={styles.itemActions}>
-                        {item.status === 'PENDING' || item.status === 'APPROVED' ? (
-                          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155', width: '100%' }}>
-                            <View style={{ backgroundColor: 'rgba(99, 102, 241, 0.12)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)', marginBottom: 10 }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                <Text style={{ color: '#818CF8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
-                                  In-App Verification Code
-                                </Text>
-                                <CountdownTimer expiresAt={item.code_expires_at} />
-                              </View>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900', letterSpacing: 4, fontFamily: 'monospace' }}>
-                                  {item.verification_code || '------'}
-                                </Text>
-                                <View style={{ backgroundColor: item.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                                  <Text style={{ color: item.status === 'APPROVED' ? '#34D399' : '#A5B4FC', fontSize: 11, fontWeight: '600' }}>
-                                    {item.status === 'APPROVED' ? 'APPROVED' : 'PENDING'}
-                                  </Text>
-                                </View>
-                              </View>
-                              <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>
-                                Share this 6-digit code with {item.ward_name || 'your ward'} so they can complete linking on their device.
-                              </Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                              <TouchableOpacity
-                                style={{ flex: 1, backgroundColor: '#10B981', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-                                onPress={() => handleRespondInvitation(item.id, 'APPROVE')}
-                              >
-                                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Approve</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={{ flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: '#EF4444', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-                                onPress={() => handleRespondInvitation(item.id, 'REJECT')}
-                              >
-                                <Text style={{ color: '#F87171', fontWeight: '700', fontSize: 13 }}>Reject</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        ) : (
-                          <View style={styles.row}>
-                            <View style={[styles.activePill, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-                              <Text style={[styles.activePillText, { color: '#60A5FA' }]}>PROTECTING</Text>
-                            </View>
-                            <TouchableOpacity
-                              style={styles.removeBtn}
-                              onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
-                            >
-                              <AppIcon name="trash" size={16} color="#EF4444" />
-                            </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {item.status === 'ACTIVE' && (
+                          <View style={[styles.activePill, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
+                            <Text style={[styles.activePillText, { color: '#60A5FA' }]}>PROTECTING</Text>
                           </View>
                         )}
+                        <TouchableOpacity
+                          style={styles.removeBtn}
+                          onPress={() => handleRemoveRelationship(item.id, item.ward_name || 'this user', 'ward')}
+                        >
+                          <AppIcon name="trash" size={16} color="#EF4444" />
+                        </TouchableOpacity>
                       </View>
                     </View>
+
+                    {item.status === 'PENDING' || item.status === 'APPROVED' ? (
+                      <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155', width: '100%' }}>
+                        <View style={{ backgroundColor: 'rgba(99, 102, 241, 0.12)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)', marginBottom: 10 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={{ color: '#818CF8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+                              In-App Verification Code
+                            </Text>
+                            <CountdownTimer expiresAt={item.code_expires_at} />
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900', letterSpacing: 4, fontFamily: 'monospace' }}>
+                              {item.verification_code || '------'}
+                            </Text>
+                            <View style={{ backgroundColor: item.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                              <Text style={{ color: item.status === 'APPROVED' ? '#34D399' : '#A5B4FC', fontSize: 11, fontWeight: '600' }}>
+                                {item.status === 'APPROVED' ? 'APPROVED' : 'PENDING'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>
+                            Share this 6-digit code with {item.ward_name || 'your ward'} so they can complete linking on their device.
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#10B981', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                            onPress={() => handleRespondInvitation(item.id, 'APPROVE')}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Approve</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: '#EF4444', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                            onPress={() => handleRespondInvitation(item.id, 'REJECT')}
+                          >
+                            <Text style={{ color: '#F87171', fontWeight: '700', fontSize: 13 }}>Reject</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : null}
 
                     {/* Ward Cumulative Spending Progress Bar */}
                     {item.status === 'ACTIVE' && (
@@ -787,10 +793,12 @@ export default function GuardianManagementScreen({ navigation }: Props) {
                         </View>
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: remaining <= 0 ? '#EF4444' : '#10B981', fontSize: 11, fontWeight: '600' }}>
-                            {remaining <= 0 ? '⚠️ Limit Exhausted (Approval Required for All Txns)' : `₹${remaining.toLocaleString('en-IN')} available limit`}
+                          <Text style={{ color: remaining <= 0 ? '#EF4444' : '#10B981', fontSize: 11, fontWeight: '600', flex: 1, marginRight: 8 }} numberOfLines={1}>
+                            {remaining <= 0 ? '⚠️ Limit Exhausted (Approval Req.)' : `₹${remaining.toLocaleString('en-IN')} available limit`}
                           </Text>
-                          <Text style={{ color: '#64748B', fontSize: 11 }}>Timeout: {timeoutMins}m</Text>
+                          <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '500', flexShrink: 0 }}>
+                            Timeout: {timeoutMins}m
+                          </Text>
                         </View>
 
                         {/* Manage Ward Button */}
