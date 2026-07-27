@@ -24,6 +24,7 @@ import { parseSafeDate } from '../utils/parsers';
 import fraudShieldApi from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
 import AppIcon from '../components/AppIcon';
+import AnimatedPressable from '../components/AnimatedPressable';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
@@ -113,6 +114,8 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, []);
 
+  const bellRingAnim = useRef(new Animated.Value(0)).current;
+
   React.useEffect(() => {
     const updateCount = async () => {
       const count = await notificationService.getUnreadCount();
@@ -121,10 +124,21 @@ export default function HomeScreen({ navigation }: Props) {
     updateCount();
     const unsub = notificationService.subscribe(async () => {
       const count = await notificationService.getUnreadCount();
-      setUnreadNotifCount(count);
+      setUnreadNotifCount(prev => {
+        if (count > prev) {
+          Animated.sequence([
+            Animated.timing(bellRingAnim, { toValue: 15, duration: 70, useNativeDriver: true }),
+            Animated.timing(bellRingAnim, { toValue: -15, duration: 70, useNativeDriver: true }),
+            Animated.timing(bellRingAnim, { toValue: 10, duration: 70, useNativeDriver: true }),
+            Animated.timing(bellRingAnim, { toValue: -10, duration: 70, useNativeDriver: true }),
+            Animated.timing(bellRingAnim, { toValue: 0, duration: 70, useNativeDriver: true }),
+          ]).start();
+        }
+        return count;
+      });
     });
     return () => unsub();
-  }, []);
+  }, [bellRingAnim]);
 
   useFocusEffect(
     useCallback(() => {
@@ -189,33 +203,33 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>Quick Payments</Text>
       </View>
       <View style={styles.quickActionGrid}>
-        <TouchableOpacity style={styles.actionPillCard} activeOpacity={0.7} onPress={() => navigation.navigate('SendMoney', {})}>
+        <AnimatedPressable style={styles.actionPillCard} onPress={() => navigation.navigate('SendMoney', {})}>
           <View style={[styles.actionIconCircle, { backgroundColor: '#ECFDF5' }]}>
             <AppIcon name="send" size={20} color="#059669" />
           </View>
           <Text style={styles.actionPillText}>Send</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
-        <TouchableOpacity style={styles.actionPillCard} activeOpacity={0.7} onPress={() => navigation.navigate('ReceiveMoney')}>
+        <AnimatedPressable style={styles.actionPillCard} onPress={() => navigation.navigate('ReceiveMoney')}>
           <View style={[styles.actionIconCircle, { backgroundColor: '#EFF6FF' }]}>
             <AppIcon name="receive" size={20} color="#2563EB" />
           </View>
           <Text style={styles.actionPillText}>Receive</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
-        <TouchableOpacity style={styles.actionPillCard} activeOpacity={0.7} onPress={() => navigation.navigate('ScanQR')}>
+        <AnimatedPressable style={styles.actionPillCard} onPress={() => navigation.navigate('ScanQR')}>
           <View style={[styles.actionIconCircle, { backgroundColor: '#F5F3FF' }]}>
             <AppIcon name="scan" size={20} color="#7C3AED" />
           </View>
           <Text style={styles.actionPillText}>Scan QR</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
-        <TouchableOpacity style={styles.actionPillCard} activeOpacity={0.7} onPress={() => navigation.navigate('TransactionHistory')}>
+        <AnimatedPressable style={styles.actionPillCard} onPress={() => navigation.navigate('TransactionHistory')}>
           <View style={[styles.actionIconCircle, { backgroundColor: '#FFFBEB' }]}>
             <AppIcon name="history" size={20} color="#D97706" />
           </View>
           <Text style={styles.actionPillText}>History</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
       {/* Activity Feed (Stripe / Revolut Style) */}
@@ -459,7 +473,16 @@ export default function HomeScreen({ navigation }: Props) {
 
         <View style={styles.headerRightActions}>
           <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7} onPress={() => navigation.navigate('Notifications')}>
-            <AppIcon name="bell" size={18} color="#0F172A" />
+            <Animated.View style={{
+              transform: [{
+                rotate: bellRingAnim.interpolate({
+                  inputRange: [-15, 15],
+                  outputRange: ['-15deg', '15deg'],
+                }),
+              }],
+            }}>
+              <AppIcon name="bell" size={18} color="#0F172A" />
+            </Animated.View>
             {unreadNotifCount > 0 && (
               <View style={styles.bellBadgeCircle}>
                 <Text style={styles.bellBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
