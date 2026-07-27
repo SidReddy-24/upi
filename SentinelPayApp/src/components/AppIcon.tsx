@@ -61,7 +61,13 @@ export type IconName =
   | 'link'
   | 'home'
   | 'menu'
-  | 'qr';
+  | 'qr'
+  | 'wifi'
+  | 'smartphone'
+  | 'layers'
+  | 'hardDrive'
+  | 'server'
+  | 'trendingUp';
 
 interface AppIconProps {
   name: IconName;
@@ -375,6 +381,55 @@ export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconP
           <Rect x="14" y="3" width="7" height="7" rx="1" />
           <Rect x="3" y="14" width="7" height="7" rx="1" />
           <Path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3v3M18 21v-3" />
+        </Svg>
+      );
+    case 'wifi':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M5 12.55a11 11 0 0114.08 0" />
+          <Path d="M1.42 9a16 16 0 0121.16 0" />
+          <Path d="M8.53 16.11a6 6 0 016.95 0" />
+          <Circle cx="12" cy="20" r="1" fill={color} />
+        </Svg>
+      );
+    case 'smartphone':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Rect x="5" y="2" width="14" height="20" rx="2" />
+          <Path d="M12 18h.01" />
+        </Svg>
+      );
+    case 'layers':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <Polyline points="2 17 12 22 22 17" />
+          <Polyline points="2 12 12 17 22 12" />
+        </Svg>
+      );
+    case 'hardDrive':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Line x1="22" y1="12" x2="2" y2="12" />
+          <Path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
+          <Line x1="6" y1="16" x2="6.01" y2="16" />
+          <Line x1="10" y1="16" x2="10.01" y2="16" />
+        </Svg>
+      );
+    case 'server':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Rect x="2" y="2" width="20" height="8" rx="2" />
+          <Rect x="2" y="14" width="20" height="8" rx="2" />
+          <Line x1="6" y1="6" x2="6.01" y2="6" />
+          <Line x1="6" y1="18" x2="6.01" y2="18" />
+        </Svg>
+      );
+    case 'trendingUp':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <Polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+          <Polyline points="17 6 23 6 23 12" />
         </Svg>
       );
     default:
