@@ -387,8 +387,15 @@ export default function GuardianManagementScreen({ navigation }: Props) {
         <TouchableOpacity style={DS.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <AppIcon name="chevronLeft" size={18} color={C.textPrimary} />
         </TouchableOpacity>
-        <Text style={DS.pageTitle}>Guardian Management</Text>
-        <View style={{ width: 36 }} />
+        <View style={{ flex: 1, paddingHorizontal: S.sm }}>
+          <Text style={DS.pageTitle}>Guardian Protection</Text>
+          <Text style={{ fontSize: T.xs, color: C.textSecondary, fontWeight: T.medium }}>
+            Protection controls & guardian oversight
+          </Text>
+        </View>
+        <TouchableOpacity style={DS.headerIconBtn} onPress={fetchRelationships} activeOpacity={0.7}>
+          <AppIcon name="refresh" size={16} color={C.textPrimary} />
+        </TouchableOpacity>
       </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
@@ -396,21 +403,27 @@ export default function GuardianManagementScreen({ navigation }: Props) {
           <RefreshControl refreshing={loading} onRefresh={fetchRelationships} tintColor={C.green} />
         }
       >
-        {/* ─── 1. HERO SAFETY DASHBOARD ─── */}
+        {/* ─── 1. HERO SAFETY DASHBOARD (Matches Home Balance Card) ─── */}
         <View style={styles.heroCard}>
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroBadge}>
-              <AppIcon name="shield" size={12} color={C.green} />
-              <Text style={styles.heroBadgeText}>ACTIVE SAFETY NET</Text>
+              <AppIcon name="shield" size={12} color="#34D399" />
+              <Text style={styles.heroBadgeText}>ACTIVE PROTECTION</Text>
             </View>
-            <TouchableOpacity onPress={fetchRelationships} style={styles.refreshBtnIcon}>
-              <AppIcon name="refresh" size={16} color={C.textTertiary} />
-            </TouchableOpacity>
+            <View style={styles.protectedStatusPill}>
+              <View style={styles.statusDotPulse} />
+              <Text style={styles.protectedStatusText}>
+                {activeGuardianCount > 0 ? 'PROTECTED' : 'SETUP PENDING'}
+              </Text>
+            </View>
           </View>
 
-          <Text style={styles.heroTitle}>Guardian Safety Net</Text>
+          <Text style={styles.heroLabelText}>CURRENT SPENDING THRESHOLD</Text>
+          <Text style={styles.heroAmountText}>
+            ₹{parseFloat(spendingLimit || '0').toLocaleString('en-IN')}
+          </Text>
           <Text style={styles.heroSubtitle}>
-            Protect your funds with trusted guardians. Payments above your limit require instant guardian approval.
+            Transfers above this threshold require guardian authorization.
           </Text>
 
           <View style={styles.metricsGrid}>
@@ -422,15 +435,15 @@ export default function GuardianManagementScreen({ navigation }: Props) {
             <View style={styles.metricDivider} />
 
             <View style={styles.metricBox}>
-              <Text style={styles.metricVal}>₹{parseFloat(spendingLimit || '0').toLocaleString('en-IN')}</Text>
-              <Text style={styles.metricLabel}>Limit Threshold</Text>
+              <Text style={styles.metricVal}>{activeWardCount}</Text>
+              <Text style={styles.metricLabel}>Protected Wards</Text>
             </View>
 
             <View style={styles.metricDivider} />
 
             <View style={styles.metricBox}>
-              <Text style={styles.metricVal}>{activeWardCount}</Text>
-              <Text style={styles.metricLabel}>Wards Protected</Text>
+              <Text style={styles.metricVal}>{pendingApprovals.length}</Text>
+              <Text style={styles.metricLabel}>Pending Requests</Text>
             </View>
           </View>
         </View>
@@ -1125,66 +1138,88 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  /* HERO DASHBOARD */
+  /* HERO DASHBOARD (Matches Home Screen Balance Card) */
   heroCard: {
-    backgroundColor: C.surface,
+    backgroundColor: C.dark,
     borderRadius: R.card,
     padding: S.lg,
     marginBottom: S.lg,
-    borderWidth: 1,
-    borderColor: C.border,
     shadowColor: C.dark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
   },
   heroHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: S.md,
+    marginBottom: S.sm,
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.greenBg,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: R.xs,
+    borderRadius: R.full,
     gap: 6,
   },
   heroBadgeText: {
-    color: C.green,
+    color: '#34D399',
     fontSize: T.xs,
-    fontWeight: T.extrabold,
+    fontWeight: T.bold,
     letterSpacing: 0.5,
   },
-  refreshBtnIcon: {
-    padding: 4,
+  protectedStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: R.full,
+    gap: 6,
   },
-  heroTitle: {
-    fontSize: T.xxl,
+  statusDotPulse: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#60A5FA',
+  },
+  protectedStatusText: {
+    color: '#60A5FA',
+    fontSize: T.xs,
+    fontWeight: T.bold,
+  },
+  heroLabelText: {
+    color: '#94A3B8',
+    fontSize: T.xs,
+    fontWeight: T.bold,
+    marginTop: S.xs,
+    letterSpacing: 0.5,
+  },
+  heroAmountText: {
+    fontSize: 32,
     fontWeight: T.black,
-    color: C.textPrimary,
+    color: '#FFFFFF',
+    marginVertical: 4,
   },
   heroSubtitle: {
     fontSize: T.sm,
-    color: C.textSecondary,
-    marginTop: 6,
+    color: '#94A3B8',
     lineHeight: 18,
   },
   metricsGrid: {
     flexDirection: 'row',
-    backgroundColor: C.surfaceAlt,
-    borderRadius: R.md,
+    backgroundColor: '#1E293B',
+    borderRadius: R.xl,
     paddingVertical: S.md,
     paddingHorizontal: S.sm,
     marginTop: S.base,
     justifyContent: 'space-around',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: '#334155',
   },
   metricBox: {
     alignItems: 'center',
@@ -1192,19 +1227,19 @@ const styles = StyleSheet.create({
   },
   metricVal: {
     fontSize: T.xl,
-    fontWeight: T.black,
-    color: C.green,
+    fontWeight: T.extrabold,
+    color: '#FFFFFF',
   },
   metricLabel: {
     fontSize: T.xs,
-    color: C.textSecondary,
+    color: '#94A3B8',
     marginTop: 2,
-    fontWeight: T.semibold,
+    fontWeight: T.medium,
   },
   metricDivider: {
     width: 1,
     height: 24,
-    backgroundColor: C.border,
+    backgroundColor: '#334155',
   },
 
   /* SEGMENTED TAB SELECTOR */
