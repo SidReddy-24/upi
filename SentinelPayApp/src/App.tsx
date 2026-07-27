@@ -62,11 +62,60 @@ export default function App(): React.JSX.Element {
     guardianService.initialize();
 
     const unsubscribeWs = guardianService.subscribe((event: any) => {
-      if (event.type === 'GUARDIAN_VERIFICATION_CODE') {
-        const { inviter_name, code } = event.data || {};
-        notificationService.showGuardianCodeAlert(inviter_name || 'Ward', code);
-      } else if (event.type === 'PAYMENT_RECEIVED') {
-        const { amount, sender_vpa, sender_name, transaction_id, receiver_vpa } = event.data || {};
+      const type = event.type;
+      const data = event.data || {};
+
+      if (type === 'GUARDIAN_INVITATION') {
+        notificationService.addNotification({
+          title: '🛡️ New Guardian Request',
+          body: `${data.ward_name || data.ward_phone || 'Someone'} wants to add you as their Guardian.`,
+          type: 'GUARDIAN_INVITATION',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'GUARDIAN_INVITATION_APPROVED') {
+        notificationService.addNotification({
+          title: '✅ Guardian Accepted',
+          body: `${data.guardian_name || 'Your Guardian'} accepted your request! Code: ${data.code || 'shown on screen'}`,
+          type: 'GUARDIAN_APPROVED',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'GUARDIAN_INVITATION_REJECTED') {
+        notificationService.addNotification({
+          title: '🚫 Guardian Request Declined',
+          body: `${data.guardian_name || 'Your Guardian'} declined your Guardian request.`,
+          type: 'GUARDIAN_REJECTED',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'GUARDIAN_CODE_READY' || type === 'GUARDIAN_VERIFICATION_CODE') {
+        notificationService.addNotification({
+          title: '🔑 Verification Code Ready',
+          body: `${data.inviter_name || 'Ward'} generated verification code: ${data.code || 'Open Guardian app'}`,
+          type: 'GUARDIAN_CODE_READY',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'GUARDIAN_LINKED') {
+        notificationService.addNotification({
+          title: '🛡️ Guardian Protection Enabled',
+          body: `Guardian relationship with ${data.ward_name || data.guardian_name || 'user'} is now active.`,
+          type: 'GUARDIAN_LINKED',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'GUARDIAN_EXPIRED') {
+        notificationService.addNotification({
+          title: '⏰ Guardian Request Expired',
+          body: 'The Guardian request has expired.',
+          type: 'GUARDIAN_EXPIRED',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'GUARDIAN_CANCELLED') {
+        notificationService.addNotification({
+          title: '❌ Guardian Request Cancelled',
+          body: 'This request has been cancelled by the Ward.',
+          type: 'GUARDIAN_CANCELLED',
+          relationship_id: data.relationship_id,
+        });
+      } else if (type === 'PAYMENT_RECEIVED') {
+        const { amount, sender_vpa, sender_name, transaction_id, receiver_vpa } = data;
         const parsedAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
         
         getUser().then(user => {
@@ -75,10 +124,8 @@ export default function App(): React.JSX.Element {
             const senderLabel = sender_name || sender_vpa || 'Someone';
             const refId = transaction_id || `SP${Date.now()}`;
 
-            // 1. Credit receiver balance & local transaction ledger
             receivePayment(sender_vpa || 'sender@sentinelpay', parsedAmount, refId);
 
-            // 2. Persistent notification feed & Truecaller-style floating banner
             notificationService.addNotification({
               title: '💰 Payment Received!',
               body: `Received ₹${formattedAmount} from ${senderLabel} (${sender_vpa}). Ref: ${refId}`,
@@ -87,8 +134,8 @@ export default function App(): React.JSX.Element {
             });
           }
         });
-      } else if (event.type === 'PAYMENT_SENT') {
-        const { amount, receiver_vpa, receiver_name, transaction_id, sender_vpa } = event.data || {};
+      } else if (type === 'PAYMENT_SENT') {
+        const { amount, receiver_vpa, receiver_name, transaction_id, sender_vpa } = data;
         const parsedAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
         
         getUser().then(user => {

@@ -20,12 +20,29 @@ try {
   console.debug('[PushNotification] Setup note:', e);
 }
 
+export type NotificationType =
+  | 'PAYMENT_RECEIVED'
+  | 'PAYMENT_SENT'
+  | 'GUARDIAN_INVITATION'
+  | 'GUARDIAN_APPROVED'
+  | 'GUARDIAN_REJECTED'
+  | 'GUARDIAN_CODE_READY'
+  | 'GUARDIAN_LINKED'
+  | 'GUARDIAN_EXPIRED'
+  | 'GUARDIAN_CANCELLED'
+  | 'AI_RISK_BLOCK'
+  | 'QR_VERIFIED'
+  | 'SCAM_DETECTED'
+  | 'DEVICE_TRUST'
+  | 'COMMUNITY_ALERT';
+
 export interface NotificationItem {
   id: string;
   title: string;
   body: string;
-  type: 'PAYMENT_RECEIVED' | 'PAYMENT_SENT' | 'GUARDIAN_APPROVED' | 'GUARDIAN_REJECTED' | 'AI_RISK_BLOCK' | 'QR_VERIFIED' | 'SCAM_DETECTED' | 'DEVICE_TRUST' | 'COMMUNITY_ALERT';
+  type: NotificationType;
   transaction_id?: string;
+  relationship_id?: string;
   timestamp: string;
   read: boolean;
 }
@@ -176,6 +193,13 @@ class NotificationService {
   async markAllAsRead(): Promise<void> {
     const current = await this.getNotifications();
     const updated = current.map(n => ({ ...n, read: true }));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    this.notifySubscribers(updated);
+  }
+
+  async markAsRead(id: string): Promise<void> {
+    const current = await this.getNotifications();
+    const updated = current.map(n => n.id === id ? { ...n, read: true } : n);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     this.notifySubscribers(updated);
   }

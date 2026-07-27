@@ -42,12 +42,15 @@ function formatTime(iso: string) {
   });
 }
 
+import { notificationService } from '../services/notificationService';
+
 export default function HomeScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('wallet');
   const [user, setUser] = useState<WalletUser | null>(null);
   const [txns, setTxns] = useState<WalletTransaction[]>([]);
   const [backendStatus, setBackendStatus] = useState<'UP' | 'DOWN' | 'CHECKING'>('CHECKING');
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const isFetchingRef = useRef(false);
   const failedCheckCountRef = useRef(0);
 
@@ -108,6 +111,19 @@ export default function HomeScreen({ navigation }: Props) {
         setBackendStatus('DOWN');
       }
     }
+  }, []);
+
+  React.useEffect(() => {
+    const updateCount = async () => {
+      const count = await notificationService.getUnreadCount();
+      setUnreadNotifCount(count);
+    };
+    updateCount();
+    const unsub = notificationService.subscribe(async () => {
+      const count = await notificationService.getUnreadCount();
+      setUnreadNotifCount(count);
+    });
+    return () => unsub();
   }, []);
 
   useFocusEffect(
@@ -444,6 +460,11 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.headerRightActions}>
           <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7} onPress={() => navigation.navigate('Notifications')}>
             <AppIcon name="bell" size={18} color="#0F172A" />
+            {unreadNotifCount > 0 && (
+              <View style={styles.bellBadgeCircle}>
+                <Text style={styles.bellBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -554,6 +575,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  bellBadgeCircle: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
   },
 
   /* ScrollView */
