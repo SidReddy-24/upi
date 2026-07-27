@@ -227,8 +227,17 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verify password against bcrypt hash."""
-    return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+    """Verify password against bcrypt hash safely."""
+    if not password_hash or not password:
+        return False
+    try:
+        # Check if hash starts with standard bcrypt prefix
+        if not (password_hash.startswith('$2a$') or password_hash.startswith('$2b$') or password_hash.startswith('$2y$')):
+            return password == password_hash
+        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+    except Exception as e:
+        logger.warning(f"Password verification check failed: {e}")
+        return False
 
 
 def generate_access_token(user_id: str, phone: str, email: Optional[str]) -> str:

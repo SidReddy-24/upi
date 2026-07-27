@@ -59,7 +59,14 @@ authClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthRoute = originalRequest?.url?.includes('/auth/login') ||
+                        originalRequest?.url?.includes('/auth/register') ||
+                        originalRequest?.url?.includes('/auth/send-otp') ||
+                        originalRequest?.url?.includes('/auth/verify-otp') ||
+                        originalRequest?.url?.includes('/auth/reset-password') ||
+                        originalRequest?.url?.includes('/auth/refresh');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       originalRequest._retry = true;
       try {
         const refreshToken = await AsyncStorage.getItem('refreshToken');

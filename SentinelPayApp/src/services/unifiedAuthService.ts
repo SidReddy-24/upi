@@ -164,20 +164,26 @@ class UnifiedAuthService {
           return { success: false, error: detailMsg || 'Mobile number is already registered. Please log in instead.' };
         }
       } else {
-        // Login mode: Try login first, auto-register if user doesn't exist yet
+        // Login mode: Try login first with phone-specific password, fallback to Sentinel@123, auto-register if new user
         try {
           const loginRes = await authService.login(phone, defaultPassword);
           backendUser = loginRes.user;
           token = loginRes.access_token;
         } catch (loginErr: any) {
           try {
-            // Auto-register seamless fallback for new phone number
-            const regRes = await authService.register(phone, defaultPassword, undefined, name || `User ${phone.slice(-4)}`);
-            backendUser = regRes.user;
-            token = regRes.access_token;
-          } catch (regErr: any) {
-            const detailMsg = loginErr?.response?.data?.detail || loginErr?.message || regErr?.message;
-            return { success: false, error: typeof detailMsg === 'string' ? detailMsg : 'Authentication failed. Please try again.' };
+            const loginRes2 = await authService.login(phone, 'Sentinel@123');
+            backendUser = loginRes2.user;
+            token = loginRes2.access_token;
+          } catch (loginErr2) {
+            try {
+              // Auto-register seamless fallback for new phone number
+              const regRes = await authService.register(phone, defaultPassword, undefined, name || `User ${phone.slice(-4)}`);
+              backendUser = regRes.user;
+              token = regRes.access_token;
+            } catch (regErr: any) {
+              const detailMsg = loginErr?.response?.data?.detail || loginErr?.message || regErr?.message;
+              return { success: false, error: typeof detailMsg === 'string' ? detailMsg : 'Authentication failed. Please try again.' };
+            }
           }
         }
       }
