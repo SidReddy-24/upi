@@ -10,6 +10,11 @@ const rnBiometrics = new ReactNativeBiometrics();
 
 let cachedAccessToken: string | null = null;
 
+// ── Profile cache: avoids repeated /auth/me calls during screen navigation ──
+let _profileCache: { data: any; ts: number } | null = null;
+let _profileInflight: Promise<any> | null = null;
+const PROFILE_CACHE_MS = 15_000; // 15 seconds
+
 // Create authenticated Axios client with 30s timeout for cloud backend resilience
 export const authClient = axios.create({
   baseURL: API_BASE_URL,
@@ -236,17 +241,31 @@ export const authService = {
    * Get current authenticated user profile.
    */
   async getMe(): Promise<UserProfile | null> {
-    try {
-      const resp = await authClient.get('/auth/me');
-      if (resp.data) {
-        await AsyncStorage.setItem('userProfile', JSON.stringify(resp.data));
-        return resp.data;
-      }
-    } catch {
-      // Fallback to local profile cache
+    // Return in-memory cache if fresh (< 15s)
+    if (_profileCache && Date.now() - _profileCache.ts < PROFILE_CACHE_MS) {
+      return _profileCache.data;
     }
-    const local = await AsyncStorage.getItem('userProfile');
-    return local ? JSON.parse(local) : null;
+    // Deduplicate concurrent calls — return same promise
+    if (_profileInflight) return _profileInflight;
+
+    _profileInflight = (async () => {
+      try {
+        const resp = await authClient.get('/auth/me');
+        if (resp.data) {
+          _profileCache = { data: resp.data, ts: Date.now() };
+          await AsyncStorage.setItem('userProfile', JSON.stringify(resp.data));
+          return resp.data;
+        }
+      } catch {
+        // Fallback to local profile cache
+      } finally {
+        _profileInflight = null;
+      }
+      const local = await AsyncStorage.getItem('userProfile');
+      return local ? JSON.parse(local) : null;
+    })();
+
+    return _profileInflight;
   },
 
   /**
@@ -254,6 +273,8 @@ export const authService = {
    */
   async logout(): Promise<void> {
     cachedAccessToken = null;
+    _profileCache = null;   // Invalidate profile cache on logout
+    _profileInflight = null;
     await AsyncStorage.removeItem('accessToken');
     await AsyncStorage.removeItem('refreshToken');
     await AsyncStorage.removeItem('userProfile');

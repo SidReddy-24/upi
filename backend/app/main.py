@@ -31,16 +31,27 @@ async def lifespan(app: FastAPI):
     # 1. Initialize Redis
     await redis_service.connect()
     
-    # 2. Initialize Rule Engine
+    # 2. Initialize psycopg connection pool (eliminates per-request connect overhead)
+    try:
+        from app.db.db_pool import init_pool
+        init_pool(min_size=2, max_size=10)
+        # Run schema + index migrations once at startup
+        from app.api.v1.auth import init_db_tables
+        init_db_tables()
+        logger.info("[startup] DB pool initialized and schema verified")
+    except Exception as e:
+        logger.warning(f"[startup] DB pool init warning: {e}")
+
+    # 3. Initialize Rule Engine
     await rule_engine.reload_rules()
     
-    # 3. Load ML Models via ModelRegistry
+    # 4. Load ML Models via ModelRegistry
     ml_engine.load_models()
     
-    # 4. Restore Graph Persistence
+    # 5. Restore Graph Persistence
     await graph_engine.restore_from_persistence()
     
-    # 5. Seed Demo Accounts & Blacklists in PostgreSQL + Redis
+    # 6. Seed Demo Accounts & Blacklists in PostgreSQL + Redis
     try:
         from app.db.seed_demo import seed_demo
         await seed_demo()
@@ -51,8 +62,14 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down engine...")
+    try:
+        from app.db.db_pool import close_pool
+        close_pool()
+    except Exception:
+        pass
     await engine.dispose()
     logger.info("Database connection pool disposed.")
+
 
 app = FastAPI(
     title=settings.APP_NAME,

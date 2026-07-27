@@ -45,13 +45,11 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const user = await getUser();
-    let data = await getTransactions();
+    const [user, data] = await Promise.all([getUser(), getTransactions()]);
     setTxns(data);
 
     if (user && user.vpa) {
-      const synced = await syncCloudTransactions(user.vpa);
-      setTxns(synced);
+      syncCloudTransactions(user.vpa).then(synced => setTxns(synced)).catch(() => {});
     }
   }, []);
 
@@ -63,7 +61,7 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
     setRefreshing(false);
   };
 
-  const renderItem = ({ item }: { item: WalletTransaction }) => (
+  const renderItem = useCallback(({ item }: { item: WalletTransaction }) => (
     <TouchableOpacity
       style={DS.rowCard}
       activeOpacity={0.7}
@@ -96,7 +94,7 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
         )}
       </View>
     </TouchableOpacity>
-  );
+  ), [navigation]);
 
   const ListEmpty = () => (
     <View style={DS.emptyCard}>
@@ -153,6 +151,10 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
         contentContainerStyle={DS.scrollContent}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} />
         }

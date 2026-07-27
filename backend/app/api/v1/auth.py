@@ -27,31 +27,42 @@ from psycopg.rows import dict_row
 import os
 import re
 
+from app.db.db_pool import get_conn, init_pool
+
 router = APIRouter()
 
-# Database connection
+# Database connection — uses global pool (zero per-request connection overhead)
 def get_db():
-    """Get database connection using DATABASE_URL or environment defaults."""
-    db_url = os.getenv("DATABASE_URL")
-    if db_url:
-        if db_url.startswith("postgresql+psycopg://"):
-            db_url = db_url.replace("postgresql+psycopg://", "postgresql://", 1)
-        conn = psycopg.connect(db_url, row_factory=dict_row)
-        init_db_tables(conn)
-        return conn
-    conn = psycopg.connect(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", 5432)),
-        dbname=os.getenv("POSTGRES_DB", "fraudshield"),
-        user=os.getenv("POSTGRES_USER", "fraudshield"),
-        password=os.getenv("POSTGRES_PASSWORD", "fraudshield_dev"),
-        row_factory=dict_row
-    )
-    init_db_tables(conn)
+    """Acquire a pooled psycopg connection from the global ConnectionPool.
+    
+    Callers use the returned connection normally and call conn.close() when done.
+    psycopg_pool recycles the connection back to the pool on close().
+    """
+    global _pool_ctx_stack
+    ctx = get_conn()
+    conn = ctx.__enter__()
+    # Patch close() so pool recycles the connection instead of closing it
+    _orig_close = conn.close
+    def _pool_close():
+        try:
+            ctx.__exit__(None, None, None)
+        except Exception:
+            pass
+    conn.close = _pool_close
     return conn
 
-def init_db_tables(conn):
-    """Ensure authentication tables exist in PostgreSQL."""
+_pool_ctx_stack = []  # unused — kept for IDE compat
+# Keep a handle for cleanup — callers must close() the connection
+_open_conns: list = []  # internal tracker (not used at runtime, pool manages lifecycle)
+
+
+def init_db_tables(conn=None):
+    """Ensure authentication tables exist. Called once at server startup."""
+    from app.db.db_pool import get_conn
+    ctx = None
+    if conn is None:
+        ctx = get_conn()
+        conn = ctx.__enter__()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -131,8 +142,23 @@ def init_db_tables(conn):
                 );
             """)
             conn.commit()
+
+            # ── Performance indexes ────────────────────────────────────────────
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_users_phone ON auth_users(phone);
+                CREATE INDEX IF NOT EXISTS idx_users_email ON auth_users(email) WHERE email IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_users_vpa_lower ON auth_users(LOWER(vpa));
+                CREATE INDEX IF NOT EXISTS idx_otps_phone_expires ON otp_verifications(phone, expires_at DESC)
+                    WHERE verified = FALSE;
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_lookup ON refresh_tokens(token)
+                    WHERE revoked = FALSE;
+                CREATE INDEX IF NOT EXISTS idx_gwc_ward ON guardian_ward_config(ward_user_id);
+                CREATE INDEX IF NOT EXISTS idx_gwc_guardian ON guardian_ward_config(guardian_user_id);
+            """)
+            conn.commit()
     except Exception as e:
         logger.warning(f"Failed to auto-init tables (may already exist or read-only): {e}")
+
 
 
 

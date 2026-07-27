@@ -55,6 +55,14 @@ class GuardianService {
   private pollingInterval: NodeJS.Timeout | null = null;
   private isConnecting = false;
 
+  // ── Relationship cache: prevents repeated /guardian/list on every screen focus ──
+  private _relCache: { data: { guardians: GuardianRelationship[]; wards: WardRelationship[] }; ts: number } | null = null;
+  private readonly REL_CACHE_MS = 30_000; // 30 seconds
+
+  private _invalidateRelCache() {
+    this._relCache = null;
+  }
+
   /**
    * Subscribe to real-time guardian events.
    */
@@ -190,8 +198,13 @@ class GuardianService {
   // ─── REST Endpoints ────────────────────────────────────────────────────────
 
   async listGuardians(): Promise<{ guardians: GuardianRelationship[]; wards: WardRelationship[] }> {
+    // Serve from cache if fresh (< 30s)
+    if (this._relCache && Date.now() - this._relCache.ts < this.REL_CACHE_MS) {
+      return this._relCache.data;
+    }
     try {
       const resp = await authClient.get('/guardian/list');
+      this._relCache = { data: resp.data, ts: Date.now() };
       return resp.data;
     } catch (e) {
       console.warn('[GuardianService] Remote listGuardians failed, using local storage fallback:', e);
@@ -206,6 +219,7 @@ class GuardianService {
   }
 
   async addGuardian(phone?: string, vpa?: string): Promise<{ relationship_id: string; status: string; verification_code?: string; message?: string }> {
+    this._invalidateRelCache();
     try {
       const resp = await authClient.post('/guardian/add', { phone, vpa });
       return resp.data;
@@ -219,6 +233,7 @@ class GuardianService {
   }
 
   async verifyGuardianCode(relationshipId: string, code: string): Promise<{ success: boolean; status: string; message?: string }> {
+    this._invalidateRelCache();
     try {
       const resp = await authClient.post('/guardian/verify-code', {
         relationship_id: relationshipId,

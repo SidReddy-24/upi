@@ -55,35 +55,25 @@ export default function HomeScreen({ navigation }: Props) {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
-      const u = await getUser();
+      // ① Show local data IMMEDIATELY — zero blocking
+      const [u, localT] = await Promise.all([getUser(), getTransactions()]);
       if (!u) {
         navigation.replace('AuthModeSelector');
         return;
       }
-      
-      setUser(prev => {
-        if (!prev || Math.abs(prev.balance - u.balance) > 0.01 || prev.vpa !== u.vpa) {
-          return u;
-        }
-        return prev;
-      });
-      
-      const localT = await getTransactions();
+      setUser(u);
       setTxns(localT.slice(0, 8));
 
+      // ② Sync cloud transactions in background — never blocks the UI
       if (u.vpa) {
-        const synced = await syncCloudTransactions(u.vpa);
-        setTxns(synced.slice(0, 8));
-        
-        const updatedUser = await getUser();
-        if (updatedUser) {
-          setUser(prev => {
-            if (!prev || Math.abs(prev.balance - updatedUser.balance) > 0.01) {
-              return updatedUser;
+        syncCloudTransactions(u.vpa).then(synced => {
+          setTxns(synced.slice(0, 8));
+          getUser().then(updatedUser => {
+            if (updatedUser && Math.abs((updatedUser.balance ?? 0) - (u.balance ?? 0)) > 0.01) {
+              setUser(updatedUser);
             }
-            return prev;
-          });
-        }
+          }).catch(() => {});
+        }).catch(() => {});
       }
     } catch (e) {
       console.error('HomeScreen loadData:', e);
@@ -91,6 +81,7 @@ export default function HomeScreen({ navigation }: Props) {
       isFetchingRef.current = false;
     }
   }, [navigation]);
+
 
   const checkBackend = useCallback(async () => {
     try {
