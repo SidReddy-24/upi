@@ -49,43 +49,6 @@ export interface NotificationItem {
 
 const STORAGE_KEY = 'sentinelpay_notifications_store';
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'NOTIF_001',
-    title: '💰 ₹500 Payment Received',
-    body: 'Received ₹500.00 from Alice (alice@sentinelpay). Ref: SP250726X91M84',
-    type: 'PAYMENT_RECEIVED',
-    transaction_id: 'SP250726X91M84',
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    read: false,
-  },
-  {
-    id: 'NOTIF_002',
-    title: '🛡️ Guardian Approved Payment',
-    body: 'Your guardian approved payment of ₹1,200.00 to Merchant. Ref: SP250726A81D72',
-    type: 'GUARDIAN_APPROVED',
-    transaction_id: 'SP250726A81D72',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    read: false,
-  },
-  {
-    id: 'NOTIF_003',
-    title: '🚫 FraudShield AI Alert',
-    body: 'High-risk transaction to unknown merchant was blocked safely by AI rule engine.',
-    type: 'AI_RISK_BLOCK',
-    timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    read: true,
-  },
-  {
-    id: 'NOTIF_004',
-    title: '🔐 Device Security Verified',
-    body: 'Device Trust score is 94%. Root, emulator, and overlay checks passed.',
-    type: 'DEVICE_TRUST',
-    timestamp: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    read: true,
-  },
-];
-
 type NotificationCallback = (notifications: NotificationItem[]) => void;
 
 class NotificationService {
@@ -102,10 +65,9 @@ class NotificationService {
       if (stored) {
         return JSON.parse(stored);
       }
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_NOTIFICATIONS));
-      return DEFAULT_NOTIFICATIONS;
+      return [];
     } catch {
-      return DEFAULT_NOTIFICATIONS;
+      return [];
     }
   }
 

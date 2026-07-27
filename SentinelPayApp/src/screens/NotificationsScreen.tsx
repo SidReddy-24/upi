@@ -160,12 +160,23 @@ export default function NotificationsScreen({ navigation }: Props) {
   );
 
   const ListEmpty = () => (
-    <View style={DS.emptyCard}>
-      <View style={[DS.iconXl, { backgroundColor: C.surfaceAlt }]}>
+    <View style={[DS.emptyCard, { paddingVertical: S.xl, alignItems: 'center' }]}>
+      <View style={[DS.iconXl, { backgroundColor: C.surfaceAlt, marginBottom: S.md }]}>
         <AppIcon name="bell" size={32} color={C.textTertiary} />
       </View>
-      <Text style={DS.emptyTitle}>No Notifications Found</Text>
-      <Text style={DS.emptySub}>No alerts match the selected filter category.</Text>
+      <Text style={[DS.emptyTitle, { textAlign: 'center', fontSize: T.md, fontWeight: T.bold, color: C.textPrimary }]}>
+        No Notifications Yet
+      </Text>
+      <Text style={[DS.emptySub, { textAlign: 'center', marginTop: S.xs, marginBottom: S.lg, paddingHorizontal: S.md, lineHeight: 20 }]}>
+        You'll see payment updates, Guardian requests, fraud alerts, and other important activity here.
+      </Text>
+      <TouchableOpacity
+        style={[DS.btn, DS.btnPrimary, { paddingHorizontal: S.xl }]}
+        onPress={() => navigation.navigate('Home')}
+        activeOpacity={0.7}
+      >
+        <Text style={DS.btnText}>Return Home</Text>
+      </TouchableOpacity>
     </View>
   );
 
