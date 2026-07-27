@@ -43,6 +43,26 @@ async function getTransactionsKey(): Promise<string> {
   return `sentinelpay_transactions_${phone}`;
 }
 
+type WalletListener = () => void;
+const walletListeners = new Set<WalletListener>();
+
+export function subscribeWallet(listener: WalletListener): () => void {
+  walletListeners.add(listener);
+  return () => {
+    walletListeners.delete(listener);
+  };
+}
+
+export function notifyWalletChanged(): void {
+  walletListeners.forEach(listener => {
+    try {
+      listener();
+    } catch (e) {
+      console.warn('[walletDb] Listener error:', e);
+    }
+  });
+}
+
 // ─── User / Balance ────────────────────────────────────────────────────────────
 
 export async function getUser(): Promise<WalletUser | null> {
@@ -64,11 +84,13 @@ export async function updateBalance(newBalance: number): Promise<void> {
   user.balance = newBalance;
   const key = await getUserKey();
   await AsyncStorage.setItem(key, JSON.stringify(user));
+  notifyWalletChanged();
 }
 
 export async function saveUser(user: WalletUser): Promise<void> {
   const key = await getUserKey();
   await AsyncStorage.setItem(key, JSON.stringify(user));
+  notifyWalletChanged();
 }
 
 export async function updateUserVpa(vpa: string, name: string, balance?: number): Promise<void> {
@@ -149,6 +171,7 @@ export async function addTransaction(txn: WalletTransaction): Promise<void> {
     const clean = deduplicateTxnList(txns);
     const key = await getTransactionsKey();
     await AsyncStorage.setItem(key, JSON.stringify(clean));
+    notifyWalletChanged();
   }
 }
 
@@ -359,5 +382,29 @@ export async function receivePayment(
 export async function resetWallet(): Promise<void> {
   const userKey = await getUserKey();
   const txnKey = await getTransactionsKey();
+  const existingUser = await getUser();
+  const phone = await getActivePhone();
+
+  // 1. Clear local storage keys
   await AsyncStorage.multiRemove([userKey, txnKey]);
+
+  // 2. Restore default demo user state (₹1,00,000 SPC balance)
+  const restoredUser: WalletUser = {
+    id: existingUser?.id || 1,
+    phone: existingUser?.phone || phone,
+    vpa: existingUser?.vpa || `${phone}@sentinelpay`,
+    name: existingUser?.name || 'Demo User',
+    balance: INITIAL_BALANCE,
+    created_at: new Date().toISOString(),
+  };
+
+  const key = await getUserKey();
+  await AsyncStorage.setItem(key, JSON.stringify(restoredUser));
+  await AsyncStorage.setItem(txnKey, JSON.stringify([]));
+
+  // 3. Reset notification feed storage
+  await AsyncStorage.removeItem('sentinelpay_notifications_store');
+
+  // 4. Notify all active UI subscribers immediately
+  notifyWalletChanged();
 }

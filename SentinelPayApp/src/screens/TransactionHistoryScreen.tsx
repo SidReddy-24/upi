@@ -11,7 +11,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, WalletTransaction } from '../types';
-import { getTransactions, getUser, syncCloudTransactions } from '../utils/walletDb';
+import { getTransactions, getUser, syncCloudTransactions, subscribeWallet } from '../utils/walletDb';
 import { parseSafeDate } from '../utils/parsers';
 import RiskBadge from '../components/RiskBadge';
 import AppIcon from '../components/AppIcon';
@@ -53,7 +53,13 @@ export default function TransactionHistoryScreen({ navigation }: Props) {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    const unsub = subscribeWallet(() => {
+      load();
+    });
+    return () => unsub();
+  }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true);

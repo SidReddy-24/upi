@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getUser, resetWallet } from '../utils/walletDb';
 import { WalletUser, RootStackParamList } from '../types';
@@ -69,20 +69,38 @@ export default function ProfileScreen({ navigation }: Props) {
     );
   };
 
+  const [isResetting, setIsResetting] = useState(false);
+
   const handleReset = async () => {
+    if (isResetting) return;
+
     Alert.alert(
-      'Reset Demo Wallet',
-      'Are you sure you want to reset balance to ₹1,00,000 SPC and clear history?',
+      'Reset Demo Wallet?',
+      'This will reset your demo wallet balance, transactions, and related demo data. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reset Wallet',
           style: 'destructive',
           onPress: async () => {
-            await resetWallet();
-            const refreshed = await getUser();
-            setUser(refreshed);
-            Alert.alert('Reset Complete', 'Wallet balance restored to ₹1,00,000 SPC.');
+            setIsResetting(true);
+            try {
+              await resetWallet();
+              const refreshed = await getUser();
+              setUser(refreshed);
+              Alert.alert(
+                '✓ Wallet Reset Successfully',
+                'Your demo wallet has been restored.'
+              );
+            } catch (e: any) {
+              console.error('Reset Wallet Error:', e);
+              Alert.alert(
+                'Reset Failed',
+                'Failed to reset demo wallet. Please try again.'
+              );
+            } finally {
+              setIsResetting(false);
+            }
           },
         },
       ]
@@ -250,8 +268,17 @@ export default function ProfileScreen({ navigation }: Props) {
         {/* 5. ACCOUNT ACTIONS */}
         <View style={DS.card}>
           <Text style={DS.sectionTitle}>Account & Session</Text>
-          <TouchableOpacity style={[DS.btn, DS.btnOutline, { marginBottom: S.sm }]} onPress={handleReset} activeOpacity={0.7}>
-            <Text style={DS.btnTextDark}>Reset Demo Wallet to ₹1,00,000 SPC</Text>
+          <TouchableOpacity
+            style={[DS.btn, DS.btnOutline, { marginBottom: S.sm, opacity: isResetting ? 0.6 : 1 }]}
+            onPress={handleReset}
+            disabled={isResetting}
+            activeOpacity={0.7}
+          >
+            {isResetting ? (
+              <ActivityIndicator color={C.dark} size="small" />
+            ) : (
+              <Text style={DS.btnTextDark}>Reset Demo Wallet to ₹1,00,000 SPC</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={[DS.btn, DS.btnDanger]} onPress={handleLogout} activeOpacity={0.7}>

@@ -20,7 +20,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, WalletUser, WalletTransaction } from '../types';
-import { getUser, getTransactions, syncCloudTransactions } from '../utils/walletDb';
+import { getUser, getTransactions, syncCloudTransactions, subscribeWallet } from '../utils/walletDb';
 import { parseSafeDate } from '../utils/parsers';
 import fraudShieldApi from '../services/fraudShieldApi';
 import RiskBadge from '../components/RiskBadge';
@@ -146,11 +146,18 @@ export default function HomeScreen({ navigation }: Props) {
       loadData();
       checkBackend();
 
+      const unsubWallet = subscribeWallet(() => {
+        loadData();
+      });
+
       const timer = setInterval(() => {
         loadData();
       }, 12000);
 
-      return () => clearInterval(timer);
+      return () => {
+        unsubWallet();
+        clearInterval(timer);
+      };
     }, [loadData, checkBackend]),
   );
 
