@@ -74,7 +74,7 @@ export default function ScamPassportScreen({ route, navigation }: Props) {
 
         {/* Intelligence Details */}
         <View style={DS.card}>
-          <Text style={DS.sectionTitle}>📊 Intelligence Summary</Text>
+          <Text style={DS.sectionTitle}>Intelligence Summary</Text>
           
           <View style={DS.statsRow}>
             <View style={DS.statCard}>

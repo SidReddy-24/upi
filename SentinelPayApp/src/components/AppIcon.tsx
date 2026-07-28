@@ -67,7 +67,8 @@ export type IconName =
   | 'layers'
   | 'hardDrive'
   | 'server'
-  | 'trendingUp';
+  | 'trendingUp'
+  | 'briefcase';
 
 interface AppIconProps {
   name: IconName;
@@ -430,6 +431,15 @@ export default function AppIcon({ name, size = 22, color = '#2D6A4F' }: AppIconP
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
           <Polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
           <Polyline points="17 6 23 6 23 12" />
+        </Svg>
+      );
+    case 'briefcase':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Rect x="2" y="7" width="20" height="14" rx="2" />
+          <Path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+          <Line x1="12" y1="12" x2="12" y2="12" />
+          <Path d="M2 13h20" />
         </Svg>
       );
     default:

@@ -223,7 +223,7 @@ export default function ScamHeatMapScreen({ navigation }: Props) {
         )}
 
         {/* Hotspot List */}
-        <Text style={DS.sectionTitle}>🔥 All Hotspots ({data.total_active_hotspots})</Text>
+        <Text style={DS.sectionTitle}>All Hotspots ({data.total_active_hotspots})</Text>
 
         {data.hotspots.map((item: any) => (
           <TouchableOpacity
